@@ -17,6 +17,14 @@ import {
   getProviderServiceRequests,
   completeServiceRequest
 } from '../api/service';
+import { registerProvider } from '../api/provider';
+
+const fileToDataUrl = (file) => new Promise((resolve, reject) => {
+  const reader = new FileReader();
+  reader.onload = () => resolve(reader.result);
+  reader.onerror = () => reject(new Error('Failed to read file'));
+  reader.readAsDataURL(file);
+});
 
 const ProviderDashboard = () => {
   const [activeSection, setActiveSection] = useState('findWork');
@@ -225,31 +233,53 @@ const ProviderDashboard = () => {
     }
   };
 
-  const handleRegSubmit = (e) => {
+  const handleRegSubmit = async (e) => {
     if (e) e.preventDefault();
     const errs = validateRegStep3();
     setRegErrors(errs);
     if (Object.keys(errs).length === 0) {
-      console.log('Registration submitted:', regForm);
-      alert('Registration submitted — we will review and contact you.');
-      setIsModalOpen(false);
-      setRegStep(1);
-      setRegForm({
-        firstName: '',
-        lastName: '',
-        email: '',
-        phoneNumber: '',
-        password: '',
-        serviceCategory: '',
-        yearsOfExperience: '',
-        hourlyRate: '',
-        professionalBio: '',
-        portfolioPhoto: null,
-        city: '',
-        district: '',
-        agreedToBackgroundCheck: false
-      });
-      setRegErrors({});
+      try {
+        const payload = {
+          firstName: regForm.firstName,
+          lastName: regForm.lastName,
+          email: regForm.email,
+          phoneNumber: regForm.phoneNumber,
+          password: regForm.password,
+          serviceCategory: regForm.serviceCategory,
+          yearsOfExperience: Number(regForm.yearsOfExperience),
+          hourlyRate: Number(regForm.hourlyRate),
+          professionalBio: regForm.professionalBio,
+          city: regForm.city,
+          district: regForm.district,
+          agreedToBackgroundCheck: regForm.agreedToBackgroundCheck,
+          portfolioPhoto: regForm.portfolioPhoto ? await fileToDataUrl(regForm.portfolioPhoto) : '',
+          idDocument: regForm.idDocument ? await fileToDataUrl(regForm.idDocument) : ''
+        };
+
+        await registerProvider(payload);
+        alert('Registration submitted — admin review is pending.');
+        setIsModalOpen(false);
+        setRegStep(1);
+        setRegForm({
+          firstName: '',
+          lastName: '',
+          email: '',
+          phoneNumber: '',
+          password: '',
+          serviceCategory: '',
+          yearsOfExperience: '',
+          hourlyRate: '',
+          professionalBio: '',
+          portfolioPhoto: null,
+          city: '',
+          district: '',
+          idDocument: null,
+          agreedToBackgroundCheck: false
+        });
+        setRegErrors({});
+      } catch (error) {
+        alert(error.response?.data?.message || 'Failed to submit registration');
+      }
     }
   };
 
