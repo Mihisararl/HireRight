@@ -1,14 +1,8 @@
 import mongoose from "mongoose";
 import bcrypt from "bcryptjs";
 
-const providerSchema = new mongoose.Schema(
+const workerRegistrationRequestSchema = new mongoose.Schema(
   {
-    userId: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "User",
-      required: true
-    },
-
     firstName: {
       type: String,
       required: true,
@@ -33,6 +27,13 @@ const providerSchema = new mongoose.Schema(
       type: String,
       required: true,
       trim: true
+    },
+
+    password: {
+      type: String,
+      required: true,
+      minlength: 6,
+      select: false
     },
 
     district: {
@@ -84,17 +85,42 @@ const providerSchema = new mongoose.Schema(
       required: true
     },
 
-    approvedAt: {
-      type: Date,
-      required: true
+    agreedToBackgroundCheck: {
+      type: Boolean,
+      required: true,
+      default: false
     },
 
-    approvedBy: {
+    status: {
+      type: String,
+      enum: ['pending', 'approved', 'rejected'],
+      default: 'pending'
+    },
+
+    approvedAt: {
+      type: Date
+    },
+
+    rejectedAt: {
+      type: Date
+    },
+
+    reviewedBy: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User"
     },
 
+    reviewNotes: {
+      type: String,
+      trim: true
+    },
+
     createdAt: {
+      type: Date,
+      default: Date.now
+    },
+
+    updatedAt: {
       type: Date,
       default: Date.now
     }
@@ -102,4 +128,11 @@ const providerSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
-export default mongoose.model("Provider", providerSchema);
+// HASH PASSWORD BEFORE SAVE
+workerRegistrationRequestSchema.pre("save", async function (next) {
+  if (!this.isModified("password")) return next();
+  this.password = await bcrypt.hash(this.password, 10);
+  next();
+});
+
+export default mongoose.model("WorkerRegistrationRequest", workerRegistrationRequestSchema);

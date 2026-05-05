@@ -53,7 +53,7 @@ export default function AdminDashboard() {
   const approveProvider = async (id) => {
     try {
       await api.post(`/admin/provider-requests/${id}/approve`);
-      setProviders((prev) => prev.filter((p) => p._id !== id));
+      setProviders((prev) => prev.map((p) => (p._id === id ? { ...p, status: 'approved', approvedAt: new Date().toISOString() } : p)));
     } catch (err) {
       setError('Failed to approve provider');
     }
@@ -62,7 +62,7 @@ export default function AdminDashboard() {
   const rejectProvider = async (id) => {
     try {
       await api.post(`/admin/provider-requests/${id}/reject`);
-      setProviders((prev) => prev.filter((p) => p._id !== id));
+      setProviders((prev) => prev.map((p) => (p._id === id ? { ...p, status: 'rejected', rejectedAt: new Date().toISOString() } : p)));
     } catch (err) {
       setError('Failed to reject provider');
     }
@@ -370,7 +370,12 @@ export default function AdminDashboard() {
                   <tr>
                     <th style={styles.th}>Name</th>
                     <th style={styles.th}>Email</th>
-                    <th style={styles.th}>NIC</th>
+                    <th style={styles.th}>Phone</th>
+                    <th style={styles.th}>Service</th>
+                    <th style={styles.th}>Location</th>
+                    <th style={styles.th}>Experience</th>
+                    <th style={styles.th}>Rate</th>
+                    <th style={styles.th}>ID Doc</th>
                     <th style={styles.th}>Status</th>
                     <th style={styles.th}>Actions</th>
                   </tr>
@@ -378,7 +383,7 @@ export default function AdminDashboard() {
                 <tbody>
                   {providers.length === 0 ? (
                     <tr>
-                      <td colSpan="5" style={styles.emptyCell}>No provider requests</td>
+                      <td colSpan="10" style={styles.emptyCell}>No provider requests</td>
                     </tr>
                   ) : (
                     providers.map((p) => (
@@ -390,24 +395,35 @@ export default function AdminDashboard() {
                           </div>
                         </td>
                         <td style={styles.td}>{p.email}</td>
-                        <td style={styles.td}>{p.nic || '-'}</td>
+                        <td style={styles.td}>{p.phone || '-'}</td>
+                        <td style={styles.td}>{p.serviceCategory || '-'}</td>
+                        <td style={styles.td}>{[p.city, p.district].filter(Boolean).join(', ') || '-'}</td>
+                        <td style={styles.td}>{p.yearsOfExperience ?? '-' } years</td>
+                        <td style={styles.td}>Rs. {p.hourlyRate ?? '-'}</td>
+                        <td style={styles.td}>{p.idDocument ? 'Uploaded' : '-'}</td>
                         <td style={styles.td}>
                           <Badge variant={p.status}>{p.status === 'pending' ? 'Pending' : p.status}</Badge>
                         </td>
                         <td style={styles.td}>
                           <div style={styles.actionButtons}>
-                            <button style={styles.btnApprove} onClick={() => approveProvider(p._id)}>
-                              <svg style={styles.btnIcon} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                              </svg>
-                              Approve
-                            </button>
-                            <button style={styles.btnReject} onClick={() => rejectProvider(p._id)}>
-                              <svg style={styles.btnIcon} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                              </svg>
-                              Reject
-                            </button>
+                            {p.status === 'pending' ? (
+                              <>
+                                <button style={styles.btnApprove} onClick={() => approveProvider(p._id)}>
+                                  <svg style={styles.btnIcon} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                                  </svg>
+                                  Approve
+                                </button>
+                                <button style={styles.btnReject} onClick={() => rejectProvider(p._id)}>
+                                  <svg style={styles.btnIcon} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                  </svg>
+                                  Reject
+                                </button>
+                              </>
+                            ) : (
+                              <span style={styles.emptyCell}>{p.status}</span>
+                            )}
                           </div>
                         </td>
                       </tr>

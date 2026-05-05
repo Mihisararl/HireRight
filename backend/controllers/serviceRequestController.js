@@ -1,5 +1,6 @@
 import ServiceRequest from "../models/ServiceRequest.js";
 import User from "../models/User.js";
+import Provider from "../models/Provider.js";
 
 // POST - Create service request
 export const createServiceRequest = async (req, res) => {
@@ -103,16 +104,18 @@ export const acceptServiceRequest = async (req, res) => {
     const { id } = req.params;
     const { message, proposedPrice, proposedDate } = req.body;
 
-    // Check if provider is approved
-    const provider = await User.findById(req.user.id);
-    if (!provider || provider.role !== 'provider') {
+    const providerAccount = await User.findById(req.user.id);
+    const providerProfile = await Provider.findOne({ userId: req.user.id });
+
+    if (!providerAccount || providerAccount.role !== 'provider') {
       return res.status(403).json({ message: "Only providers can send offers" });
     }
 
-    if (provider.providerStatus !== 'approved') {
+    const isApproved = providerProfile?.status === 'approved' || providerAccount.providerStatus === 'approved';
+    if (!isApproved) {
       return res.status(403).json({
         message: "Your provider account is not approved yet. Please wait for admin approval.",
-        providerStatus: provider.providerStatus
+        providerStatus: providerProfile?.status || providerAccount.providerStatus
       });
     }
 

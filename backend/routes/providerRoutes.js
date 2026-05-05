@@ -1,8 +1,8 @@
-// routes/ProviderRoutes.js
 import express from "express";
+import { registerProvider } from "../controllers/providerController.js";
 
 const router = express.Router();
 
-// Provider routes 
+router.post('/register', registerProvider);
 
 export default router;

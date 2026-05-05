@@ -144,7 +144,9 @@ export default function BecomeWorker() {
               Join thousands of professionals earning on their own terms
             </p>
             <div style={{ display: 'flex', gap: '15px', marginBottom: '40px' }}>
-              <button style={{
+              <a href="/provider-registration" style={{
+                display: 'inline-block',
+                textDecoration: 'none',
                 backgroundColor: '#fff',
                 color: '#0066ff',
                 border: 'none',
@@ -156,7 +158,7 @@ export default function BecomeWorker() {
                 boxShadow: '0 4px 15px rgba(0,0,0,0.2)'
               }}>
                 Get Started Now
-              </button>
+              </a>
               <button style={{
                 backgroundColor: 'transparent',
                 color: '#fff',
