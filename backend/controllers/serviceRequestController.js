@@ -9,6 +9,16 @@ export const createServiceRequest = async (req, res) => {
     const payload = { ...req.body, userId: req.user.id };
     if (payload.budget) payload.budget = Number(payload.budget);
 
+    // If this is a direct booking, initialize providerResponse
+    if (payload.bookingType === 'direct') {
+      payload.providerResponse = {
+        respondedAt: null,
+        status: 'pending',
+        responseMessage: null
+      };
+      payload.status = 'Pending';
+    }
+
     const newRequest = new ServiceRequest(payload);
     await newRequest.save();
 
@@ -86,7 +96,9 @@ export const updateServiceRequest = async (req, res) => {
 // GET - Get available service requests for providers
 export const getAvailableServiceRequests = async (req, res) => {
   try {
-    const requests = await ServiceRequest.find({ status: "Pending" })
+    const query = { status: "Pending", bookingType: "post" };
+
+    const requests = await ServiceRequest.find(query)
       .populate('userId', 'name email')
       .sort({ createdAt: -1 });
     res.status(200).json(requests);
@@ -278,6 +290,112 @@ export const rejectProviderOffer = async (req, res) => {
     console.error('rejectProviderOffer error:', error);
     res.status(500).json({
       message: "Failed to reject offer",
+      error: error.message,
+    });
+  }
+};
+
+// GET - Get direct booking requests for provider (from Services page)
+export const getDirectBookingRequests = async (req, res) => {
+  try {
+    const requests = await ServiceRequest.find({
+      providerId: req.user.id,
+      bookingType: 'direct',
+      'providerResponse.status': 'pending'
+    })
+      .populate('userId', 'name email phone')
+      .sort({ createdAt: -1 });
+
+    res.status(200).json(requests);
+  } catch (error) {
+    console.error('getDirectBookingRequests error:', error);
+    res.status(500).json({
+      message: "Failed to fetch booking requests",
+      error: error.message,
+    });
+  }
+};
+
+// POST - Provider accepts direct booking from Services page
+export const acceptDirectBooking = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { responseMessage } = req.body;
+
+    const serviceRequest = await ServiceRequest.findOne({
+      _id: id,
+      providerId: req.user.id,
+      bookingType: 'direct'
+    });
+
+    if (!serviceRequest) {
+      return res.status(404).json({ message: "Booking request not found or not authorized" });
+    }
+
+    if (serviceRequest.providerResponse?.status !== 'pending') {
+      return res.status(400).json({ message: "This booking has already been responded to" });
+    }
+
+    serviceRequest.status = "Confirmed";
+    serviceRequest.providerResponse = {
+      respondedAt: new Date(),
+      status: 'accepted',
+      responseMessage: responseMessage || 'Booking accepted'
+    };
+    serviceRequest.acceptedAt = new Date();
+
+    await serviceRequest.save();
+
+    res.status(200).json({
+      message: "Booking accepted successfully",
+      serviceRequest,
+    });
+  } catch (error) {
+    console.error('acceptDirectBooking error:', error);
+    res.status(500).json({
+      message: "Failed to accept booking",
+      error: error.message,
+    });
+  }
+};
+
+// POST - Provider rejects direct booking from Services page
+export const rejectDirectBooking = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { responseMessage } = req.body;
+
+    const serviceRequest = await ServiceRequest.findOne({
+      _id: id,
+      providerId: req.user.id,
+      bookingType: 'direct'
+    });
+
+    if (!serviceRequest) {
+      return res.status(404).json({ message: "Booking request not found or not authorized" });
+    }
+
+    if (serviceRequest.providerResponse?.status !== 'pending') {
+      return res.status(400).json({ message: "This booking has already been responded to" });
+    }
+
+    serviceRequest.status = "ProviderRejected";
+    serviceRequest.providerResponse = {
+      respondedAt: new Date(),
+      status: 'rejected',
+      responseMessage: responseMessage || 'Booking rejected'
+    };
+
+    await serviceRequest.save();
+
+    res.status(200).json({
+      message: "Booking rejected successfully",
+      serviceRequest,
+    });
+  } catch (error) {
+    console.error('rejectDirectBooking error:', error);
+    res.status(500).json({
+      message: "Failed to reject booking",
       error: error.message,
     });
   }

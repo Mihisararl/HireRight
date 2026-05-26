@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useContext } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   Search,
   Briefcase,
@@ -15,9 +16,13 @@ import {
   getAvailableServiceRequests,
   acceptServiceRequest,
   getProviderServiceRequests,
-  completeServiceRequest
+  completeServiceRequest,
+  getDirectBookingRequests,
+  acceptDirectBooking,
+  rejectDirectBooking
 } from '../api/service';
 import { registerProvider } from '../api/provider';
+import { AuthContext } from '../context/AuthContext';
 
 const fileToDataUrl = (file) => new Promise((resolve, reject) => {
   const reader = new FileReader();
@@ -27,9 +32,12 @@ const fileToDataUrl = (file) => new Promise((resolve, reject) => {
 });
 
 const ProviderDashboard = () => {
+  const { user, refreshUser, logout } = useContext(AuthContext);
+  const navigate = useNavigate();
   const [activeSection, setActiveSection] = useState('findWork');
   const [availableRequests, setAvailableRequests] = useState([]);
   const [myRequests, setMyRequests] = useState([]);
+  const [bookingRequests, setBookingRequests] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -57,8 +65,35 @@ const ProviderDashboard = () => {
       loadAvailableRequests();
     } else if (['myRequests', 'upcoming', 'history', 'earnings'].includes(activeSection)) {
       loadMyRequests();
+    } else if (activeSection === 'bookingRequests') {
+      loadBookingRequests();
     }
   }, [activeSection]);
+
+  useEffect(() => {
+    if (!user) return;
+    if (user.role !== 'provider') {
+      logout();
+      navigate('/login');
+    }
+  }, [user, logout, navigate]);
+
+  useEffect(() => {
+    if (!isModalOpen || !user?.email || user.role !== 'provider') return;
+    setRegForm((prev) => ({
+      ...prev,
+      email: user.email
+    }));
+  }, [isModalOpen, user]);
+
+  useEffect(() => {
+    if (!user) return;
+    refreshUser();
+    const intervalId = setInterval(() => {
+      refreshUser();
+    }, 30000);
+    return () => clearInterval(intervalId);
+  }, [user, refreshUser]);
 
   const loadAvailableRequests = async () => {
     setLoading(true);
@@ -85,6 +120,50 @@ const ProviderDashboard = () => {
       console.error(err);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const loadBookingRequests = async () => {
+    setLoading(true);
+    setError('');
+    try {
+      const data = await getDirectBookingRequests();
+      setBookingRequests(data);
+    } catch (err) {
+      setError('Failed to load booking requests');
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleAcceptBooking = async (requestId) => {
+    try {
+      const responseMessage = prompt('Add a message for the customer (optional):');
+      if (responseMessage === null) return; // User cancelled
+
+      await acceptDirectBooking(requestId, responseMessage);
+      loadBookingRequests();
+      alert('Booking accepted successfully!');
+    } catch (err) {
+      const errorMsg = err.response?.data?.message || 'Failed to accept booking';
+      alert(errorMsg);
+      console.error(err);
+    }
+  };
+
+  const handleRejectBooking = async (requestId) => {
+    try {
+      const responseMessage = prompt('Why are you rejecting this booking? (optional):');
+      if (responseMessage === null) return; // User cancelled
+
+      await rejectDirectBooking(requestId, responseMessage);
+      loadBookingRequests();
+      alert('Booking rejected successfully!');
+    } catch (err) {
+      const errorMsg = err.response?.data?.message || 'Failed to reject booking';
+      alert(errorMsg);
+      console.error(err);
     }
   };
 
@@ -304,6 +383,10 @@ const ProviderDashboard = () => {
     'Badulla', 'Monaragala', 'Ratnapura', 'Kegalle'
   ];
 
+  const providerStatus = user?.providerStatus || 'pending';
+  const isApproved = providerStatus === 'approved';
+  const isRejected = providerStatus === 'rejected';
+
   return (
     <>
       <style>{`
@@ -456,25 +539,44 @@ const ProviderDashboard = () => {
             </div>
 
             <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
-              <button
-                onClick={() => setIsModalOpen(true)}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '8px',
+              {user?.providerStatus !== 'approved' && (
+                <button
+                  onClick={() => setIsModalOpen(true)}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    padding: '10px 20px',
+                    borderRadius: '8px',
+                    border: 'none',
+                    background: 'linear-gradient(135deg, #f6573b, #cc3737)',
+                    color: 'white',
+                    fontSize: '14px',
+                    fontWeight: '600',
+                    cursor: 'pointer',
+                    transition: 'all 0.3s ease'
+                  }}
+                >
+                  Create Worker Profile
+                </button>
+              )}
+
+              {user?.providerStatus === 'approved' && (
+                <div style={{
                   padding: '10px 20px',
                   borderRadius: '8px',
-                  border: 'none',
-                  background: 'linear-gradient(135deg, #f6573b, #cc3737)',
+                  background: 'linear-gradient(135deg, #10b981, #059669)',
                   color: 'white',
                   fontSize: '14px',
                   fontWeight: '600',
-                  cursor: 'pointer',
-                  transition: 'all 0.3s ease'
-                }}
-              >
-                Create Worker Profile
-              </button>
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px'
+                }}>
+                  <CheckCircle size={18} />
+                  Profile Approved
+                </div>
+              )}
 
               <button
                 onClick={handleLogout}
@@ -498,6 +600,23 @@ const ProviderDashboard = () => {
               </button>
             </div>
           </div>
+
+          {!isApproved && (
+            <div style={{
+              marginBottom: '20px',
+              padding: '14px 16px',
+              borderRadius: '12px',
+              background: isRejected ? '#fee2e2' : '#fff7ed',
+              border: `1px solid ${isRejected ? '#fecaca' : '#fed7aa'}`,
+              color: isRejected ? '#991b1b' : '#9a3412',
+              fontSize: '14px',
+              fontWeight: '600'
+            }}>
+              {isRejected
+                ? 'Your worker registration was rejected. Please resubmit your profile.'
+                : 'Your worker profile is under review. You will be able to send offers after approval.'}
+            </div>
+          )}
 
           {/* Main Dashboard Container */}
           <div className="dashboard-container" style={{
@@ -528,6 +647,14 @@ const ProviderDashboard = () => {
                 >
                   <Search size={20} />
                   <span>Find Work</span>
+                </div>
+
+                <div
+                  className={`sidebar-item ${activeSection === 'bookingRequests' ? 'sidebar-item-active' : ''}`}
+                  onClick={() => setActiveSection('bookingRequests')}
+                >
+                  <Briefcase size={20} />
+                  <span>Booking Requests</span>
                 </div>
 
                 <div
@@ -654,8 +781,156 @@ const ProviderDashboard = () => {
                             <button
                               className="btn-primary"
                               onClick={() => handleAcceptJob(request._id, request.budget, request.preferredDate)}
+                              disabled={!isApproved}
+                              style={!isApproved ? { opacity: 0.6, cursor: 'not-allowed' } : undefined}
                             >
                               Send Offer
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Booking Requests Section (from Services page) */}
+              {activeSection === 'bookingRequests' && (
+                <div>
+                  <div style={{ marginBottom: '24px' }}>
+                    <h2 style={{ fontSize: '24px', fontWeight: '700', color: '#1e293b', marginBottom: '8px' }}>
+                      Booking Requests
+                    </h2>
+                    <p style={{ fontSize: '14px', color: '#64748b' }}>
+                      Direct booking requests from customers via Services page
+                    </p>
+                  </div>
+
+                  {loading ? (
+                    <div style={{ textAlign: 'center', padding: '40px', color: '#64748b' }}>
+                      Loading booking requests...
+                    </div>
+                  ) : bookingRequests.length === 0 ? (
+                    <div style={{
+                      backgroundColor: '#f1f5f9',
+                      borderRadius: '12px',
+                      padding: '40px',
+                      textAlign: 'center',
+                      color: '#64748b'
+                    }}>
+                      <Briefcase size={32} style={{ margin: '0 auto 16px', opacity: 0.5 }} />
+                      <p style={{ fontSize: '16px' }}>No booking requests yet</p>
+                      <p style={{ fontSize: '14px' }}>Customers who book you through the Services page will appear here</p>
+                    </div>
+                  ) : (
+                    <div style={{
+                      display: 'grid',
+                      gap: '16px'
+                    }}>
+                      {bookingRequests.map((booking) => (
+                        <div key={booking._id} className='request-card' style={{
+                          backgroundColor: '#fff',
+                          borderRadius: '12px',
+                          padding: '20px',
+                          boxShadow: '0 2px 8px rgba(0, 0, 0, 0.06)',
+                          border: '1px solid #e2e8f0'
+                        }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', marginBottom: '16px' }}>
+                            <div>
+                              <h3 style={{ fontSize: '18px', fontWeight: '600', color: '#1e293b', margin: '0 0 8px 0' }}>
+                                {booking.serviceTitle}
+                              </h3>
+                              <p style={{ fontSize: '14px', color: '#64748b', margin: '0 0 4px 0' }}>
+                                <strong>Customer:</strong> {booking.userId?.name || 'Unknown'}
+                              </p>
+                              <p style={{ fontSize: '14px', color: '#64748b', margin: '0' }}>
+                                <strong>Contact:</strong> {booking.userId?.phone}
+                              </p>
+                            </div>
+                            <div style={{
+                              backgroundColor: '#dbeafe',
+                              color: '#0c4a6e',
+                              padding: '6px 12px',
+                              borderRadius: '20px',
+                              fontSize: '12px',
+                              fontWeight: '600'
+                            }}>
+                              {booking.status}
+                            </div>
+                          </div>
+
+                          <div style={{
+                            display: 'grid',
+                            gridTemplateColumns: '1fr 1fr',
+                            gap: '12px',
+                            marginBottom: '16px',
+                            fontSize: '14px'
+                          }}>
+                            <div>
+                              <span style={{ color: '#64748b' }}>📅 Date:</span>
+                              <div style={{ fontWeight: '600', color: '#1e293b' }}>{booking.preferredDate}</div>
+                            </div>
+                            <div>
+                              <span style={{ color: '#64748b' }}>🕐 Time:</span>
+                              <div style={{ fontWeight: '600', color: '#1e293b' }}>{booking.preferredTime}</div>
+                            </div>
+                            <div>
+                              <span style={{ color: '#64748b' }}>📍 Location:</span>
+                              <div style={{ fontWeight: '600', color: '#1e293b' }}>{booking.location}</div>
+                            </div>
+                            <div>
+                              <span style={{ color: '#64748b' }}>💰 Budget:</span>
+                              <div style={{ fontWeight: '600', color: '#1e293b' }}>Rs.{booking.budget}</div>
+                            </div>
+                          </div>
+
+                          {booking.description && (
+                            <div style={{ marginBottom: '16px' }}>
+                              <div style={{ fontSize: '12px', color: '#64748b', marginBottom: '4px' }}>Description:</div>
+                              <p style={{ fontSize: '14px', color: '#475569', margin: '0' }}>{booking.description}</p>
+                            </div>
+                          )}
+
+                          {booking.specificRequirements && (
+                            <div style={{ marginBottom: '16px' }}>
+                              <div style={{ fontSize: '12px', color: '#64748b', marginBottom: '4px' }}>Special Requirements:</div>
+                              <p style={{ fontSize: '14px', color: '#475569', margin: '0' }}>{booking.specificRequirements}</p>
+                            </div>
+                          )}
+
+                          <div style={{ display: 'flex', gap: '12px', paddingTop: '16px', borderTop: '1px solid #e2e8f0' }}>
+                            <button
+                              onClick={() => handleAcceptBooking(booking._id)}
+                              className='btn-success'
+                              style={{
+                                flex: 1,
+                                backgroundColor: '#10b981',
+                                color: '#fff',
+                                border: 'none',
+                                padding: '12px 16px',
+                                borderRadius: '8px',
+                                fontSize: '14px',
+                                fontWeight: '600',
+                                cursor: 'pointer'
+                              }}
+                            >
+                              ✓ Accept Booking
+                            </button>
+                            <button
+                              onClick={() => handleRejectBooking(booking._id)}
+                              style={{
+                                flex: 1,
+                                backgroundColor: '#fff',
+                                color: '#ef4444',
+                                border: '2px solid #ef4444',
+                                padding: '10px 16px',
+                                borderRadius: '8px',
+                                fontSize: '14px',
+                                fontWeight: '600',
+                                cursor: 'pointer'
+                              }}
+                            >
+                              ✗ Reject Booking
                             </button>
                           </div>
                         </div>
@@ -1157,7 +1432,18 @@ const ProviderDashboard = () => {
                       <label style={{ display: 'block', fontSize: '13px', fontWeight: '600', color: '#334155', marginBottom: '6px' }}>
                         Email Address <span style={{ color: '#ef4444' }}>*</span>
                       </label>
-                      <input name="email" type="email" value={regForm.email} onChange={handleRegChange} placeholder="you@example.com" style={{ width: '100%', padding: '10px 12px', borderRadius: '8px', border: `2px solid ${regErrors.email ? '#fca5a5' : '#e2e8f0'}`, fontSize: '14px', outline: 'none' }} />
+                      <input
+                        name="email"
+                        type="email"
+                        value={regForm.email}
+                        onChange={handleRegChange}
+                        placeholder="you@example.com"
+                        disabled={Boolean(user?.email)}
+                        style={{ width: '100%', padding: '10px 12px', borderRadius: '8px', border: `2px solid ${regErrors.email ? '#fca5a5' : '#e2e8f0'}`, fontSize: '14px', outline: 'none' }}
+                      />
+                      <div style={{ color: '#64748b', fontSize: '12px', marginTop: '4px' }}>
+                        Use the same email as your account.
+                      </div>
                       {regErrors.email && <div style={{ color: '#ef4444', fontSize: '12px', marginTop: '4px' }}>{regErrors.email}</div>}
                     </div>
 

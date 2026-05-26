@@ -13,6 +13,18 @@ const CustomerDashboard = () => {
   const [editingRequest, setEditingRequest] = useState(null);
   const [formData, setFormData] = useState({});
 
+  // Helper function to display the correct status label
+  const getStatusDisplay = (status) => {
+    const statusMap = {
+      'Accepted': 'Confirmed',
+      'OfferSent': 'Offer Received',
+      'Pending': 'Pending',
+      'Completed': 'Completed',
+      'Rejected': 'Rejected'
+    };
+    return statusMap[status] || status;
+  };
+
   useEffect(() => {
     const fetchServiceRequests = async () => {
       try {
@@ -248,7 +260,7 @@ const CustomerDashboard = () => {
                     <span style={styles.budgetLabel}>Budget</span>
                     <span style={styles.budgetValue}>Rs.{request.budget}</span>
                   </div>
-                  <div style={styles.statusBadge}>{request.status}</div>
+                  <div style={styles.statusBadge}>{getStatusDisplay(request.status)}</div>
                 </div>
 
                 {/* PROVIDER OFFER SECTION */}
@@ -321,6 +333,45 @@ const CustomerDashboard = () => {
                         >
                           ✗ Reject Offer
                         </button>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* DIRECT BOOKING RESPONSE SECTION */}
+                {request.bookingType === 'direct' && (
+                  <div style={{
+                    marginTop: '16px',
+                    padding: '16px',
+                    background: request.providerResponse?.status === 'accepted'
+                      ? 'linear-gradient(135deg, #dcfce7, #bbf7d0)'
+                      : request.providerResponse?.status === 'rejected'
+                        ? 'linear-gradient(135deg, #fee2e2, #fecaca)'
+                        : 'linear-gradient(135deg, #f3e8ff, #e9d5ff)',
+                    borderRadius: '12px',
+                    border: '2px solid ' + (
+                      request.providerResponse?.status === 'accepted'
+                        ? '#10b981'
+                        : request.providerResponse?.status === 'rejected'
+                          ? '#ef4444'
+                          : '#a78bfa'
+                    )
+                  }}>
+                    <div style={{ fontSize: '15px', fontWeight: '700', color: '#1e293b', marginBottom: '12px' }}>
+                      {request.providerResponse?.status === 'pending' && '⏳ Provider Reviewing...'}
+                      {request.providerResponse?.status === 'accepted' && '✓ Booking Confirmed!'}
+                      {request.providerResponse?.status === 'rejected' && '✗ Booking Rejected'}
+                    </div>
+
+                    {request.providerResponse?.responseMessage && (
+                      <div style={{ fontSize: '14px', color: '#374151', fontStyle: 'italic', marginBottom: '8px' }}>
+                        "{request.providerResponse.responseMessage}"
+                      </div>
+                    )}
+
+                    {request.providerResponse?.respondedAt && (
+                      <div style={{ fontSize: '12px', color: '#64748b' }}>
+                        Responded at: {new Date(request.providerResponse.respondedAt).toLocaleString()}
                       </div>
                     )}
                   </div>

@@ -1,126 +1,86 @@
-import React, { useState } from 'react';
-import { Search, Wrench, Home, Paintbrush, Truck, Sparkles, MapPin, Clock, Star } from 'lucide-react';
+import React, { useState, useEffect, useContext } from 'react';
+import { Search, Wrench, Home, Paintbrush, Truck, Sparkles, MapPin, Clock, Star, X } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { AuthContext } from '../context/AuthContext';
+import { getApprovedProviders, getProvidersByCategory } from '../api/provider';
+import { createServiceRequest } from '../api/service';
 
 export default function Services() {
+  const navigate = useNavigate();
+  const { user } = useContext(AuthContext);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('All Services');
   const [sortBy, setSortBy] = useState('rating');
+  const [providers, setProviders] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [bookingModal, setBookingModal] = useState(null);
+  const [bookingForm, setBookingForm] = useState({
+    serviceTitle: '',
+    description: '',
+    preferredDate: '',
+    preferredTime: '',
+    estimatedDuration: '',
+    budget: '',
+    location: '',
+    specificRequirements: ''
+  });
 
   const categories = [
     { name: 'All Services', icon: Sparkles, count: null },
-    { name: 'Cleaning', icon: Sparkles, count: 246 },
-    { name: 'Repairs', icon: Wrench, count: 198 },
-    { name: 'Painting', icon: Paintbrush, count: 156 },
-    { name: 'Moving', icon: Truck, count: 132 },
-    { name: 'Assembly', icon: Home, count: 187 },
-    { name: 'Handyman', icon: Wrench, count: 223 },
-    { name: 'Gardening', icon: Home, count: 145 }
+    { name: 'Home Cleaning', icon: Sparkles, count: null },
+    { name: 'Plumbing', icon: Wrench, count: null },
+    { name: 'Electrical', icon: Wrench, count: null },
+    { name: 'Carpentry', icon: Wrench, count: null },
+    { name: 'Painting', icon: Paintbrush, count: null },
+    { name: 'Landscaping', icon: Home, count: null },
+    { name: 'HVAC', icon: Home, count: null },
+    { name: 'Handyman', icon: Wrench, count: null },
+    { name: 'Moving', icon: Truck, count: null },
+    { name: 'Other', icon: Sparkles, count: null }
   ];
 
-  const services = [
-    {
-      id: 1,
-      title: 'Deep House Cleaning',
-      provider: 'Sarah Johnson',
-      image: 'https://images.unsplash.com/photo-1581578731548-c64695cc6952?w=400&h=300&fit=crop',
-      location: 'Downtown',
-      rating: 4.9,
-      reviews: 127,
-      price: 45,
-      responseTime: '1 hour',
-      category: 'Cleaning'
-    },
-    {
-      id: 2,
-      title: 'Plumbing & Repairs',
-      provider: 'Mike Chen',
-      image: 'https://images.unsplash.com/photo-1607472586893-edb57bdc0e39?w=400&h=300&fit=crop',
-      location: 'Westside',
-      rating: 4.8,
-      reviews: 93,
-      price: 65,
-      responseTime: '30 mins',
-      category: 'Repairs'
-    },
-    {
-      id: 3,
-      title: 'Interior Painting',
-      provider: 'David Mason',
-      image: 'https://images.unsplash.com/photo-1562259949-e8e7689d7828?w=400&h=300&fit=crop',
-      location: 'Northside',
-      rating: 5.0,
-      reviews: 84,
-      price: 50,
-      responseTime: '2 hours',
-      category: 'Painting'
-    },
-    {
-      id: 4,
-      title: 'Moving & Delivery',
-      provider: 'Tom Wilson',
-      image: 'https://images.unsplash.com/photo-1600880292203-757bb62b4baf?w=400&h=300&fit=crop',
-      location: 'Eastside',
-      rating: 4.7,
-      reviews: 156,
-      price: 80,
-      responseTime: '1 hour',
-      category: 'Moving'
-    },
-    {
-      id: 5,
-      title: 'Furniture Assembly',
-      provider: 'Lisa Anderson',
-      image: 'https://images.unsplash.com/photo-1581858726788-75bc0f1a4e1a?w=400&h=300&fit=crop',
-      location: 'Downtown',
-      rating: 4.9,
-      reviews: 112,
-      price: 55,
-      responseTime: '45 mins',
-      category: 'Assembly'
-    },
-    {
-      id: 6,
-      title: 'Garden Maintenance',
-      provider: 'John Green',
-      image: 'https://images.unsplash.com/photo-1416879595882-3373a0480b5b?w=400&h=300&fit=crop',
-      location: 'Suburbs',
-      rating: 4.8,
-      reviews: 68,
-      price: 40,
-      responseTime: '2 hours',
-      category: 'Gardening'
-    },
-    {
-      id: 7,
-      title: 'Electrical Repairs',
-      provider: 'Alex Rodriguez',
-      image: 'https://images.unsplash.com/photo-1621905251189-08b45d6a269e?w=400&h=300&fit=crop',
-      location: 'Westside',
-      rating: 5.0,
-      reviews: 145,
-      price: 70,
-      responseTime: '1 hour',
-      category: 'Repairs'
-    },
-    {
-      id: 8,
-      title: 'Window Cleaning',
-      provider: 'Emma Davis',
-      image: 'https://images.unsplash.com/photo-1628177142898-93e36e4e3a50?w=400&h=300&fit=crop',
-      location: 'Downtown',
-      rating: 4.9,
-      reviews: 91,
-      price: 35,
-      responseTime: '30 mins',
-      category: 'Cleaning'
-    }
-  ];
+  // Fetch providers on component mount
+  useEffect(() => {
+    const fetchProviders = async () => {
+      try {
+        setLoading(true);
+        const data = await getApprovedProviders();
+        setProviders(data);
+      } catch (error) {
+        console.error('Failed to fetch providers:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
 
-  const filteredServices = services.filter(service => 
+    fetchProviders();
+  }, []);
+
+  // Transform providers to service format
+  const services = providers.map((provider, index) => ({
+    id: provider._id,
+    providerId: provider.userId,
+    title: `${provider.serviceCategory} Service`,
+    provider: `${provider.firstName} ${provider.lastName}`,
+    image: provider.portfolioPhoto || 'https://images.unsplash.com/photo-1581578731548-c64695cc6952?w=400&h=300&fit=crop',
+    location: `${provider.city}`,
+    rating: provider.rating,
+    reviews: provider.totalReviews,
+    price: provider.hourlyRate,
+    responseTime: '1 hour',
+    category: provider.serviceCategory,
+    experience: provider.yearsOfExperience,
+    bio: provider.professionalBio,
+    email: provider.email,
+    phone: provider.phone,
+    district: provider.district
+  }));
+
+  const filteredServices = services.filter(service =>
     (selectedCategory === 'All Services' || service.category === selectedCategory) &&
-    (searchQuery === '' || 
-     service.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-     service.provider.toLowerCase().includes(searchQuery.toLowerCase()))
+    (searchQuery === '' ||
+      service.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      service.provider.toLowerCase().includes(searchQuery.toLowerCase()))
   );
 
   const sortedServices = [...filteredServices].sort((a, b) => {
@@ -129,6 +89,86 @@ export default function Services() {
     if (sortBy === 'price-high') return b.price - a.price;
     return 0;
   });
+
+  const handleBook = (service) => {
+    if (!user) {
+      // Not logged in, redirect to login
+      navigate('/login', { state: { from: '/services', message: 'Please login to book a service' } });
+      return;
+    }
+
+    // If customer, open booking modal
+    if (user.role === 'customer') {
+      setBookingModal(service);
+      setBookingForm({
+        serviceTitle: service.title,
+        description: `Booking ${service.provider} for ${service.category}`,
+        preferredDate: '',
+        preferredTime: '',
+        estimatedDuration: '',
+        budget: service.price.toString(),
+        location: '',
+        specificRequirements: ''
+      });
+    } else {
+      alert('Only customers can book services');
+    }
+  };
+
+  const handleSubmitBooking = async () => {
+    if (!bookingForm.preferredDate || !bookingForm.preferredTime || !bookingForm.location) {
+      alert('Please fill in all required fields');
+      return;
+    }
+
+    try {
+      const payload = {
+        userId: user.id,
+        serviceCategory: bookingModal.category,
+        serviceTitle: bookingForm.serviceTitle,
+        description: bookingForm.description,
+        preferredDate: bookingForm.preferredDate,
+        preferredTime: bookingForm.preferredTime,
+        estimatedDuration: bookingForm.estimatedDuration,
+        budget: parseFloat(bookingForm.budget) || bookingModal.price,
+        location: bookingForm.location,
+        specificRequirements: bookingForm.specificRequirements,
+        providerId: bookingModal.providerId,
+        bookingType: 'direct'
+      };
+
+      await createServiceRequest(payload);
+      alert('Service request sent successfully! The provider will review your booking request.');
+      setBookingModal(null);
+      setBookingForm({
+        serviceTitle: '',
+        description: '',
+        preferredDate: '',
+        preferredTime: '',
+        estimatedDuration: '',
+        budget: '',
+        location: '',
+        specificRequirements: ''
+      });
+    } catch (error) {
+      console.error('Failed to book service:', error);
+      alert('Failed to send service request. Please try again.');
+    }
+  };
+
+  const closeBookingModal = () => {
+    setBookingModal(null);
+    setBookingForm({
+      serviceTitle: '',
+      description: '',
+      preferredDate: '',
+      preferredTime: '',
+      estimatedDuration: '',
+      budget: '',
+      location: '',
+      specificRequirements: ''
+    });
+  };
 
   return (
     <div style={{ minHeight: '100vh', backgroundColor: '#f8f9fa', fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif' }}>
@@ -152,7 +192,7 @@ export default function Services() {
         }}>
           Hire Right
         </div>
-        
+
         <nav style={{ display: 'flex', gap: '35px', alignItems: 'center' }}>
           <a href="/" style={{ textDecoration: 'none', color: '#333', fontSize: '16px', fontWeight: '500' }}>Home</a>
           <a href="/services" style={{ textDecoration: 'none', color: '#0066ff', fontSize: '16px', fontWeight: '500' }}>Services</a>
@@ -263,7 +303,7 @@ export default function Services() {
               Filter by Category
             </span>
           </div>
-          
+
           <div style={{
             display: 'flex',
             gap: '12px',
@@ -355,143 +395,178 @@ export default function Services() {
           </div>
 
           {/* Service Cards Grid */}
-          <div style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))',
-            gap: '25px'
-          }}>
-            {sortedServices.map((service) => (
-              <div
-                key={service.id}
-                style={{
-                  backgroundColor: '#fff',
-                  borderRadius: '16px',
-                  overflow: 'hidden',
-                  boxShadow: '0 2px 8px rgba(0,0,0,0.06)',
-                  cursor: 'pointer',
-                  transition: 'all 0.3s'
-                }}
-                onMouseOver={(e) => {
-                  e.currentTarget.style.transform = 'translateY(-4px)';
-                  e.currentTarget.style.boxShadow = '0 12px 24px rgba(0,0,0,0.1)';
-                }}
-                onMouseOut={(e) => {
-                  e.currentTarget.style.transform = 'translateY(0)';
-                  e.currentTarget.style.boxShadow = '0 2px 8px rgba(0,0,0,0.06)';
-                }}
-              >
-                {/* Image */}
-                <div style={{
-                  position: 'relative',
-                  height: '200px',
-                  overflow: 'hidden'
-                }}>
-                  <img
-                    src={service.image}
-                    alt={service.title}
-                    style={{
-                      width: '100%',
-                      height: '100%',
-                      objectFit: 'cover'
-                    }}
-                  />
-                  <div style={{
-                    position: 'absolute',
-                    top: '12px',
-                    right: '12px',
-                    backgroundColor: '#fff',
-                    borderRadius: '20px',
-                    padding: '6px 12px',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '4px',
-                    boxShadow: '0 2px 8px rgba(0,0,0,0.15)'
-                  }}>
-                    <Star size={14} fill="#fbbf24" color="#fbbf24" />
-                    <span style={{ fontSize: '13px', fontWeight: '600', color: '#374151' }}>
-                      {service.rating}
-                    </span>
-                  </div>
-                </div>
-
-                {/* Content */}
-                <div style={{ padding: '20px' }}>
-                  <h3 style={{
-                    fontSize: '18px',
-                    fontWeight: '600',
-                    color: '#1f2937',
-                    marginBottom: '8px'
-                  }}>
-                    {service.title}
-                  </h3>
-                  <p style={{
-                    fontSize: '14px',
-                    color: '#6b7280',
-                    marginBottom: '16px'
-                  }}>
-                    {service.provider}
-                  </p>
-
-                  <div style={{
-                    display: 'flex',
-                    flexDirection: 'column',
-                    gap: '8px',
-                    marginBottom: '16px'
-                  }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                      <MapPin size={14} color="#9ca3af" />
-                      <span style={{ fontSize: '13px', color: '#6b7280' }}>
-                        {service.location}
-                      </span>
-                    </div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                      <Clock size={14} color="#9ca3af" />
-                      <span style={{ fontSize: '13px', color: '#6b7280' }}>
-                        Responds in {service.responseTime}
-                      </span>
-                    </div>
-                  </div>
-
-                  <div style={{
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: 'center',
-                    paddingTop: '16px',
-                    borderTop: '1px solid #f3f4f6'
-                  }}>
-                    <div>
-                      <span style={{
-                        fontSize: '24px',
-                        fontWeight: 'bold',
-                        color: '#1f2937'
-                      }}>
-                        ${service.price}
-                      </span>
-                      <span style={{
-                        fontSize: '14px',
-                        color: '#9ca3af',
-                        marginLeft: '2px'
-                      }}>
-                        /hr
-                      </span>
-                    </div>
-                    <button style={{
-                      backgroundColor: '#0066ff',
-                      color: '#fff',
-                      border: 'none',
-                      borderRadius: '8px',
-                      padding: '10px 20px',
-                      fontSize: '14px',
-                      fontWeight: '600',
-                      cursor: 'pointer'
-                    }}>
-                      Book
-                    </button>
-                  </div>
-                </div>
+          {loading ? (
+            <div style={{
+              textAlign: 'center',
+              padding: '60px 20px',
+              color: '#6b7280'
+            }}>
+              <div style={{ fontSize: '18px', marginBottom: '16px' }}>Loading providers...</div>
+              <div style={{
+                display: 'inline-block',
+                width: '40px',
+                height: '40px',
+                border: '4px solid #e5e7eb',
+                borderTop: '4px solid #0066ff',
+                borderRadius: '50%',
+                animation: 'spin 1s linear infinite'
+              }}>
               </div>
-            ))}
-          </div>
+              <style>{`
+                @keyframes spin {
+                  to { transform: rotate(360deg); }
+                }
+              `}</style>
+            </div>
+          ) : sortedServices.length === 0 ? (
+            <div style={{
+              textAlign: 'center',
+              padding: '60px 20px',
+              color: '#6b7280'
+            }}>
+              <div style={{ fontSize: '18px' }}>No providers found in this category</div>
+            </div>
+          ) : (
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))',
+              gap: '25px'
+            }}>
+              {sortedServices.map((service) => (
+                <div
+                  key={service.id}
+                  style={{
+                    backgroundColor: '#fff',
+                    borderRadius: '16px',
+                    overflow: 'hidden',
+                    boxShadow: '0 2px 8px rgba(0,0,0,0.06)',
+                    cursor: 'pointer',
+                    transition: 'all 0.3s'
+                  }}
+                  onMouseOver={(e) => {
+                    e.currentTarget.style.transform = 'translateY(-4px)';
+                    e.currentTarget.style.boxShadow = '0 12px 24px rgba(0,0,0,0.1)';
+                  }}
+                  onMouseOut={(e) => {
+                    e.currentTarget.style.transform = 'translateY(0)';
+                    e.currentTarget.style.boxShadow = '0 2px 8px rgba(0,0,0,0.06)';
+                  }}
+                >
+                  {/* Image */}
+                  <div style={{
+                    position: 'relative',
+                    height: '200px',
+                    overflow: 'hidden'
+                  }}>
+                    <img
+                      src={service.image}
+                      alt={service.title}
+                      style={{
+                        width: '100%',
+                        height: '100%',
+                        objectFit: 'cover'
+                      }}
+                    />
+                    <div style={{
+                      position: 'absolute',
+                      top: '12px',
+                      right: '12px',
+                      backgroundColor: '#fff',
+                      borderRadius: '20px',
+                      padding: '6px 12px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '4px',
+                      boxShadow: '0 2px 8px rgba(0,0,0,0.15)'
+                    }}>
+                      <Star size={14} fill="#fbbf24" color="#fbbf24" />
+                      <span style={{ fontSize: '13px', fontWeight: '600', color: '#374151' }}>
+                        {service.rating}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Content */}
+                  <div style={{ padding: '20px' }}>
+                    <h3 style={{
+                      fontSize: '18px',
+                      fontWeight: '600',
+                      color: '#1f2937',
+                      marginBottom: '8px'
+                    }}>
+                      {service.title}
+                    </h3>
+                    <p style={{
+                      fontSize: '14px',
+                      color: '#6b7280',
+                      marginBottom: '16px'
+                    }}>
+                      {service.provider}
+                    </p>
+
+                    <div style={{
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '8px',
+                      marginBottom: '16px'
+                    }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <MapPin size={14} color="#9ca3af" />
+                        <span style={{ fontSize: '13px', color: '#6b7280' }}>
+                          {service.location}
+                        </span>
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <Clock size={14} color="#9ca3af" />
+                        <span style={{ fontSize: '13px', color: '#6b7280' }}>
+                          Responds in {service.responseTime}
+                        </span>
+                      </div>
+                    </div>
+
+                    <div style={{
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                      paddingTop: '16px',
+                      borderTop: '1px solid #f3f4f6'
+                    }}>
+                      <div>
+                        <span style={{
+                          fontSize: '24px',
+                          fontWeight: 'bold',
+                          color: '#1f2937'
+                        }}>
+                          ${service.price}
+                        </span>
+                        <span style={{
+                          fontSize: '14px',
+                          color: '#9ca3af',
+                          marginLeft: '2px'
+                        }}>
+                          /hr
+                        </span>
+                      </div>
+                      <button
+                        onClick={() => handleBook(service)}
+                        style={{
+                          backgroundColor: '#0066ff',
+                          color: '#fff',
+                          border: 'none',
+                          borderRadius: '8px',
+                          padding: '10px 20px',
+                          fontSize: '14px',
+                          fontWeight: '600',
+                          cursor: 'pointer'
+                        }}>
+                        Book
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       </section>
 
@@ -552,6 +627,298 @@ export default function Services() {
           © 2025 Hire Right. All rights reserved.
         </div>
       </footer>
+
+      {/* Booking Modal */}
+      {bookingModal && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: 'rgba(0,0,0,0.5)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 2000
+        }}>
+          <div style={{
+            backgroundColor: '#fff',
+            borderRadius: '16px',
+            padding: '40px',
+            maxWidth: '600px',
+            width: '90%',
+            maxHeight: '80vh',
+            overflowY: 'auto',
+            boxShadow: '0 20px 60px rgba(0,0,0,0.2)'
+          }}>
+            <div style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              marginBottom: '24px'
+            }}>
+              <h2 style={{
+                fontSize: '24px',
+                fontWeight: 'bold',
+                color: '#1f2937',
+                margin: 0
+              }}>
+                Request Service from {bookingModal.provider}
+              </h2>
+              <button
+                onClick={closeBookingModal}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  cursor: 'pointer',
+                  padding: '8px'
+                }}
+              >
+                <X size={24} color="#6b7280" />
+              </button>
+            </div>
+
+            <div style={{
+              display: 'grid',
+              gap: '16px'
+            }}>
+              {/* Service Info */}
+              <div style={{
+                backgroundColor: '#f3f4f6',
+                padding: '16px',
+                borderRadius: '12px',
+                marginBottom: '16px'
+              }}>
+                <div style={{ fontSize: '14px', color: '#6b7280', marginBottom: '4px' }}>Provider</div>
+                <div style={{ fontSize: '16px', fontWeight: '600', color: '#1f2937', marginBottom: '8px' }}>
+                  {bookingModal.provider}
+                </div>
+                <div style={{ fontSize: '14px', color: '#6b7280', marginBottom: '4px' }}>Service Category</div>
+                <div style={{ fontSize: '16px', fontWeight: '600', color: '#1f2937', marginBottom: '8px' }}>
+                  {bookingModal.category}
+                </div>
+                <div style={{ fontSize: '14px', color: '#6b7280', marginBottom: '4px' }}>Hourly Rate</div>
+                <div style={{ fontSize: '16px', fontWeight: '600', color: '#1f2937' }}>
+                  Rs.{bookingModal.price}/hr
+                </div>
+              </div>
+
+              {/* Form Fields */}
+              <div>
+                <label style={{ fontSize: '14px', fontWeight: '600', color: '#1f2937', display: 'block', marginBottom: '8px' }}>
+                  Service Title *
+                </label>
+                <input
+                  type="text"
+                  value={bookingForm.serviceTitle}
+                  onChange={(e) => setBookingForm({ ...bookingForm, serviceTitle: e.target.value })}
+                  style={{
+                    width: '100%',
+                    padding: '12px',
+                    border: '1px solid #d1d5db',
+                    borderRadius: '8px',
+                    fontSize: '14px',
+                    fontFamily: 'inherit',
+                    boxSizing: 'border-box'
+                  }}
+                />
+              </div>
+
+              <div>
+                <label style={{ fontSize: '14px', fontWeight: '600', color: '#1f2937', display: 'block', marginBottom: '8px' }}>
+                  Description
+                </label>
+                <textarea
+                  value={bookingForm.description}
+                  onChange={(e) => setBookingForm({ ...bookingForm, description: e.target.value })}
+                  style={{
+                    width: '100%',
+                    padding: '12px',
+                    border: '1px solid #d1d5db',
+                    borderRadius: '8px',
+                    fontSize: '14px',
+                    fontFamily: 'inherit',
+                    minHeight: '80px',
+                    boxSizing: 'border-box',
+                    resize: 'vertical'
+                  }}
+                />
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                <div>
+                  <label style={{ fontSize: '14px', fontWeight: '600', color: '#1f2937', display: 'block', marginBottom: '8px' }}>
+                    Preferred Date *
+                  </label>
+                  <input
+                    type="date"
+                    value={bookingForm.preferredDate}
+                    onChange={(e) => setBookingForm({ ...bookingForm, preferredDate: e.target.value })}
+                    style={{
+                      width: '100%',
+                      padding: '12px',
+                      border: '1px solid #d1d5db',
+                      borderRadius: '8px',
+                      fontSize: '14px',
+                      fontFamily: 'inherit',
+                      boxSizing: 'border-box'
+                    }}
+                  />
+                </div>
+                <div>
+                  <label style={{ fontSize: '14px', fontWeight: '600', color: '#1f2937', display: 'block', marginBottom: '8px' }}>
+                    Preferred Time *
+                  </label>
+                  <input
+                    type="time"
+                    value={bookingForm.preferredTime}
+                    onChange={(e) => setBookingForm({ ...bookingForm, preferredTime: e.target.value })}
+                    style={{
+                      width: '100%',
+                      padding: '12px',
+                      border: '1px solid #d1d5db',
+                      borderRadius: '8px',
+                      fontSize: '14px',
+                      fontFamily: 'inherit',
+                      boxSizing: 'border-box'
+                    }}
+                  />
+                </div>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                <div>
+                  <label style={{ fontSize: '14px', fontWeight: '600', color: '#1f2937', display: 'block', marginBottom: '8px' }}>
+                    Estimated Duration
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="e.g., 2 hours"
+                    value={bookingForm.estimatedDuration}
+                    onChange={(e) => setBookingForm({ ...bookingForm, estimatedDuration: e.target.value })}
+                    style={{
+                      width: '100%',
+                      padding: '12px',
+                      border: '1px solid #d1d5db',
+                      borderRadius: '8px',
+                      fontSize: '14px',
+                      fontFamily: 'inherit',
+                      boxSizing: 'border-box'
+                    }}
+                  />
+                </div>
+                <div>
+                  <label style={{ fontSize: '14px', fontWeight: '600', color: '#1f2937', display: 'block', marginBottom: '8px' }}>
+                    Budget (Rs.)
+                  </label>
+                  <input
+                    type="number"
+                    value={bookingForm.budget}
+                    onChange={(e) => setBookingForm({ ...bookingForm, budget: e.target.value })}
+                    style={{
+                      width: '100%',
+                      padding: '12px',
+                      border: '1px solid #d1d5db',
+                      borderRadius: '8px',
+                      fontSize: '14px',
+                      fontFamily: 'inherit',
+                      boxSizing: 'border-box'
+                    }}
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label style={{ fontSize: '14px', fontWeight: '600', color: '#1f2937', display: 'block', marginBottom: '8px' }}>
+                  Location *
+                </label>
+                <input
+                  type="text"
+                  placeholder="Enter your location"
+                  value={bookingForm.location}
+                  onChange={(e) => setBookingForm({ ...bookingForm, location: e.target.value })}
+                  style={{
+                    width: '100%',
+                    padding: '12px',
+                    border: '1px solid #d1d5db',
+                    borderRadius: '8px',
+                    fontSize: '14px',
+                    fontFamily: 'inherit',
+                    boxSizing: 'border-box'
+                  }}
+                />
+              </div>
+
+              <div>
+                <label style={{ fontSize: '14px', fontWeight: '600', color: '#1f2937', display: 'block', marginBottom: '8px' }}>
+                  Specific Requirements
+                </label>
+                <textarea
+                  placeholder="Any special requests or requirements..."
+                  value={bookingForm.specificRequirements}
+                  onChange={(e) => setBookingForm({ ...bookingForm, specificRequirements: e.target.value })}
+                  style={{
+                    width: '100%',
+                    padding: '12px',
+                    border: '1px solid #d1d5db',
+                    borderRadius: '8px',
+                    fontSize: '14px',
+                    fontFamily: 'inherit',
+                    minHeight: '60px',
+                    boxSizing: 'border-box',
+                    resize: 'vertical'
+                  }}
+                />
+              </div>
+
+              {/* Buttons */}
+              <div style={{
+                display: 'flex',
+                gap: '12px',
+                marginTop: '24px',
+                borderTop: '1px solid #e5e7eb',
+                paddingTop: '24px'
+              }}>
+                <button
+                  onClick={closeBookingModal}
+                  style={{
+                    flex: 1,
+                    padding: '12px 24px',
+                    backgroundColor: '#f3f4f6',
+                    color: '#374151',
+                    border: 'none',
+                    borderRadius: '8px',
+                    fontSize: '14px',
+                    fontWeight: '600',
+                    cursor: 'pointer',
+                    transition: 'all 0.2s'
+                  }}
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleSubmitBooking}
+                  style={{
+                    flex: 1,
+                    padding: '12px 24px',
+                    backgroundColor: '#0066ff',
+                    color: '#fff',
+                    border: 'none',
+                    borderRadius: '8px',
+                    fontSize: '14px',
+                    fontWeight: '600',
+                    cursor: 'pointer',
+                    transition: 'all 0.2s'
+                  }}
+                >
+                  Send Request
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

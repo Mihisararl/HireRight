@@ -41,14 +41,21 @@ const serviceRequestSchema = new mongoose.Schema(
     specificRequirements: {
       type: String,
     },
+    // Booking type: 'direct' (from Services page) or 'post' (customer created post)
+    bookingType: {
+      type: String,
+      enum: ['direct', 'post'],
+      default: 'post'
+    },
     status: {
       type: String,
-      default: "Pending", // Pending / OfferSent / Accepted / Completed / Rejected
+      default: "Pending", // Pending / OfferSent / Accepted / Completed / Rejected / ProviderRejected
     },
     providerId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'User',
     },
+    // For 'post' type bookings - provider sends offer to customer
     providerOffer: {
       sendAt: { type: Date },
       message: { type: String },
@@ -60,6 +67,16 @@ const serviceRequestSchema = new mongoose.Schema(
         default: 'pending'
       },
       customerResponseAt: { type: Date }
+    },
+    // For 'direct' type bookings - customer books provider, provider accepts/rejects
+    providerResponse: {
+      respondedAt: { type: Date },
+      status: {
+        type: String,
+        enum: ['pending', 'accepted', 'rejected'],
+        default: 'pending'
+      },
+      responseMessage: { type: String }
     },
     acceptedAt: {
       type: Date,

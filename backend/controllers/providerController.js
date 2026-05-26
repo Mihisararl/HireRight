@@ -1,4 +1,3 @@
-import jwt from 'jsonwebtoken';
 import User from '../models/User.js';
 import WorkerRegistrationRequest from '../models/WorkerRegistrationRequest.js';
 import Provider from '../models/Provider.js';
@@ -29,21 +28,16 @@ export const registerProvider = async (req, res) => {
     const providerPhone = phone || phoneNumber;
     const normalizedEmail = String(email || '').trim().toLowerCase();
 
-    // Optionally decode bearer token to identify requester (token contains user id)
-    const authHeader = req.header('Authorization') || '';
-    const token = authHeader.startsWith('Bearer ') ? authHeader.split(' ')[1] : null;
-    let requesterEmail = null;
-    if (token) {
-      try {
-        const decoded = jwt.verify(token, process.env.JWT_SECRET);
-        req.user = decoded;
-        if (decoded.id) {
-          const requester = await User.findById(decoded.id).select('email');
-          requesterEmail = requester?.email ? String(requester.email).trim().toLowerCase() : null;
-        }
-      } catch (err) {
-        // ignore invalid token — treat as unauthenticated
-      }
+    const requester = await User.findById(req.user.id).select('email');
+    if (!requester?.email) {
+      return res.status(401).json({ message: 'Please log in to submit worker registration.' });
+    }
+
+    const requesterEmail = String(requester.email).trim().toLowerCase();
+    if (normalizedEmail !== requesterEmail) {
+      return res.status(400).json({
+        message: 'Worker registration email must match your account email.'
+      });
     }
 
     if (!firstName || !lastName || !normalizedEmail || !providerPhone || !password) {
@@ -68,15 +62,21 @@ export const registerProvider = async (req, res) => {
     const existingUser = await User.findOne({ email: normalizedEmail });
     const existingRequest = await WorkerRegistrationRequest.findOne({ email: normalizedEmail });
 
+    if (!existingUser) {
+      return res.status(400).json({
+        message: 'Please sign up first, then use the same email to submit worker registration.'
+      });
+    }
+
     if (existingUser) {
-      // If an account exists for this email, only allow the authenticated owner to register
-      if (!requesterEmail || requesterEmail !== normalizedEmail) {
+      if (String(existingUser._id) !== String(req.user.id)) {
         return res.status(400).json({ message: 'This email is already registered' });
       }
 
       // owner is registering themselves — update their User record to provider/pending
       existingUser.role = 'provider';
       existingUser.providerStatus = 'pending';
+      existingUser.isVerified = true;
       existingUser.serviceCategory = serviceCategory || existingUser.serviceCategory;
       existingUser.yearsOfExperience = toNumber(yearsOfExperience) ?? existingUser.yearsOfExperience;
       existingUser.hourlyRate = toNumber(hourlyRate) ?? existingUser.hourlyRate;
@@ -124,62 +124,7 @@ export const registerProvider = async (req, res) => {
       });
     }
 
-    // No existing user — proceed to create a new User and registration request
-    if (existingRequest) {
-      return res.status(400).json({ message: 'A registration request with this email already exists.' });
-    }
-
-    const user = await User.create({
-      name: `${firstName} ${lastName}`.trim(),
-      email: normalizedEmail,
-      phone: providerPhone,
-      district,
-      postalCode,
-      password,
-      role: 'provider',
-      providerStatus: 'pending',
-      serviceCategory,
-      yearsOfExperience: toNumber(yearsOfExperience),
-      hourlyRate: toNumber(hourlyRate),
-      professionalBio,
-      portfolioPhoto,
-      idDocument,
-      city,
-      isVerified: true
-    });
-
-    // Create WorkerRegistrationRequest record
-    const registrationRequest = await WorkerRegistrationRequest.create({
-      firstName,
-      lastName,
-      email: normalizedEmail,
-      phone: providerPhone,
-      password,
-      serviceCategory,
-      yearsOfExperience: toNumber(yearsOfExperience),
-      hourlyRate: toNumber(hourlyRate),
-      professionalBio,
-      portfolioPhoto,
-      city,
-      district,
-      postalCode,
-      idDocument,
-      agreedToBackgroundCheck: Boolean(agreedToBackgroundCheck),
-      status: 'pending'
-    });
-
-    return res.status(201).json({
-      message: 'Worker registration submitted successfully. Awaiting admin approval.',
-      registrationRequest: {
-        _id: registrationRequest._id,
-        firstName: registrationRequest.firstName,
-        lastName: registrationRequest.lastName,
-        email: registrationRequest.email,
-        serviceCategory: registrationRequest.serviceCategory,
-        status: registrationRequest.status,
-        createdAt: registrationRequest.createdAt
-      }
-    });
+    return res.status(400).json({ message: 'This email is already registered' });
   } catch (error) {
     console.error('registerProvider error:', error);
     return res.status(500).json({
@@ -196,6 +141,83 @@ export const getWorkerRegistrationRequests = async (req, res) => {
   } catch (error) {
     res.status(500).json({
       message: 'Failed to fetch worker registration requests',
+      error: error.message
+    });
+  }
+};
+
+// GET - Get all approved providers for the Services page
+export const getApprovedProviders = async (req, res) => {
+  try {
+    const providers = await Provider.find()
+      .populate('userId', 'name email phone')
+      .sort({ createdAt: -1 });
+
+    const formattedProviders = providers.map(provider => ({
+      _id: provider._id,
+      userId: provider.userId._id,
+      firstName: provider.firstName,
+      lastName: provider.lastName,
+      email: provider.email,
+      phone: provider.phone,
+      serviceCategory: provider.serviceCategory,
+      city: provider.city,
+      district: provider.district,
+      yearsOfExperience: provider.yearsOfExperience,
+      hourlyRate: provider.hourlyRate,
+      professionalBio: provider.professionalBio,
+      portfolioPhoto: provider.portfolioPhoto,
+      rating: provider.rating || 4.8,
+      totalReviews: provider.totalReviews || 0,
+      approvedAt: provider.approvedAt
+    }));
+
+    res.json(formattedProviders);
+  } catch (error) {
+    res.status(500).json({
+      message: 'Failed to fetch approved providers',
+      error: error.message
+    });
+  }
+};
+
+// GET - Get approved providers by service category
+export const getProvidersByCategory = async (req, res) => {
+  try {
+    const { category } = req.params;
+
+    const query = {};
+    if (category && category !== 'All Services') {
+      query.serviceCategory = category;
+    }
+
+    const providers = await Provider.find(query)
+      .populate('userId', 'name email phone')
+      .sort({ createdAt: -1 });
+
+    const formattedProviders = providers.map(provider => ({
+      _id: provider._id,
+      userId: provider.userId._id,
+      firstName: provider.firstName,
+      lastName: provider.lastName,
+      email: provider.email,
+      phone: provider.phone,
+      serviceCategory: provider.serviceCategory,
+      city: provider.city,
+      district: provider.district,
+      yearsOfExperience: provider.yearsOfExperience,
+      hourlyRate: provider.hourlyRate,
+      professionalBio: provider.professionalBio,
+      portfolioPhoto: provider.portfolioPhoto,
+      rating: provider.rating || 4.8,
+      totalReviews: provider.totalReviews || 0,
+      approvedAt: provider.approvedAt
+    }));
+
+    res.json(formattedProviders);
+  } catch (error) {
+    res.status(500).json({
+      message: 'Failed to fetch providers',
       error: error.message
     });
   }

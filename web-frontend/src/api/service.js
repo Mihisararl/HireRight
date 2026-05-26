@@ -1,5 +1,10 @@
 import api from '../utils/api';
 
+export const createServiceRequest = async (data) => {
+  const response = await api.post('/services', data);
+  return response.data;
+};
+
 export const getUserServiceRequests = async () => {
   const response = await api.get('/services/user');
   return response.data;
@@ -25,6 +30,11 @@ export const getProviderServiceRequests = async () => {
   return response.data;
 };
 
+export const getDirectBookingRequests = async () => {
+  const response = await api.get('/services/bookings/direct');
+  return response.data;
+};
+
 export const completeServiceRequest = async (id) => {
   const response = await api.post(`/services/${id}/complete`);
   return response.data;
@@ -37,5 +47,15 @@ export const acceptProviderOffer = async (id) => {
 
 export const rejectProviderOffer = async (id) => {
   const response = await api.post(`/services/${id}/reject-offer`);
+  return response.data;
+};
+
+export const acceptDirectBooking = async (id, responseMessage = '') => {
+  const response = await api.post(`/services/${id}/accept-booking`, { responseMessage });
+  return response.data;
+};
+
+export const rejectDirectBooking = async (id, responseMessage = '') => {
+  const response = await api.post(`/services/${id}/reject-booking`, { responseMessage });
   return response.data;
 };

@@ -38,7 +38,7 @@ export const approveProvider = async (req, res) => {
         }
 
         // Find the corresponding User account
-        const user = await User.findOne({ email: registrationRequest.email, role: 'provider' });
+        const user = await User.findOne({ email: registrationRequest.email });
         if (!user) {
             return res.status(404).json({ message: 'Associated user account not found' });
         }
@@ -70,6 +70,7 @@ export const approveProvider = async (req, res) => {
         await registrationRequest.save();
 
         // Update User account status
+        user.role = 'provider';
         user.providerStatus = 'approved';
         user.approvedAt = new Date();
         await user.save();

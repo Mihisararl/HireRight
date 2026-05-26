@@ -1,4 +1,5 @@
 import { createContext, useState, useEffect, useCallback } from 'react';
+import api from '../utils/api';
 
 export const AuthContext = createContext();
 
@@ -44,8 +45,24 @@ export const AuthProvider = ({ children }) => {
         setLoading(false);
     }, []);
 
+    const refreshUser = useCallback(async () => {
+        const token = localStorage.getItem('token');
+        if (!token) return;
+
+        try {
+            const response = await api.get('/auth/me');
+            const nextUser = response.data?.user;
+            if (nextUser) {
+                localStorage.setItem('user', JSON.stringify(nextUser));
+                setUser(nextUser);
+            }
+        } catch (err) {
+            // If refresh fails, keep the existing session as-is
+        }
+    }, []);
+
     return (
-        <AuthContext.Provider value={{ user, loading, login, logout }}>
+        <AuthContext.Provider value={{ user, loading, login, logout, refreshUser }}>
             {children}
         </AuthContext.Provider>
     );

@@ -32,6 +32,7 @@ export const register = async (req, res) => {
     // Generate verification token
     const verificationToken = crypto.randomBytes(32).toString('hex');
 
+    const normalizedRole = role || 'customer';
     const user = new User({
       name,
       email,
@@ -39,7 +40,8 @@ export const register = async (req, res) => {
       district,
       postalCode,
       password,
-      role: role || 'customer',
+      role: normalizedRole,
+      providerStatus: normalizedRole === 'provider' ? 'pending' : undefined,
       verificationToken,
       verificationExpires: Date.now() + 24 * 60 * 60 * 1000,
       isVerified: false
@@ -120,8 +122,8 @@ export const login = async (req, res) => {
       return res.status(400).json({ message: "Invalid credentials" });
     }
 
-    // BLOCK IF NOT VERIFIED
-    if (!user.isVerified) {
+    // BLOCK IF NOT VERIFIED (admins can bypass)
+    if (!user.isVerified && user.role !== 'admin') {
       return res.status(401).json({
         message: "Please verify your email before logging in."
       });
@@ -153,5 +155,32 @@ export const login = async (req, res) => {
   } catch (err) {
     console.error("Login error:", err);
     res.status(500).json({ message: "Server error" });
+  }
+};
+
+// ================= CURRENT USER =================
+export const getMe = async (req, res) => {
+  try {
+    const user = await User.findById(req.user.id).select('-password');
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    res.json({
+      user: {
+        id: user._id,
+        name: user.name,
+        email: user.email,
+        phone: user.phone,
+        role: user.role,
+        providerStatus: user.providerStatus,
+        serviceCategory: user.serviceCategory,
+        yearsOfExperience: user.yearsOfExperience,
+        hourlyRate: user.hourlyRate
+      }
+    });
+  } catch (err) {
+    console.error('getMe error:', err);
+    res.status(500).json({ message: 'Server error' });
   }
 };
