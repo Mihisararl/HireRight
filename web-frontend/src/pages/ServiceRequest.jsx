@@ -1,8 +1,12 @@
 import React, { useState } from "react";
-import { Calendar, Clock, MapPin, DollarSign } from "lucide-react";
+import { Calendar, Clock } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 import api from '../utils/api';
+import LocationPicker from '../components/location/LocationPicker';
+import { hasCoordinates } from '../utils/locationHelpers';
 
 const ServiceRequestPage = () => {
+  const navigate = useNavigate();
   const [formData, setFormData] = useState({
     serviceCategory: "",
     serviceTitle: "",
@@ -11,7 +15,7 @@ const ServiceRequestPage = () => {
     preferredTime: "",
     estimatedDuration: "",
     budget: "",
-    location: "",
+    location: { address: '' },
     specificRequirements: "",
   });
 
@@ -23,9 +27,15 @@ const ServiceRequestPage = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
 
+    if (!hasCoordinates(formData.location) || !String(formData.location.address || '').trim()) {
+      alert('Please select your location on the map and enter an address.');
+      return;
+    }
+
     try {
       await api.post("/services", formData);
       alert("Service request posted successfully ✅");
+      navigate("/customer-dashboard", { state: { tab: 'posts' } });
       setFormData({
         serviceCategory: "",
         serviceTitle: "",
@@ -34,7 +44,7 @@ const ServiceRequestPage = () => {
         preferredTime: "",
         estimatedDuration: "",
         budget: "",
-        location: "",
+        location: { address: '' },
         specificRequirements: "",
       });
     } catch (error) {
@@ -330,40 +340,10 @@ const ServiceRequestPage = () => {
               </div>
             </div>
 
-            {/* Location */}
-            <div style={{ position: 'relative' }}>
-              <label style={{
-                display: 'block',
-                fontSize: '14px',
-                fontWeight: '500',
-                color: '#374151',
-                marginBottom: '8px'
-              }}>Service Location *</label>
-              <MapPin style={{
-                position: 'absolute',
-                left: '12px',
-                top: '38px',
-                color: '#9ca3af',
-                pointerEvents: 'none'
-              }} size={18} />
-              <input
-                type="text"
-                name="location"
-                value={formData.location}
-                onChange={handleChange}
-                style={{
-                  width: '100%',
-                  padding: '10px 12px 10px 40px',
-                  fontSize: '14px',
-                  border: '1px solid #d1d5db',
-                  borderRadius: '8px',
-                  outline: 'none',
-                  boxSizing: 'border-box'
-                }}
-                placeholder="Enter address"
-                required
-              />
-            </div>
+            <LocationPicker
+              value={formData.location}
+              onChange={(location) => setFormData((prev) => ({ ...prev, location }))}
+            />
 
             {/* Optional */}
             <div style={{ display: 'flex', flexDirection: 'column' }}>

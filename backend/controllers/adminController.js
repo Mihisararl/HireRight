@@ -2,7 +2,9 @@ import User from '../models/User.js';
 import WorkerRegistrationRequest from '../models/WorkerRegistrationRequest.js';
 import Provider from '../models/Provider.js';
 import Payment from '../models/Payment.js';
+import ServiceRequest from '../models/ServiceRequest.js';
 import Complaint from '../models/Complaint.js';
+import UserPaymentDetails from '../models/UserPaymentDetails.js';
 
 // Get all users
 export const getUsers = async (req, res) => {
@@ -14,7 +16,12 @@ export const getUsers = async (req, res) => {
 export const getProviderRequests = async (req, res) => {
     try {
         const requests = await WorkerRegistrationRequest.find().sort({ createdAt: -1 });
-        res.json(requests);
+        const sortedRequests = requests.sort((a, b) => {
+            if (a.status === 'pending' && b.status !== 'pending') return -1;
+            if (a.status !== 'pending' && b.status === 'pending') return 1;
+            return 0;
+        });
+        res.json(sortedRequests);
     } catch (error) {
         res.status(500).json({
             message: 'Failed to fetch provider requests',
@@ -59,6 +66,10 @@ export const approveProvider = async (req, res) => {
             professionalBio: registrationRequest.professionalBio,
             portfolioPhoto: registrationRequest.portfolioPhoto,
             idDocument: registrationRequest.idDocument,
+            bankName: registrationRequest.bankName,
+            accountNumber: registrationRequest.accountNumber,
+            branch: registrationRequest.branch,
+            accountHolderName: registrationRequest.accountHolderName,
             approvedAt: new Date(),
             approvedBy: req.user.id
         });
@@ -135,7 +146,8 @@ export const rejectProvider = async (req, res) => {
 export const getPayments = async (req, res) => {
     const payments = await Payment.find()
         .populate('userId', 'name email')
-        .populate('providerId', 'name email');
+        .populate('providerId', 'firstName lastName email phone')
+        .populate('serviceRequestId', 'customerCompleted providerCompleted customerCompletedAt providerCompletedAt');
 
     res.json(payments);
 };
@@ -149,7 +161,42 @@ export const approvePayment = async (req, res) => {
         return res.status(404).json({ message: 'Payment not found' });
     }
 
+    if (!payment.serviceRequestId) {
+        return res.status(400).json({ message: 'Payment is not linked to a service request' });
+    }
+
+    const serviceRequest = await ServiceRequest.findById(payment.serviceRequestId);
+    if (!serviceRequest) {
+        return res.status(404).json({ message: 'Service request not found' });
+    }
+
+    const bothCompleted = serviceRequest.customerCompleted && serviceRequest.providerCompleted;
+    if (!bothCompleted) {
+        return res.status(400).json({
+            message: 'Cannot release payment until both customer and provider complete the task'
+        });
+    }
+
+    const latestComplaint = await Complaint.findOne({
+        serviceRequestId: serviceRequest._id
+    }).sort({ createdAt: -1 });
+
+    if (latestComplaint?.status === 'open') {
+        return res.status(400).json({
+            message: 'Service provider has a complaint. Please resolve it and continue payment.'
+        });
+    }
+
+    if (latestComplaint?.status === 'resolved' && latestComplaint.reopenUntil && Date.now() < latestComplaint.reopenUntil.getTime()) {
+        return res.status(400).json({
+            message: 'Complaint resolved. Waiting 48 hours for possible reopen before releasing payment.'
+        });
+    }
+
     payment.status = 'approved';
+    payment.payoutStatus = 'paid';
+    payment.approvedAt = new Date();
+    payment.releasedAt = new Date();
     await payment.save();
 
     res.json({ message: 'Payment approved' });
@@ -173,7 +220,54 @@ export const resolveComplaint = async (req, res) => {
     }
 
     complaint.status = 'resolved';
+    complaint.resolvedAt = new Date();
+    complaint.reopenUntil = new Date(Date.now() + 2 * 60 * 1000);
     await complaint.save();
 
+    if (complaint.serviceRequestId) {
+        const serviceRequest = await ServiceRequest.findById(complaint.serviceRequestId);
+        const bothCompleted = serviceRequest?.customerCompleted && serviceRequest?.providerCompleted;
+
+        if (bothCompleted) {
+            const payment = await Payment.findOne({ serviceRequestId: complaint.serviceRequestId });
+            if (payment) {
+                payment.payoutStatus = 'hold';
+                payment.holdUntil = complaint.reopenUntil;
+                await payment.save();
+            }
+        }
+    }
+
     res.json({ message: 'Complaint resolved' });
+};
+
+// Get user bank details (admin only)
+export const getUserBankDetails = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const details = await UserPaymentDetails.findOne({ userId: id });
+
+        if (!details) {
+            return res.json({ hasDetails: false });
+        }
+
+        res.json({
+            hasDetails: true,
+            user: {
+                name: details.name,
+                email: details.email,
+                phone: details.phone,
+                address: details.address,
+                postalCode: details.postalCode
+            },
+            bank: {
+                bankName: details.bankName,
+                accountNumber: details.accountNumber,
+                accountHolderName: details.accountHolderName,
+                branch: details.branch
+            }
+        });
+    } catch (error) {
+        res.status(500).json({ message: 'Failed to fetch bank details' });
+    }
 };

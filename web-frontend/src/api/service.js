@@ -10,6 +10,11 @@ export const getUserServiceRequests = async () => {
   return response.data;
 };
 
+export const getAllServiceRequests = async () => {
+  const response = await api.get('/services');
+  return response.data;
+};
+
 export const updateServiceRequest = async (id, data) => {
   const response = await api.put(`/services/${id}`, data);
   return response.data;
@@ -37,6 +42,11 @@ export const getDirectBookingRequests = async () => {
 
 export const completeServiceRequest = async (id) => {
   const response = await api.post(`/services/${id}/complete`);
+  return response.data;
+};
+
+export const completeServiceRequestByCustomer = async (id) => {
+  const response = await api.post(`/services/${id}/complete-by-customer`);
   return response.data;
 };
 

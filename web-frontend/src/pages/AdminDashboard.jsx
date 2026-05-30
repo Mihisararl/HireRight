@@ -14,6 +14,10 @@ export default function AdminDashboard() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [activeTab, setActiveTab] = useState('overview');
+  const [bankModalOpen, setBankModalOpen] = useState(false);
+  const [bankDetails, setBankDetails] = useState(null);
+  const [bankUser, setBankUser] = useState(null);
+  const [bankLoading, setBankLoading] = useState(false);
 
   useEffect(() => {
     if (!user || user.role !== 'admin') {
@@ -73,7 +77,7 @@ export default function AdminDashboard() {
       await api.post(`/admin/payments/${id}/approve`);
       setPayments((prev) => prev.map((p) => (p._id === id ? { ...p, status: 'approved' } : p)));
     } catch (err) {
-      setError('Failed to approve payment');
+      setError(err.response?.data?.message || 'Failed to approve payment');
     }
   };
 
@@ -83,6 +87,21 @@ export default function AdminDashboard() {
       setComplaints((prev) => prev.map((c) => (c._id === id ? { ...c, status: 'resolved' } : c)));
     } catch (err) {
       setError('Failed to resolve complaint');
+    }
+  };
+
+  const openBankDetails = async (userItem) => {
+    setBankUser(userItem);
+    setBankDetails(null);
+    setBankModalOpen(true);
+    setBankLoading(true);
+    try {
+      const response = await api.get(`/admin/users/${userItem._id}/bank-details`);
+      setBankDetails(response.data || null);
+    } catch (err) {
+      setBankDetails({ hasDetails: false });
+    } finally {
+      setBankLoading(false);
     }
   };
 
@@ -142,7 +161,7 @@ export default function AdminDashboard() {
       {/* Sidebar */}
       <aside style={styles.sidebar}>
         <div style={styles.sidebarContent}>
-          <div style={styles.brandSection}>   
+          <div style={styles.brandSection}>
             <h2 style={styles.brand}>HireRight</h2>
             <p style={styles.brandSubtitle}>Admin Portal</p>
           </div>
@@ -317,22 +336,35 @@ export default function AdminDashboard() {
               <table style={styles.table}>
                 <thead>
                   <tr>
+                    <th style={styles.th}>Photo</th>
                     <th style={styles.th}>Name</th>
                     <th style={styles.th}>Email</th>
                     <th style={styles.th}>Phone</th>
                     <th style={styles.th}>District</th>
                     <th style={styles.th}>Postal Code</th>
                     <th style={styles.th}>Role</th>
+                    <th style={styles.th}>Actions</th>
                   </tr>
                 </thead>
                 <tbody>
                   {users.length === 0 ? (
                     <tr>
-                      <td colSpan="5" style={styles.emptyCell}>No users found</td>
+                      <td colSpan="8" style={styles.emptyCell}>No users found</td>
                     </tr>
                   ) : (
                     users.map((u) => (
                       <tr key={u._id} style={styles.tableRow}>
+                        <td style={styles.td}>
+                          {u.profilePhoto ? (
+                            <img
+                              src={u.profilePhoto}
+                              alt={u.name || 'User'}
+                              style={styles.userPhoto}
+                            />
+                          ) : (
+                            <div style={styles.miniAvatar}>{u.name?.charAt(0).toUpperCase()}</div>
+                          )}
+                        </td>
                         <td style={styles.td}>
                           <div style={styles.userCell}>
                             <div style={styles.miniAvatar}>{u.name?.charAt(0).toUpperCase()}</div>
@@ -347,6 +379,14 @@ export default function AdminDashboard() {
                           <Badge variant={u.role === 'admin' ? 'approved' : 'default'}>
                             {u.role.charAt(0).toUpperCase() + u.role.slice(1)}
                           </Badge>
+                        </td>
+                        <td style={styles.td}>
+                          <button
+                            style={styles.btnSecondary}
+                            onClick={() => openBankDetails(u)}
+                          >
+                            Bank Details
+                          </button>
                         </td>
                       </tr>
                     ))
@@ -398,7 +438,7 @@ export default function AdminDashboard() {
                         <td style={styles.td}>{p.phone || '-'}</td>
                         <td style={styles.td}>{p.serviceCategory || '-'}</td>
                         <td style={styles.td}>{[p.city, p.district].filter(Boolean).join(', ') || '-'}</td>
-                        <td style={styles.td}>{p.yearsOfExperience ?? '-' } years</td>
+                        <td style={styles.td}>{p.yearsOfExperience ?? '-'} years</td>
                         <td style={styles.td}>Rs. {p.hourlyRate ?? '-'}</td>
                         <td style={styles.td}>{p.idDocument ? 'Uploaded' : '-'}</td>
                         <td style={styles.td}>
@@ -449,6 +489,7 @@ export default function AdminDashboard() {
                     <th style={styles.th}>From</th>
                     <th style={styles.th}>To</th>
                     <th style={styles.th}>Amount (LKR)</th>
+                    <th style={styles.th}>Task Completion</th>
                     <th style={styles.th}>Status</th>
                     <th style={styles.th}>Actions</th>
                   </tr>
@@ -456,31 +497,72 @@ export default function AdminDashboard() {
                 <tbody>
                   {payments.length === 0 ? (
                     <tr>
-                      <td colSpan="5" style={styles.emptyCell}>No payment records</td>
+                      <td colSpan="6" style={styles.emptyCell}>No payment records</td>
                     </tr>
                   ) : (
-                    payments.map((p) => (
-                      <tr key={p._id} style={styles.tableRow}>
-                        <td style={styles.td}>{p.userId?.name || '-'}</td>
-                        <td style={styles.td}>{p.providerId?.name || '-'}</td>
-                        <td style={styles.td}>
-                          <span style={styles.amountText}>LKR {p.amount?.toLocaleString()}</span>
-                        </td>
-                        <td style={styles.td}>
-                          <Badge variant={p.status}>{p.status}</Badge>
-                        </td>
-                        <td style={styles.td}>
-                          {p.status === 'pending' && (
-                            <button style={styles.btnApprove} onClick={() => approvePayment(p._id)}>
-                              <svg style={styles.btnIcon} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                              </svg>
-                              Approve
-                            </button>
-                          )}
-                        </td>
-                      </tr>
-                    ))
+                    payments.map((p) => {
+                      const isReadyForApproval = p.serviceRequestId
+                        ? (p.serviceRequestId.customerCompleted && p.serviceRequestId.providerCompleted)
+                        : true;
+
+                      return (
+                        <tr key={p._id} style={styles.tableRow}>
+                          <td style={styles.td}>{p.userId?.name || '-'}</td>
+                          <td style={styles.td}>
+                            {p.providerId ? `${p.providerId.firstName || ''} ${p.providerId.lastName || ''}`.trim() || '-' : '-'}
+                          </td>
+                          <td style={styles.td}>
+                            <span style={styles.amountText}>LKR {p.amount?.toLocaleString()}</span>
+                          </td>
+                          <td style={styles.td}>
+                            {p.serviceRequestId ? (
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px' }}>
+                                  <span style={{ color: '#64748b', minWidth: '70px', fontWeight: '500' }}>Receiver:</span>
+                                  <Badge variant={p.serviceRequestId.customerCompleted ? 'approved' : 'pending'}>
+                                    {p.serviceRequestId.customerCompleted ? 'Completed' : 'Pending'}
+                                  </Badge>
+                                </div>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px' }}>
+                                  <span style={{ color: '#64748b', minWidth: '70px', fontWeight: '500' }}>Provider:</span>
+                                  <Badge variant={p.serviceRequestId.providerCompleted ? 'approved' : 'pending'}>
+                                    {p.serviceRequestId.providerCompleted ? 'Completed' : 'Pending'}
+                                  </Badge>
+                                </div>
+                              </div>
+                            ) : (
+                              <span style={{ color: '#94a3b8', fontStyle: 'italic' }}>N/A</span>
+                            )}
+                          </td>
+                          <td style={styles.td}>
+                            <Badge variant={p.status}>{p.status}</Badge>
+                          </td>
+                          <td style={styles.td}>
+                            {p.status === 'pending' && (
+                              <button
+                                style={{
+                                  ...styles.btnApprove,
+                                  ...(!isReadyForApproval ? { opacity: 0.5, cursor: 'not-allowed', background: '#94a3b8' } : {})
+                                }}
+                                disabled={!isReadyForApproval}
+                                onClick={() => {
+                                  if (!isReadyForApproval) {
+                                    alert('Cannot release payment. Both the Service Receiver and Provider must mark the task as completed first.');
+                                    return;
+                                  }
+                                  approvePayment(p._id);
+                                }}
+                              >
+                                <svg style={styles.btnIcon} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                                </svg>
+                                Approve
+                              </button>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })
                   )}
                 </tbody>
               </table>
@@ -500,6 +582,8 @@ export default function AdminDashboard() {
                 <thead>
                   <tr>
                     <th style={styles.th}>From</th>
+                    <th style={styles.th}>Provider</th>
+                    <th style={styles.th}>Phone</th>
                     <th style={styles.th}>Subject</th>
                     <th style={styles.th}>Message</th>
                     <th style={styles.th}>Status</th>
@@ -509,12 +593,14 @@ export default function AdminDashboard() {
                 <tbody>
                   {complaints.length === 0 ? (
                     <tr>
-                      <td colSpan="5" style={styles.emptyCell}>No complaints</td>
+                      <td colSpan="7" style={styles.emptyCell}>No complaints</td>
                     </tr>
                   ) : (
                     complaints.map((c) => (
                       <tr key={c._id} style={styles.tableRow}>
                         <td style={styles.td}>{c.userId?.name || '-'}</td>
+                        <td style={styles.td}>{c.providerName || '-'}</td>
+                        <td style={styles.td}>{c.providerPhone || '-'}</td>
                         <td style={styles.td}>
                           <div style={styles.subjectCell}>{c.subject}</div>
                         </td>
@@ -539,6 +625,67 @@ export default function AdminDashboard() {
                   )}
                 </tbody>
               </table>
+            </div>
+          </div>
+        )}
+
+        {bankModalOpen && (
+          <div style={styles.modalOverlay}>
+            <div style={styles.modalCard}>
+              <div style={styles.modalHeader}>
+                <div>
+                  <h3 style={styles.modalTitle}>Bank Details</h3>
+                  <p style={styles.modalSubtitle}>{bankUser?.name || 'User'}</p>
+                </div>
+                <button
+                  style={styles.modalClose}
+                  onClick={() => setBankModalOpen(false)}
+                >
+                  ×
+                </button>
+              </div>
+
+              {bankLoading ? (
+                <div style={styles.modalBody}>Loading...</div>
+              ) : bankDetails?.hasDetails ? (
+                <div style={styles.modalBody}>
+                  <div style={styles.detailRow}>
+                    <span style={styles.detailLabel}>Account Holder</span>
+                    <span style={styles.detailValue}>{bankDetails.bank?.accountHolderName || '-'}</span>
+                  </div>
+                  <div style={styles.detailRow}>
+                    <span style={styles.detailLabel}>Bank Name</span>
+                    <span style={styles.detailValue}>{bankDetails.bank?.bankName || '-'}</span>
+                  </div>
+                  <div style={styles.detailRow}>
+                    <span style={styles.detailLabel}>Account Number</span>
+                    <span style={styles.detailValue}>{bankDetails.bank?.accountNumber || '-'}</span>
+                  </div>
+                  <div style={styles.detailRow}>
+                    <span style={styles.detailLabel}>Branch</span>
+                    <span style={styles.detailValue}>{bankDetails.bank?.branch || '-'}</span>
+                  </div>
+                  <div style={styles.detailDivider}></div>
+                  <div style={styles.detailRow}>
+                    <span style={styles.detailLabel}>Email</span>
+                    <span style={styles.detailValue}>{bankDetails.user?.email || '-'}</span>
+                  </div>
+                  <div style={styles.detailRow}>
+                    <span style={styles.detailLabel}>Phone</span>
+                    <span style={styles.detailValue}>{bankDetails.user?.phone || '-'}</span>
+                  </div>
+                  <div style={styles.detailRow}>
+                    <span style={styles.detailLabel}>Address</span>
+                    <span style={styles.detailValue}>{bankDetails.user?.address || '-'}</span>
+                  </div>
+                  <div style={styles.detailRow}>
+                    <span style={styles.detailLabel}>Postal Code</span>
+                    <span style={styles.detailValue}>{bankDetails.user?.postalCode || '-'}</span>
+                  </div>
+                </div>
+              ) : (
+                <div style={styles.modalBody}>No bank details available.</div>
+              )}
             </div>
           </div>
         )}
@@ -929,6 +1076,13 @@ const styles = {
     fontWeight: '600',
     flexShrink: 0
   },
+  userPhoto: {
+    width: '40px',
+    height: '40px',
+    borderRadius: '10px',
+    objectFit: 'cover',
+    border: '1px solid #e2e8f0'
+  },
   subjectCell: {
     fontWeight: '500',
     color: '#1e293b'
@@ -978,6 +1132,16 @@ const styles = {
     borderRadius: '10px',
     cursor: 'pointer',
     transition: 'all 0.2s'
+  },
+  btnSecondary: {
+    padding: '8px 14px',
+    fontSize: '12px',
+    fontWeight: '600',
+    color: '#1d4ed8',
+    backgroundColor: '#e0f2fe',
+    border: '1px solid #bfdbfe',
+    borderRadius: '10px',
+    cursor: 'pointer'
   },
   btnResolve: {
     display: 'flex',
@@ -1054,6 +1218,76 @@ const styles = {
     marginTop: '16px',
     fontSize: '14px',
     color: '#64748b'
+  },
+
+  modalOverlay: {
+    position: 'fixed',
+    inset: 0,
+    backgroundColor: 'rgba(15, 23, 42, 0.5)',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 999
+  },
+  modalCard: {
+    width: '90%',
+    maxWidth: '520px',
+    backgroundColor: '#ffffff',
+    borderRadius: '16px',
+    boxShadow: '0 20px 40px rgba(15, 23, 42, 0.2)',
+    overflow: 'hidden'
+  },
+  modalHeader: {
+    padding: '20px 24px',
+    borderBottom: '1px solid #f1f5f9',
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center'
+  },
+  modalTitle: {
+    margin: 0,
+    fontSize: '18px',
+    fontWeight: '700',
+    color: '#1e293b'
+  },
+  modalSubtitle: {
+    margin: '4px 0 0',
+    fontSize: '13px',
+    color: '#64748b'
+  },
+  modalClose: {
+    width: '32px',
+    height: '32px',
+    borderRadius: '8px',
+    border: '1px solid #e2e8f0',
+    backgroundColor: '#ffffff',
+    cursor: 'pointer',
+    fontSize: '18px',
+    color: '#64748b'
+  },
+  modalBody: {
+    padding: '20px 24px',
+    fontSize: '14px',
+    color: '#475569'
+  },
+  detailRow: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    gap: '16px',
+    padding: '8px 0'
+  },
+  detailLabel: {
+    fontWeight: '600',
+    color: '#64748b'
+  },
+  detailValue: {
+    fontWeight: '600',
+    color: '#0f172a'
+  },
+  detailDivider: {
+    height: '1px',
+    backgroundColor: '#e2e8f0',
+    margin: '12px 0'
   }
 };
 
@@ -1111,7 +1345,7 @@ styleSheet.textContent = `
     background-color: #f8fafc !important;
   }
 
-  .btnApprove:hover {
+  .btnApprove:hover:not(:disabled) {
     background-color: #1d4ed8 !important;
     box-shadow: 0 4px 12px rgba(37, 99, 235, 0.3);
   }
