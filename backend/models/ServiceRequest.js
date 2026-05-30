@@ -35,8 +35,16 @@ const serviceRequestSchema = new mongoose.Schema(
       required: true,
     },
     location: {
-      type: String,
-      required: true,
+      lat: { type: Number },
+      lng: { type: Number },
+      address: { type: String, required: true },
+    },
+    journeyActive: {
+      type: Boolean,
+      default: false,
+    },
+    journeyStartedAt: {
+      type: Date,
     },
     specificRequirements: {
       type: String,
@@ -80,6 +88,20 @@ const serviceRequestSchema = new mongoose.Schema(
     },
     acceptedAt: {
       type: Date,
+    },
+    customerCompleted: {
+      type: Boolean,
+      default: false
+    },
+    providerCompleted: {
+      type: Boolean,
+      default: false
+    },
+    customerCompletedAt: {
+      type: Date
+    },
+    providerCompletedAt: {
+      type: Date
     },
     completedAt: {
       type: Date,

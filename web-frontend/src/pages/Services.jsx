@@ -4,6 +4,8 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { AuthContext } from '../context/AuthContext';
 import { getApprovedProviders, getProvidersByCategory } from '../api/provider';
 import { createServiceRequest } from '../api/service';
+import LocationPicker from '../components/location/LocationPicker';
+import { hasCoordinates } from '../utils/locationHelpers';
 
 export default function Services() {
   const navigate = useNavigate();
@@ -22,7 +24,7 @@ export default function Services() {
     preferredTime: '',
     estimatedDuration: '',
     budget: '',
-    location: '',
+    location: { address: '' },
     specificRequirements: ''
   });
 
@@ -148,7 +150,7 @@ export default function Services() {
         preferredTime: '',
         estimatedDuration: '',
         budget: service.price.toString(),
-        location: '',
+        location: { address: '' },
         specificRequirements: ''
       });
     } else {
@@ -157,8 +159,13 @@ export default function Services() {
   };
 
   const handleSubmitBooking = async () => {
-    if (!bookingForm.preferredDate || !bookingForm.preferredTime || !bookingForm.location) {
+    if (!bookingForm.preferredDate || !bookingForm.preferredTime) {
       alert('Please fill in all required fields');
+      return;
+    }
+
+    if (!hasCoordinates(bookingForm.location) || !String(bookingForm.location.address || '').trim()) {
+      alert('Please select your location on the map and enter an address.');
       return;
     }
 
@@ -189,7 +196,7 @@ export default function Services() {
         preferredTime: '',
         estimatedDuration: '',
         budget: '',
-        location: '',
+        location: { address: '' },
         specificRequirements: ''
       });
     } catch (error) {
@@ -207,7 +214,7 @@ export default function Services() {
       preferredTime: '',
       estimatedDuration: '',
       budget: '',
-      location: '',
+      location: { address: '' },
       specificRequirements: ''
     });
   };
@@ -923,26 +930,10 @@ export default function Services() {
                 </div>
               </div>
 
-              <div>
-                <label style={{ fontSize: '14px', fontWeight: '600', color: '#1f2937', display: 'block', marginBottom: '8px' }}>
-                  Location *
-                </label>
-                <input
-                  type="text"
-                  placeholder="Enter your location"
-                  value={bookingForm.location}
-                  onChange={(e) => setBookingForm({ ...bookingForm, location: e.target.value })}
-                  style={{
-                    width: '100%',
-                    padding: '12px',
-                    border: '1px solid #d1d5db',
-                    borderRadius: '8px',
-                    fontSize: '14px',
-                    fontFamily: 'inherit',
-                    boxSizing: 'border-box'
-                  }}
-                />
-              </div>
+              <LocationPicker
+                value={bookingForm.location}
+                onChange={(location) => setBookingForm((prev) => ({ ...prev, location }))}
+              />
 
               <div>
                 <label style={{ fontSize: '14px', fontWeight: '600', color: '#1f2937', display: 'block', marginBottom: '8px' }}>
