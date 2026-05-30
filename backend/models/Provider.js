@@ -3,7 +3,19 @@ import bcrypt from "bcryptjs";
 
 const providerSchema = new mongoose.Schema(
   {
-    name: {
+    userId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      required: true
+    },
+
+    firstName: {
+      type: String,
+      required: true,
+      trim: true
+    },
+
+    lastName: {
       type: String,
       required: true,
       trim: true
@@ -17,59 +29,130 @@ const providerSchema = new mongoose.Schema(
       trim: true
     },
 
-    password: {
+    phone: {
       type: String,
       required: true,
-      minlength: 6,
-      select: false
+      trim: true
     },
 
-    role: {
+    district: {
       type: String,
-      default: "provider"
+      required: true,
+      trim: true
     },
 
-    isVerified: {
-      type: Boolean,
-      default: false
-    },
-
-    status: {
+    city: {
       type: String,
-      enum: ['pending', 'approved', 'rejected'],
-      default: 'pending'
+      required: true,
+      trim: true
     },
 
-    verificationToken: {
+    postalCode: {
+      type: String,
+      trim: true
+    },
+
+    serviceCategory: {
+      type: String,
+      required: true,
+      trim: true
+    },
+
+    yearsOfExperience: {
+      type: Number,
+      required: true,
+      min: 0
+    },
+
+    hourlyRate: {
+      type: Number,
+      required: true,
+      min: 0
+    },
+
+    professionalBio: {
+      type: String,
+      trim: true
+    },
+
+    portfolioPhoto: {
       type: String
     },
 
-    verificationTokenExpires: {
-      type: Date
+    idDocument: {
+      type: String,
+      required: true
+    },
+
+    bankName: {
+      type: String,
+      required: true,
+      trim: true
+    },
+
+    accountNumber: {
+      type: String,
+      required: true,
+      trim: true
+    },
+
+    branch: {
+      type: String,
+      required: true,
+      trim: true
+    },
+
+    accountHolderName: {
+      type: String,
+      required: true,
+      trim: true
+    },
+
+    approvedAt: {
+      type: Date,
+      required: true
+    },
+
+    approvedBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User"
     },
 
     createdAt: {
       type: Date,
       default: Date.now
-    }
+    },
+
+    rating: {
+      type: Number,
+      default: 0,
+      min: 0,
+      max: 5
+    },
+
+    totalReviews: {
+      type: Number,
+      default: 0,
+      min: 0
+    },
+
+    // Daily availability (provider sets each day)
+    availabilityDate: {
+      type: String,
+      trim: true
+    },
+    isAvailableToday: {
+      type: Boolean,
+      default: true
+    },
+
+    location: {
+      lat: { type: Number },
+      lng: { type: Number },
+      updatedAt: { type: Date },
+    },
   },
   { timestamps: true }
 );
-
-
-// HASH PASSWORD BEFORE SAVE
-providerSchema.pre("save", async function (next) {
-  if (!this.isModified("password")) return next();
-
-  this.password = await bcrypt.hash(this.password, 10);
-  next();
-});
-
-
-// MATCH PASSWORD METHOD
-providerSchema.methods.matchPassword = async function (enteredPassword) {
-  return await bcrypt.compare(enteredPassword, this.password);
-};
-
 
 export default mongoose.model("Provider", providerSchema);

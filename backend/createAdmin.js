@@ -20,7 +20,8 @@ const createAdmin = async () => {
             email: 'admin@hireright.lk',
             phone: '0710000000',
             password: 'Admin@123',
-            role: 'admin'
+            role: 'admin',
+            isVerified: true
         });
 
         await admin.save();

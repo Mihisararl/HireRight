@@ -5,10 +5,12 @@ const userSchema = new mongoose.Schema({
   name: { type: String, required: true, trim: true },
   email: { type: String, required: true, unique: true, lowercase: true, trim: true },
   phone: { type: String, required: true, trim: true },
+  address: { type: String, trim: true },
   district: { type: String, trim: true },
   postalCode: { type: String, trim: true },
   password: { type: String, required: true },
   role: { type: String, enum: ['customer', 'provider', 'admin'], default: 'customer' },
+  profilePhoto: { type: String },
 
   // Provider-specific fields
   serviceCategory: { type: String },
@@ -30,6 +32,7 @@ const userSchema = new mongoose.Schema({
   providerStatus: {
     type: String,
     enum: ['pending', 'approved', 'rejected'],
+    default: 'pending',
     required: function () {
       return this.role === 'provider';
     }
@@ -46,7 +49,7 @@ userSchema.pre('save', async function (next) {
   const salt = await bcrypt.genSalt(10);
   this.password = await bcrypt.hash(this.password, salt);
   next();
-  
+
 });
 
 export default mongoose.model('User', userSchema);

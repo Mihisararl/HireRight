@@ -1,5 +1,13 @@
 import React, { useState } from 'react';
 import { ChevronLeft } from 'lucide-react';
+import { registerProvider } from '../api/provider';
+
+const fileToDataUrl = (file) => new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = () => reject(new Error('Failed to read file'));
+    reader.readAsDataURL(file);
+});
 
 const ProviderRegistration = () => {
     const [step, setStep] = useState(1);
@@ -151,18 +159,29 @@ const ProviderRegistration = () => {
 
     const handleSubmit = async () => {
         if (validateStep3()) {
-            // Submit the form data
-            console.log('Form submitted:', formData);
+            try {
+                const payload = {
+                    firstName: formData.firstName,
+                    lastName: formData.lastName,
+                    email: formData.email,
+                    phoneNumber: formData.phoneNumber,
+                    password: formData.password,
+                    serviceCategory: formData.serviceCategory,
+                    yearsOfExperience: Number(formData.yearsOfExperience),
+                    hourlyRate: Number(formData.hourlyRate),
+                    professionalBio: formData.professionalBio,
+                    city: formData.city,
+                    district: formData.district,
+                    agreedToBackgroundCheck: formData.agreedToBackgroundCheck,
+                    portfolioPhoto: formData.portfolioPhoto ? await fileToDataUrl(formData.portfolioPhoto) : '',
+                    idDocument: formData.idDocument ? await fileToDataUrl(formData.idDocument) : ''
+                };
 
-            // Here you would typically send the data to your backend
-            // Example:
-            // const response = await fetch('/api/provider/register', {
-            //   method: 'POST',
-            //   headers: { 'Content-Type': 'application/json' },
-            //   body: JSON.stringify(formData)
-            // });
-
-            alert('Registration completed successfully!');
+                await registerProvider(payload);
+                alert('Registration completed successfully! Admin review is pending.');
+            } catch (error) {
+                alert(error.response?.data?.message || 'Failed to submit registration');
+            }
         }
     };
 

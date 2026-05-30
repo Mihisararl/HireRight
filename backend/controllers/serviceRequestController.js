@@ -1,5 +1,9 @@
 import ServiceRequest from "../models/ServiceRequest.js";
 import User from "../models/User.js";
+import Provider from "../models/Provider.js";
+import { validateServiceLocation } from "../utils/locationUtils.js";
+import { stopJourneyForProvider } from "../utils/locationUtils.js";
+import { attachProviderProfilesToRequests } from "../utils/providerProfileUtils.js";
 
 // POST - Create service request
 export const createServiceRequest = async (req, res) => {
@@ -7,6 +11,22 @@ export const createServiceRequest = async (req, res) => {
     // Coerce numeric fields if necessary
     const payload = { ...req.body, userId: req.user.id };
     if (payload.budget) payload.budget = Number(payload.budget);
+
+    const locationCheck = validateServiceLocation(payload.location);
+    if (!locationCheck.valid) {
+      return res.status(400).json({ message: locationCheck.message });
+    }
+    payload.location = locationCheck.location;
+
+    // If this is a direct booking, initialize providerResponse
+    if (payload.bookingType === 'direct') {
+      payload.providerResponse = {
+        respondedAt: null,
+        status: 'pending',
+        responseMessage: null
+      };
+      payload.status = 'Pending';
+    }
 
     const newRequest = new ServiceRequest(payload);
     await newRequest.save();
@@ -42,8 +62,12 @@ export const getAllServiceRequests = async (req, res) => {
 // GET - Get service requests by user
 export const getServiceRequestsByUser = async (req, res) => {
   try {
-    const requests = await ServiceRequest.find({ userId: req.user.id }).sort({ createdAt: -1 });
-    res.status(200).json(requests);
+    const requests = await ServiceRequest.find({ userId: req.user.id })
+      .populate('providerId', 'name email phone profilePhoto')
+      .sort({ createdAt: -1 });
+
+    const enrichedRequests = await attachProviderProfilesToRequests(requests);
+    res.status(200).json(enrichedRequests);
   } catch (error) {
     res.status(500).json({
       message: "Failed to fetch service requests",
@@ -58,6 +82,14 @@ export const updateServiceRequest = async (req, res) => {
     const { id } = req.params;
     const payload = { ...req.body };
     if (payload.budget) payload.budget = Number(payload.budget);
+
+    if (payload.location !== undefined) {
+      const locationCheck = validateServiceLocation(payload.location);
+      if (!locationCheck.valid) {
+        return res.status(400).json({ message: locationCheck.message });
+      }
+      payload.location = locationCheck.location;
+    }
 
     const updatedRequest = await ServiceRequest.findOneAndUpdate(
       { _id: id, userId: req.user.id },
@@ -85,10 +117,18 @@ export const updateServiceRequest = async (req, res) => {
 // GET - Get available service requests for providers
 export const getAvailableServiceRequests = async (req, res) => {
   try {
-    const requests = await ServiceRequest.find({ status: "Pending" })
-      .populate('userId', 'name email')
+    const query = { status: "Pending", bookingType: "post" };
+
+    const requests = await ServiceRequest.find(query)
+      .populate('userId', 'name email role')
       .sort({ createdAt: -1 });
-    res.status(200).json(requests);
+
+    // Filter to only include requests where userId exists and has role 'customer'
+    const filteredRequests = requests.filter(
+      (request) => request.userId && request.userId.role === 'customer'
+    );
+
+    res.status(200).json(filteredRequests);
   } catch (error) {
     res.status(500).json({
       message: "Failed to fetch available service requests",
@@ -103,16 +143,18 @@ export const acceptServiceRequest = async (req, res) => {
     const { id } = req.params;
     const { message, proposedPrice, proposedDate } = req.body;
 
-    // Check if provider is approved
-    const provider = await User.findById(req.user.id);
-    if (!provider || provider.role !== 'provider') {
+    const providerAccount = await User.findById(req.user.id);
+    const providerProfile = await Provider.findOne({ userId: req.user.id });
+
+    if (!providerAccount || providerAccount.role !== 'provider') {
       return res.status(403).json({ message: "Only providers can send offers" });
     }
 
-    if (provider.providerStatus !== 'approved') {
+    const isApproved = providerProfile?.status === 'approved' || providerAccount.providerStatus === 'approved';
+    if (!isApproved) {
       return res.status(403).json({
         message: "Your provider account is not approved yet. Please wait for admin approval.",
-        providerStatus: provider.providerStatus
+        providerStatus: providerProfile?.status || providerAccount.providerStatus
       });
     }
 
@@ -181,21 +223,74 @@ export const completeServiceRequest = async (req, res) => {
       return res.status(404).json({ message: "Service request not found or not authorized" });
     }
 
-    if (serviceRequest.status !== "Accepted") {
-      return res.status(400).json({ message: "Service request is not in accepted status" });
+    if (!['Accepted', 'Confirmed'].includes(serviceRequest.status)) {
+      return res.status(400).json({ message: "Service request is not in a completable status" });
     }
 
-    serviceRequest.status = "Completed";
-    serviceRequest.completedAt = new Date();
+    serviceRequest.providerCompleted = true;
+    serviceRequest.providerCompletedAt = new Date();
 
+    if (serviceRequest.customerCompleted) {
+      serviceRequest.status = "Completed";
+      serviceRequest.completedAt = new Date();
+    }
+
+    serviceRequest.journeyActive = false;
     await serviceRequest.save();
+    await stopJourneyForProvider(req.user.id);
 
     res.status(200).json({
-      message: "Service request completed successfully",
+      message: "Provider completion recorded",
       serviceRequest,
     });
   } catch (error) {
     console.error('completeServiceRequest error:', error);
+    res.status(500).json({
+      message: "Failed to complete service request",
+      error: error.message,
+    });
+  }
+};
+
+// POST - Customer marks a service request completed
+export const completeServiceRequestByCustomer = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const serviceRequest = await ServiceRequest.findOne({
+      _id: id,
+      userId: req.user.id
+    });
+
+    if (!serviceRequest) {
+      return res.status(404).json({ message: "Service request not found or not authorized" });
+    }
+
+    if (!['Accepted', 'Confirmed'].includes(serviceRequest.status)) {
+      return res.status(400).json({ message: "Service request is not in a completable status" });
+    }
+
+    serviceRequest.customerCompleted = true;
+    serviceRequest.customerCompletedAt = new Date();
+
+    if (serviceRequest.providerCompleted) {
+      serviceRequest.status = "Completed";
+      serviceRequest.completedAt = new Date();
+    }
+
+    serviceRequest.journeyActive = false;
+    await serviceRequest.save();
+
+    if (serviceRequest.status === 'Completed' && serviceRequest.providerId) {
+      await stopJourneyForProvider(serviceRequest.providerId);
+    }
+
+    res.status(200).json({
+      message: "Customer completion recorded",
+      serviceRequest,
+    });
+  } catch (error) {
+    console.error('completeServiceRequestByCustomer error:', error);
     res.status(500).json({
       message: "Failed to complete service request",
       error: error.message,
@@ -275,6 +370,112 @@ export const rejectProviderOffer = async (req, res) => {
     console.error('rejectProviderOffer error:', error);
     res.status(500).json({
       message: "Failed to reject offer",
+      error: error.message,
+    });
+  }
+};
+
+// GET - Get direct booking requests for provider (from Services page)
+export const getDirectBookingRequests = async (req, res) => {
+  try {
+    const requests = await ServiceRequest.find({
+      providerId: req.user.id,
+      bookingType: 'direct',
+      'providerResponse.status': 'pending'
+    })
+      .populate('userId', 'name email phone')
+      .sort({ createdAt: -1 });
+
+    res.status(200).json(requests);
+  } catch (error) {
+    console.error('getDirectBookingRequests error:', error);
+    res.status(500).json({
+      message: "Failed to fetch booking requests",
+      error: error.message,
+    });
+  }
+};
+
+// POST - Provider accepts direct booking from Services page
+export const acceptDirectBooking = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { responseMessage } = req.body;
+
+    const serviceRequest = await ServiceRequest.findOne({
+      _id: id,
+      providerId: req.user.id,
+      bookingType: 'direct'
+    });
+
+    if (!serviceRequest) {
+      return res.status(404).json({ message: "Booking request not found or not authorized" });
+    }
+
+    if (serviceRequest.providerResponse?.status !== 'pending') {
+      return res.status(400).json({ message: "This booking has already been responded to" });
+    }
+
+    serviceRequest.status = "Confirmed";
+    serviceRequest.providerResponse = {
+      respondedAt: new Date(),
+      status: 'accepted',
+      responseMessage: responseMessage || 'Booking accepted'
+    };
+    serviceRequest.acceptedAt = new Date();
+
+    await serviceRequest.save();
+
+    res.status(200).json({
+      message: "Booking accepted successfully",
+      serviceRequest,
+    });
+  } catch (error) {
+    console.error('acceptDirectBooking error:', error);
+    res.status(500).json({
+      message: "Failed to accept booking",
+      error: error.message,
+    });
+  }
+};
+
+// POST - Provider rejects direct booking from Services page
+export const rejectDirectBooking = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { responseMessage } = req.body;
+
+    const serviceRequest = await ServiceRequest.findOne({
+      _id: id,
+      providerId: req.user.id,
+      bookingType: 'direct'
+    });
+
+    if (!serviceRequest) {
+      return res.status(404).json({ message: "Booking request not found or not authorized" });
+    }
+
+    if (serviceRequest.providerResponse?.status !== 'pending') {
+      return res.status(400).json({ message: "This booking has already been responded to" });
+    }
+
+    serviceRequest.status = "ProviderRejected";
+    serviceRequest.providerResponse = {
+      respondedAt: new Date(),
+      status: 'rejected',
+      responseMessage: responseMessage || 'Booking rejected'
+    };
+
+    await serviceRequest.save();
+
+    res.status(200).json({
+      message: "Booking rejected successfully",
+      serviceRequest,
+    });
+  } catch (error) {
+    console.error('rejectDirectBooking error:', error);
+    res.status(500).json({
+      message: "Failed to reject booking",
       error: error.message,
     });
   }

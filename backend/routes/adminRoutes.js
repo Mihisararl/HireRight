@@ -8,7 +8,8 @@ import {
     getPayments,
     approvePayment,
     getComplaints,
-    resolveComplaint
+    resolveComplaint,
+    getUserBankDetails
 } from '../controllers/adminController.js';
 
 const router = express.Router();
@@ -21,5 +22,6 @@ router.get('/payments', auth('admin'), getPayments);
 router.post('/payments/:id/approve', auth('admin'), approvePayment);
 router.get('/complaints', auth('admin'), getComplaints);
 router.post('/complaints/:id/resolve', auth('admin'), resolveComplaint);
+router.get('/users/:id/bank-details', auth('admin'), getUserBankDetails);
 
 export default router;

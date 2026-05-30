@@ -1,38 +1,143 @@
-import React, { useState, useEffect, useContext } from "react";
-import { Bell, Settings, LogOut, Calendar, Clock, MapPin, Edit, X } from "lucide-react";
-import { useNavigate } from 'react-router-dom';
-import { getUserServiceRequests, updateServiceRequest, acceptProviderOffer, rejectProviderOffer } from '../api/service';
+import React, { useState, useEffect, useContext, useCallback, useRef } from "react";
+import { Bell, Settings, LogOut, Calendar, Clock, MapPin, Edit, X, CheckCircle, CreditCard } from "lucide-react";
+import { useNavigate, useLocation } from 'react-router-dom';
+import { getUserServiceRequests, updateServiceRequest, acceptProviderOffer, rejectProviderOffer, completeServiceRequestByCustomer } from '../api/service';
+import { getUserPayments } from '../api/payment';
+import { getUserComplaints } from '../api/complaint';
+import { createReview, getUserReviews } from '../api/review';
 import { AuthContext } from "../context/AuthContext";
+import LocationPicker from '../components/location/LocationPicker';
+import CustomerProviderTracking from '../components/location/CustomerProviderTracking';
+import ProviderOfferProfile from '../components/offers/ProviderOfferProfile';
+import { formatLocationDisplay, hasCoordinates } from '../utils/locationHelpers';
+
+const isPendingProviderOffer = (request) => (
+  request?.status === 'OfferSent'
+  && request?.providerOffer?.customerResponse === 'pending'
+);
 
 const CustomerDashboard = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const { user } = useContext(AuthContext);
   const [activeTab, setActiveTab] = useState("active");
   const [serviceRequests, setServiceRequests] = useState([]);
+  const [payments, setPayments] = useState([]);
+  const [complaints, setComplaints] = useState([]);
+  const [reviews, setReviews] = useState([]);
+  const [reviewModalOpen, setReviewModalOpen] = useState(false);
+  const [reviewTarget, setReviewTarget] = useState(null);
+  const [reviewRating, setReviewRating] = useState(5);
+  const [reviewComment, setReviewComment] = useState('');
+  const [reviewSaving, setReviewSaving] = useState(false);
+  const [reviewThanks, setReviewThanks] = useState('');
   const [isEditing, setIsEditing] = useState(false);
   const [editingRequest, setEditingRequest] = useState(null);
   const [formData, setFormData] = useState({});
+  const previousOfferCountRef = useRef(0);
+
+  const refreshServiceRequests = useCallback(async () => {
+    try {
+      const requests = await getUserServiceRequests();
+      setServiceRequests(requests);
+      return requests;
+    } catch (error) {
+      console.error('Failed to fetch service requests:', error);
+      return null;
+    }
+  }, []);
+
+  // Helper function to display the correct status label
+  const getStatusDisplay = (status) => {
+    const statusMap = {
+      'Accepted': 'Confirmed',
+      'OfferSent': 'Offer Received',
+      'Pending': 'Pending',
+      'Completed': 'Completed',
+      'Rejected': 'Rejected'
+    };
+    return statusMap[status] || status;
+  };
 
   useEffect(() => {
-    const fetchServiceRequests = async () => {
+    if (location.state?.tab) {
+      setActiveTab(location.state.tab);
+    }
+  }, [location.state]);
+
+  useEffect(() => {
+    const loadDashboardData = async () => {
+      const requests = await refreshServiceRequests();
+      if (!requests) return;
+
       try {
-        const requests = await getUserServiceRequests();
-        setServiceRequests(requests);
+        const paymentList = await getUserPayments();
+        setPayments(paymentList || []);
+        const complaintList = await getUserComplaints();
+        setComplaints(complaintList || []);
+        const reviewList = await getUserReviews();
+        setReviews(reviewList || []);
       } catch (error) {
-        console.error('Failed to fetch service requests:', error);
+        console.error('Failed to fetch dashboard data:', error);
       }
     };
 
-    fetchServiceRequests();
+    loadDashboardData();
+  }, [refreshServiceRequests]);
+
+  useEffect(() => {
+    const pollOffers = async () => {
+      await refreshServiceRequests();
+    };
+
+    const intervalId = setInterval(pollOffers, 30000);
+    const handleFocus = () => pollOffers();
+    window.addEventListener('focus', handleFocus);
+
+    return () => {
+      clearInterval(intervalId);
+      window.removeEventListener('focus', handleFocus);
+    };
+  }, [refreshServiceRequests]);
+
+  useEffect(() => {
+    const refreshComplaints = async () => {
+      try {
+        const complaintList = await getUserComplaints();
+        setComplaints(complaintList || []);
+      } catch (error) {
+        console.error('Failed to refresh complaints:', error);
+      }
+    };
+
+    const intervalId = setInterval(refreshComplaints, 30000);
+    const handleFocus = () => refreshComplaints();
+    window.addEventListener('focus', handleFocus);
+
+    return () => {
+      clearInterval(intervalId);
+      window.removeEventListener('focus', handleFocus);
+    };
   }, []);
 
   const handleEdit = (request) => {
     setEditingRequest(request);
-    setFormData({ ...request });
+    const loc = request.location;
+    const normalizedLocation = typeof loc === 'string'
+      ? { address: loc }
+      : {
+        ...(loc?.lat != null && loc?.lng != null ? { lat: loc.lat, lng: loc.lng } : {}),
+        address: loc?.address || '',
+      };
+    setFormData({ ...request, location: normalizedLocation });
     setIsEditing(true);
   };
 
   const handleSave = async () => {
+    if (formData.location && !hasCoordinates(formData.location)) {
+      alert('Please select a map location with coordinates before saving.');
+      return;
+    }
     try {
       await updateServiceRequest(editingRequest._id, formData);
       setServiceRequests(serviceRequests.map(req =>
@@ -54,9 +159,8 @@ const CustomerDashboard = () => {
   const handleAcceptOffer = async (requestId) => {
     try {
       await acceptProviderOffer(requestId);
-      // Refresh service requests
-      const requests = await getUserServiceRequests();
-      setServiceRequests(requests);
+      const requests = await refreshServiceRequests();
+      if (requests) setServiceRequests(requests);
       alert('Provider offer accepted successfully!');
     } catch (error) {
       console.error('Failed to accept offer:', error);
@@ -67,9 +171,8 @@ const CustomerDashboard = () => {
   const handleRejectOffer = async (requestId) => {
     try {
       await rejectProviderOffer(requestId);
-      // Refresh service requests
-      const requests = await getUserServiceRequests();
-      setServiceRequests(requests);
+      const requests = await refreshServiceRequests();
+      if (requests) setServiceRequests(requests);
       alert('Provider offer rejected. Request is now available for other providers.');
     } catch (error) {
       console.error('Failed to reject offer:', error);
@@ -77,70 +180,1062 @@ const CustomerDashboard = () => {
     }
   };
 
+  const handleCompleteBooking = async (requestId) => {
+    try {
+      await completeServiceRequestByCustomer(requestId);
+      const requests = await getUserServiceRequests();
+      setServiceRequests(requests);
+      alert('Completion recorded. Waiting for provider confirmation.');
+    } catch (error) {
+      console.error('Failed to complete request:', error);
+      alert(error.response?.data?.message || 'Failed to mark as completed');
+    }
+  };
+
+  const activeBookings = serviceRequests.filter((request) => (
+    request.status === 'Accepted' || request.status === 'Confirmed'
+  ));
+
+  const completedBookings = serviceRequests.filter((request) => request.status === 'Completed');
+
+  const totalSpent = completedBookings.reduce((sum, request) => sum + (Number(request.budget) || 0), 0);
+
   const stats = [
-    { label: "Active Requests", value: "2", icon: "📋", bg: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)" },
-    { label: "Completed", value: "2", icon: "✓", bg: "linear-gradient(135deg, #0ea5e9 0%, #2563eb 100%)" },
-    { label: "Total Spent", value: "Rs.3500", icon: "💳", bg: "linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)" },
+    { label: "Active Requests", value: String(activeBookings.length), icon: "📋", bg: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)" },
+    { label: "Completed", value: String(completedBookings.length), icon: "✓", bg: "linear-gradient(135deg, #0ea5e9 0%, #2563eb 100%)" },
+    { label: "Total Spent", value: `Rs.${totalSpent}`, icon: "💳", bg: "linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)" },
   ];
 
-  const bookings = [
-    {
-      id: 1,
-      provider: "Sarah Johnson",
-      rating: 4.8,
-      service: "House Cleaning",
-      status: "Confirmed",
-      statusColor: "#1d4ed8",
-      statusBg: "#dbeafe",
-      date: "Dec 2, 2024 at 2:00 PM",
-      duration: "3 hours",
-      location: "123 Main St, Seattle",
-      amount: "Rs.2300.00",
-      canPayNow: true,
-      canReport: true,
-    },
-    {
-      id: 2,
-      provider: "Mike Torres",
-      rating: 4.9,
-      service: "Plumbing Repair",
-      status: "In Progress",
-      statusColor: "#ca8a04",
-      statusBg: "#fef3c7",
-      date: "Dec 3, 2024 at 10:00 AM",
-      duration: "2 hours",
-      location: "123 Main St, Seattle",
-      amount: "Rs.1200.00",
-      canPayNow: true,
-      canComplete: true,
-      canReport: true,
-    },
-  ];
+  const toBookingCard = (request) => {
+    const providerName = request.providerId?.name || 'Provider';
+    const statusLabel = getStatusDisplay(request.status);
+    const isConfirmed = request.status === 'Accepted' || request.status === 'Confirmed';
+    const payment = payments.find((item) => String(item.serviceRequestId) === String(request._id));
+    const isPaid = Boolean(payment);
+    const paymentReleased = payment?.payoutStatus === 'paid';
+    const complaint = complaints.find((item) => String(item.serviceRequestId) === String(request._id));
+    return {
+      id: request._id,
+      orderId: request._id,
+      providerUserId: request.providerId?._id || null,
+      provider: providerName,
+      phone: request.providerId?.phone || '',
+      service: request.serviceTitle,
+      status: statusLabel,
+      statusColor: isConfirmed ? "#1d4ed8" : "#ca8a04",
+      statusBg: isConfirmed ? "#dbeafe" : "#fef3c7",
+      date: `${request.preferredDate} at ${request.preferredTime}`,
+      duration: request.estimatedDuration || 'N/A',
+      location: formatLocationDisplay(request.location),
+      customerLocation: request.location,
+      amount: `Rs.${request.budget || 0}`,
+      amountValue: Number(request.budget) || 0,
+      canPayNow: (request.status === 'Accepted' || request.status === 'Confirmed') && !isPaid,
+      isPaid,
+      canComplete: (request.status === 'Accepted' || request.status === 'Confirmed') && !request.customerCompleted,
+      customerCompleted: Boolean(request.customerCompleted),
+      canReport: !paymentReleased,
+      complaintStatus: complaint?.status || null,
+      paymentReleased,
+    };
+  };
+
+  const handleReviewSubmit = async () => {
+    if (!reviewTarget) return;
+    setReviewSaving(true);
+    try {
+      await createReview({
+        serviceRequestId: reviewTarget.id,
+        rating: reviewRating,
+        comment: reviewComment
+      });
+      const reviewList = await getUserReviews();
+      setReviews(reviewList || []);
+      setReviewModalOpen(false);
+      setReviewTarget(null);
+      setReviewThanks('Thank you for your feedback!');
+      setTimeout(() => setReviewThanks(''), 4000);
+    } catch (error) {
+      alert(error.response?.data?.message || 'Failed to submit review');
+    } finally {
+      setReviewSaving(false);
+    }
+  };
+
+  const handleReviewRemindLater = () => {
+    if (reviewTarget) {
+      const remindUntil = Date.now() + 24 * 60 * 60 * 1000;
+      localStorage.setItem(`review_remind_${reviewTarget.id}`, String(remindUntil));
+    }
+    setReviewModalOpen(false);
+    setReviewTarget(null);
+  };
+
+  const bookings = activeBookings.map(toBookingCard);
+  const completedCards = completedBookings.map(toBookingCard);
+  const pendingPosts = serviceRequests.filter((request) => (
+    request.status === 'Pending' || request.status === 'OfferSent' || request.status === 'ProviderRejected'
+  ));
+  const pendingOffers = serviceRequests.filter(isPendingProviderOffer);
+  const pendingOfferCount = pendingOffers.length;
+  const offersInitializedRef = useRef(false);
+
+  useEffect(() => {
+    const baseTitle = 'HireRight — Customer Dashboard';
+    document.title = pendingOfferCount > 0
+      ? `(${pendingOfferCount}) New offer${pendingOfferCount > 1 ? 's' : ''} — HireRight`
+      : baseTitle;
+    return () => {
+      document.title = 'HireRight';
+    };
+  }, [pendingOfferCount]);
+
+  useEffect(() => {
+    if (!offersInitializedRef.current) {
+      offersInitializedRef.current = true;
+      previousOfferCountRef.current = pendingOfferCount;
+      return;
+    }
+    if (pendingOfferCount > previousOfferCountRef.current) {
+      setActiveTab('posts');
+    }
+    previousOfferCountRef.current = pendingOfferCount;
+  }, [pendingOfferCount]);
+
+  useEffect(() => {
+    if (reviewModalOpen) return;
+    const reviewedIds = new Set(reviews.map((review) => String(review.serviceRequestId)));
+    const remindKey = (id) => `review_remind_${id}`;
+    const now = Date.now();
+
+    const pending = completedCards.find((card) => {
+      if (!card.paymentReleased) return false;
+      if (reviewedIds.has(String(card.id))) return false;
+      const reminder = localStorage.getItem(remindKey(card.id));
+      if (!reminder) return true;
+      const remindUntil = Number(reminder);
+      return Number.isNaN(remindUntil) || now > remindUntil;
+    });
+
+    if (pending) {
+      setReviewTarget(pending);
+      setReviewRating(5);
+      setReviewComment('');
+      setReviewModalOpen(true);
+    }
+  }, [completedCards, reviews, reviewModalOpen]);
 
   return (
-    <div style={styles.page}>
+    <div className="dashboard-page">
+      <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap');
+
+        .dashboard-page {
+          min-height: 100vh;
+          position: relative;
+          overflow-x: hidden;
+          background: linear-gradient(140deg, #f8fafc 0%, #eef2f6 45%, #e2e8f0 100%);
+          font-family: 'Outfit', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+          color: #1e293b;
+        }
+
+        .dashboard-page::before,
+        .dashboard-page::after {
+          content: '';
+          position: absolute;
+          width: 420px;
+          height: 420px;
+          border-radius: 50%;
+          background: radial-gradient(circle, rgba(59, 130, 246, 0.18), rgba(14, 165, 233, 0));
+          filter: blur(10px);
+          z-index: 0;
+        }
+
+        .dashboard-page::before {
+          top: -120px;
+          right: -120px;
+        }
+
+        .dashboard-page::after {
+          bottom: -160px;
+          left: -140px;
+        }
+
+        .dashboard-header {
+          background-color: rgba(255, 255, 255, 0.9);
+          backdrop-filter: blur(12px);
+          border-bottom: 1px solid rgba(226, 232, 240, 0.8);
+          padding: 16px 48px;
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          position: sticky;
+          top: 0;
+          z-index: 100;
+          box-shadow: 0 4px 20px rgba(0, 0, 0, 0.02);
+        }
+
+        .logo-container {
+          display: flex;
+          align-items: center;
+          gap: 12px;
+        }
+
+        .logo-icon {
+          width: 42px;
+          height: 42px;
+          background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+          border-radius: 12px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          color: #ffffff;
+          font-size: 22px;
+          font-weight: 800;
+          box-shadow: 0 4px 12px rgba(37, 99, 235, 0.25);
+          overflow: hidden;
+        }
+
+        .logo-icon-img {
+          width: 100%;
+          height: 100%;
+          object-fit: cover;
+        }
+
+        .logo-text {
+          font-size: 22px;
+          font-weight: 800;
+          background: linear-gradient(135deg, #1e3a8a 0%, #3b82f6 100%);
+          -webkit-background-clip: text;
+          -webkit-text-fill-color: transparent;
+          letter-spacing: -0.5px;
+        }
+
+        .header-right {
+          display: flex;
+          align-items: center;
+          gap: 16px;
+        }
+
+        .icon-btn {
+          position: relative;
+          width: 40px;
+          height: 40px;
+          border-radius: 12px;
+          background-color: #ffffff;
+          border: 1px solid #e2e8f0;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          cursor: pointer;
+          transition: all 0.2s ease;
+          box-shadow: 0 2px 4px rgba(0,0,0,0.02);
+        }
+
+        .icon-btn:hover {
+          transform: translateY(-2px);
+          background-color: #f8fafc;
+          border-color: #cbd5e1;
+          box-shadow: 0 4px 8px rgba(0,0,0,0.05);
+        }
+
+        .notification-badge {
+          position: absolute;
+          top: -2px;
+          right: -2px;
+          width: 10px;
+          height: 10px;
+          background-color: #ef4444;
+          border-radius: 50%;
+          border: 2px solid #fff;
+        }
+
+        .logout-btn {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          padding: 10px 20px;
+          border-radius: 12px;
+          background-color: #ffffff;
+          border: 1px solid #fee2e2;
+          color: #ef4444;
+          cursor: pointer;
+          font-weight: 600;
+          font-size: 14px;
+          transition: all 0.2s ease;
+          box-shadow: 0 2px 4px rgba(239, 68, 68, 0.05);
+        }
+
+        .logout-btn:hover {
+          background-color: #ef4444;
+          color: #ffffff;
+          transform: translateY(-2px);
+          box-shadow: 0 4px 12px rgba(239, 68, 68, 0.2);
+        }
+
+        .dashboard-container {
+          max-width: 1280px;
+          margin: 0 auto;
+          padding: 40px 24px;
+          position: relative;
+          z-index: 1;
+          animation: fadeUp 0.6s ease both;
+        }
+
+        .user-section-card {
+          display: flex;
+          align-items: center;
+          gap: 24px;
+          margin-bottom: 32px;
+          padding: 28px;
+          background: linear-gradient(#ffffff, #ffffff) padding-box,
+            linear-gradient(135deg, rgba(59, 130, 246, 0.5), rgba(14, 165, 233, 0.4)) border-box;
+          border: 1px solid transparent;
+          border-radius: 24px;
+          box-shadow: 0 16px 36px rgba(15, 23, 42, 0.08);
+        }
+
+        .user-avatar {
+          width: 76px;
+          height: 76px;
+          background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);
+          border-radius: 20px;
+          color: white;
+          font-size: 30px;
+          display: flex;
+          justify-content: center;
+          align-items: center;
+          font-weight: 800;
+          box-shadow: 0 12px 30px rgba(37, 99, 235, 0.3);
+          transform: rotate(-3deg);
+          transition: all 0.3s ease;
+          border: 3px solid rgba(255, 255, 255, 0.9);
+          overflow: hidden;
+        }
+
+        .user-avatar-img {
+          width: 100%;
+          height: 100%;
+          object-fit: cover;
+          border-radius: 18px;
+        }
+
+        .user-section-card:hover .user-avatar {
+          transform: rotate(0deg) scale(1.05);
+        }
+
+        .user-name-title {
+          font-size: 28px;
+          font-weight: 800;
+          color: #0f172a;
+          letter-spacing: -0.5px;
+          margin-bottom: 4px;
+        }
+
+        .user-role-badge {
+          color: #64748b;
+          font-size: 14px;
+          font-weight: 600;
+          background: #f1f5f9;
+          padding: 4px 12px;
+          border-radius: 20px;
+          display: inline-block;
+        }
+
+        .stats-container {
+          display: grid;
+          grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+          gap: 24px;
+          margin-bottom: 32px;
+        }
+
+        .stat-card-item {
+          background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
+          padding: 24px;
+          border-radius: 20px;
+          border: 1px solid rgba(226, 232, 240, 0.9);
+          box-shadow: 0 8px 18px rgba(15, 23, 42, 0.06);
+          transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+          cursor: default;
+          position: relative;
+          overflow: hidden;
+        }
+
+        .stat-card-item::after {
+          content: '';
+          position: absolute;
+          top: 0;
+          left: 0;
+          width: 100%;
+          height: 4px;
+          background: linear-gradient(90deg, rgba(59, 130, 246, 0.6), rgba(14, 165, 233, 0.6));
+          opacity: 0;
+          transition: opacity 0.3s ease;
+        }
+
+        .stat-card-item:hover {
+          transform: translateY(-6px);
+          box-shadow: 0 16px 34px rgba(15, 23, 42, 0.12);
+          border-color: rgba(59, 130, 246, 0.2);
+        }
+
+        .stat-card-item:hover::after {
+          opacity: 1;
+        }
+
+        .stat-card-inner-flex {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+        }
+
+        .stat-info-col {
+          flex: 1;
+        }
+
+        .stat-card-label {
+          color: #64748b;
+          font-size: 14px;
+          font-weight: 600;
+          text-transform: uppercase;
+          letter-spacing: 0.5px;
+          margin-bottom: 6px;
+        }
+
+        .stat-card-value {
+          font-size: 32px;
+          font-weight: 800;
+          color: #0f172a;
+        }
+
+        .stat-icon-badge {
+          width: 56px;
+          height: 56px;
+          border-radius: 16px;
+          display: flex;
+          justify-content: center;
+          align-items: center;
+          font-size: 24px;
+          color: white;
+          box-shadow: 0 10px 22px rgba(15, 23, 42, 0.12);
+        }
+
+        .post-request-btn {
+          background: linear-gradient(135deg, #2563eb 0%, #0ea5e9 100%);
+          color: #fff;
+          padding: 16px 36px;
+          border-radius: 18px;
+          font-weight: 700;
+          font-size: 16px;
+          border: none;
+          display: flex;
+          align-items: center;
+          gap: 12px;
+          cursor: pointer;
+          margin-bottom: 36px;
+          box-shadow: 0 10px 26px rgba(37, 99, 235, 0.28);
+          transition: all 0.3s ease;
+          letter-spacing: 0.2px;
+        }
+
+        .post-request-btn:hover {
+          transform: translateY(-2px);
+          box-shadow: 0 10px 25px rgba(37, 99, 235, 0.4);
+          background: linear-gradient(135deg, #2563eb 0%, #1e40af 100%);
+        }
+
+        .post-request-btn:active {
+          transform: translateY(0);
+        }
+
+        .tabs-navigation {
+          margin-bottom: 32px;
+        }
+
+        .tabs-nav-box {
+          display: inline-flex;
+          gap: 6px;
+          padding: 6px;
+          background: linear-gradient(135deg, rgba(255, 255, 255, 0.92), rgba(226, 232, 240, 0.7));
+          backdrop-filter: blur(10px);
+          border-radius: 18px;
+          border: 1px solid rgba(226, 232, 240, 0.9);
+          box-shadow: 0 8px 18px rgba(15, 23, 42, 0.06);
+        }
+
+        .tab-nav-button {
+          padding: 12px 28px;
+          border-radius: 12px;
+          background: transparent;
+          color: #64748b;
+          border: none;
+          cursor: pointer;
+          font-weight: 700;
+          font-size: 14px;
+          transition: all 0.2s ease;
+        }
+
+        .tab-nav-button:hover {
+          color: #0f172a;
+        }
+
+        .tab-nav-button-active {
+          background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+          color: #fff !important;
+          box-shadow: 0 4px 14px rgba(37, 99, 235, 0.25);
+        }
+
+        .tab-nav-button-wrap {
+          position: relative;
+          display: inline-flex;
+        }
+
+        .tab-notification-dot {
+          position: absolute;
+          top: 6px;
+          right: 8px;
+          min-width: 18px;
+          height: 18px;
+          padding: 0 5px;
+          border-radius: 999px;
+          background: #ef4444;
+          color: #fff;
+          font-size: 11px;
+          font-weight: 800;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          border: 2px solid #fff;
+          box-shadow: 0 2px 8px rgba(239, 68, 68, 0.45);
+          animation: offerPulse 1.6s ease-in-out infinite;
+        }
+
+        .tab-nav-button-active .tab-notification-dot {
+          border-color: #2563eb;
+        }
+
+        .notification-bell-btn {
+          position: relative;
+          cursor: pointer;
+        }
+
+        .notification-bell-dot {
+          position: absolute;
+          top: -2px;
+          right: -2px;
+          min-width: 18px;
+          height: 18px;
+          padding: 0 5px;
+          border-radius: 999px;
+          background: #ef4444;
+          color: #fff;
+          font-size: 10px;
+          font-weight: 800;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          border: 2px solid #fff;
+          box-shadow: 0 2px 8px rgba(239, 68, 68, 0.45);
+        }
+
+        .offer-alert-banner {
+          margin-bottom: 20px;
+          padding: 14px 18px;
+          border-radius: 14px;
+          background: linear-gradient(135deg, #fff7ed 0%, #ffedd5 100%);
+          border: 1px solid #fdba74;
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          gap: 16px;
+          flex-wrap: wrap;
+          cursor: pointer;
+          animation: fadeUp 0.35s ease;
+        }
+
+        .offer-alert-banner:hover {
+          box-shadow: 0 8px 20px rgba(249, 115, 22, 0.15);
+        }
+
+        .offer-alert-title {
+          font-size: 15px;
+          font-weight: 700;
+          color: #9a3412;
+          margin-bottom: 4px;
+        }
+
+        .offer-alert-text {
+          font-size: 13px;
+          color: #c2410c;
+        }
+
+        .offer-alert-action {
+          background: #ea580c;
+          color: #fff;
+          border: none;
+          border-radius: 10px;
+          padding: 10px 16px;
+          font-size: 13px;
+          font-weight: 700;
+          cursor: pointer;
+          white-space: nowrap;
+        }
+
+        .item-card-has-offer {
+          border: 2px solid #fb923c !important;
+          box-shadow: 0 12px 28px rgba(249, 115, 22, 0.18) !important;
+        }
+
+        .offer-new-badge {
+          display: inline-flex;
+          align-items: center;
+          gap: 6px;
+          background: #ef4444;
+          color: #fff;
+          font-size: 11px;
+          font-weight: 800;
+          letter-spacing: 0.4px;
+          padding: 4px 10px;
+          border-radius: 999px;
+          margin-bottom: 8px;
+          animation: offerPulse 1.6s ease-in-out infinite;
+        }
+
+        .offer-new-badge-dot {
+          width: 7px;
+          height: 7px;
+          border-radius: 50%;
+          background: #fff;
+        }
+
+        @keyframes offerPulse {
+          0%, 100% { transform: scale(1); opacity: 1; }
+          50% { transform: scale(1.06); opacity: 0.92; }
+        }
+
+        .dashboard-grid {
+          display: grid;
+          grid-template-columns: repeat(auto-fill, minmax(380px, 1fr));
+          gap: 28px;
+        }
+
+        .item-card {
+          background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
+          padding: 28px;
+          border-radius: 24px;
+          border: 1px solid rgba(226, 232, 240, 0.9);
+          box-shadow: 0 10px 26px rgba(15, 23, 42, 0.06);
+          transition: all 0.3s ease;
+          position: relative;
+          overflow: hidden;
+        }
+
+        .item-card::before {
+          content: '';
+          position: absolute;
+          inset: 0;
+          background: radial-gradient(circle at top right, rgba(14, 165, 233, 0.12), transparent 55%);
+          opacity: 0;
+          transition: opacity 0.3s ease;
+          pointer-events: none;
+        }
+
+        .item-card:hover {
+          transform: translateY(-6px);
+          box-shadow: 0 18px 40px rgba(15, 23, 42, 0.12);
+          border-color: rgba(59, 130, 246, 0.2);
+        }
+
+        .item-card:hover::before {
+          opacity: 1;
+        }
+
+        .item-card-title {
+          color: #0f172a;
+          font-weight: 800;
+          font-size: 20px;
+          line-height: 1.4;
+          margin-bottom: 8px;
+          letter-spacing: -0.3px;
+        }
+
+        .item-card-category {
+          display: inline-block;
+          padding: 6px 14px;
+          font-size: 12px;
+          font-weight: 700;
+          border-radius: 20px;
+          background: #eff6ff;
+          color: #2563eb;
+          margin-bottom: 16px;
+          text-transform: capitalize;
+        }
+
+        .item-card-desc {
+          color: #475569;
+          font-size: 14px;
+          line-height: 1.6;
+          margin-bottom: 20px;
+        }
+
+        .item-details-list {
+          background-color: #f8fafc;
+          padding: 16px;
+          border-radius: 16px;
+          margin-bottom: 20px;
+          border: 1px solid #f1f5f9;
+        }
+
+        .item-detail-row {
+          display: flex;
+          align-items: center;
+          gap: 12px;
+          font-size: 14px;
+          color: #475569;
+          margin-bottom: 10px;
+          font-weight: 500;
+        }
+
+        .item-detail-row:last-child {
+          margin-bottom: 0;
+        }
+
+        .item-card-footer-flex {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          padding-top: 18px;
+          border-top: 1px solid #f1f5f9;
+        }
+
+        .item-budget-box {
+          display: flex;
+          flex-direction: column;
+        }
+
+        .item-budget-lbl {
+          font-size: 11px;
+          color: #64748b;
+          font-weight: 600;
+          text-transform: uppercase;
+        }
+
+        .item-budget-val {
+          font-size: 22px;
+          font-weight: 800;
+          color: #0f172a;
+          background: linear-gradient(135deg, #10b981, #22c55e);
+          -webkit-background-clip: text;
+          -webkit-text-fill-color: transparent;
+        }
+
+        .item-status-badge {
+          padding: 6px 14px;
+          font-size: 12px;
+          border-radius: 20px;
+          font-weight: 700;
+          background: #f1f5f9;
+          color: #475569;
+        }
+
+        .provider-profile-flex {
+          display: flex;
+          align-items: center;
+          gap: 14px;
+          margin-bottom: 20px;
+          padding-bottom: 18px;
+          border-bottom: 1px solid #f1f5f9;
+        }
+
+        .provider-avatar-circle {
+          width: 52px;
+          height: 52px;
+          background: linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%);
+          color: #1e40af;
+          border-radius: 16px;
+          display: flex;
+          justify-content: center;
+          align-items: center;
+          font-weight: 800;
+          font-size: 18px;
+        }
+
+        .provider-info-box {
+          flex: 1;
+        }
+
+        .provider-name-txt {
+          font-size: 16px;
+          font-weight: 700;
+          color: #0f172a;
+          margin-bottom: 2px;
+        }
+
+        .provider-phone-txt {
+          color: #64748b;
+          font-size: 13px;
+          font-weight: 500;
+        }
+
+        .card-status-badge {
+          padding: 6px 14px;
+          font-size: 12px;
+          border-radius: 20px;
+          font-weight: 700;
+        }
+
+        .booking-amount-flex {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          padding-bottom: 18px;
+          margin-bottom: 18px;
+          border-bottom: 1px solid #f1f5f9;
+        }
+
+        .booking-amount-lbl {
+          color: #64748b;
+          font-weight: 600;
+          font-size: 14px;
+        }
+
+        .booking-amount-val {
+          font-weight: 800;
+          font-size: 24px;
+          background: linear-gradient(135deg, #2563eb, #0ea5e9);
+          -webkit-background-clip: text;
+          -webkit-text-fill-color: transparent;
+        }
+
+        .btn-actions-row {
+          display: flex;
+          gap: 12px;
+          margin-bottom: 12px;
+        }
+
+        .primary-action-btn {
+          flex: 1;
+          background: linear-gradient(135deg, #3b82f6 0%, #155eef 100%);
+          color: #fff;
+          padding: 12px 18px;
+          border-radius: 12px;
+          border: none;
+          cursor: pointer;
+          font-weight: 700;
+          font-size: 14px;
+          transition: all 0.2s ease;
+          box-shadow: 0 4px 12px rgba(37, 99, 235, 0.2);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          gap: 6px;
+        }
+
+        .primary-action-btn:hover {
+          transform: translateY(-2px);
+          box-shadow: 0 6px 16px rgba(37, 99, 235, 0.3);
+        }
+
+        .primary-action-btn:disabled {
+          background: #cbd5e1;
+          color: #94a3b8;
+          cursor: not-allowed;
+          transform: none;
+          box-shadow: none;
+        }
+
+        .secondary-action-btn {
+          flex: 1;
+          background-color: #ffffff;
+          color: #475569;
+          padding: 12px 18px;
+          border-radius: 12px;
+          border: 1px solid #cbd5e1;
+          cursor: pointer;
+          font-weight: 700;
+          font-size: 14px;
+          transition: all 0.2s ease;
+        }
+
+        .secondary-action-btn:hover {
+          background-color: #f8fafc;
+          color: #0f172a;
+          border-color: #94a3b8;
+          transform: translateY(-2px);
+        }
+
+        .secondary-action-btn:disabled {
+          opacity: 0.7;
+          cursor: default;
+          transform: none;
+          background-color: #f1f5f9;
+        }
+
+        .danger-action-btn {
+          width: 100%;
+          background-color: #fff5f5;
+          color: #e53e3e;
+          padding: 12px;
+          border-radius: 12px;
+          border: 1px solid #fed7d7;
+          cursor: pointer;
+          font-weight: 700;
+          font-size: 14px;
+          transition: all 0.2s ease;
+        }
+
+        .danger-action-btn:hover {
+          background-color: #e53e3e;
+          color: #ffffff;
+          border-color: #e53e3e;
+          transform: translateY(-2px);
+        }
+
+        .edit-icon-btn {
+          background-color: #f8fafc;
+          color: #3b82f6;
+          border: 1px solid #e2e8f0;
+          padding: 8px;
+          border-radius: 10px;
+          cursor: pointer;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          transition: all 0.2s ease;
+        }
+
+        .edit-icon-btn:hover {
+          background-color: #3b82f6;
+          color: #ffffff;
+          border-color: #3b82f6;
+          transform: translateY(-2px);
+        }
+
+        .offer-card-section {
+          margin-top: 20px;
+          padding: 20px;
+          background: linear-gradient(135deg, #eff6ff, #dbeafe);
+          border-radius: 16px;
+          border: 1.5px solid #bfdbfe;
+        }
+
+        .offer-title-lbl {
+          font-size: 15px;
+          font-weight: 800;
+          color: #1e3a8a;
+          margin-bottom: 12px;
+        }
+
+        .offer-msg-bubble {
+          font-size: 13.5px;
+          color: #1e40af;
+          margin-bottom: 12px;
+          font-style: italic;
+          background: rgba(255, 255, 255, 0.6);
+          padding: 10px 14px;
+          border-radius: 12px;
+          border-left: 4px solid #3b82f6;
+        }
+
+        .offer-details-row {
+          display: flex;
+          gap: 16px;
+          margin-bottom: 16px;
+          font-size: 14px;
+        }
+
+        .offer-btn-accept {
+          flex: 1;
+          padding: 12px;
+          border-radius: 12px;
+          border: none;
+          background: linear-gradient(135deg, #10b981, #059669);
+          color: white;
+          font-size: 14px;
+          font-weight: 700;
+          cursor: pointer;
+          transition: all 0.2s;
+          box-shadow: 0 4px 12px rgba(16, 185, 129, 0.2);
+        }
+
+        .offer-btn-accept:hover {
+          transform: translateY(-2px);
+          box-shadow: 0 6px 16px rgba(16, 185, 129, 0.3);
+        }
+
+        .offer-btn-reject {
+          flex: 1;
+          padding: 12px;
+          border-radius: 12px;
+          border: 2px solid #ef4444;
+          background: white;
+          color: #ef4444;
+          font-size: 14px;
+          font-weight: 700;
+          cursor: pointer;
+          transition: all 0.2s;
+        }
+
+        .offer-btn-reject:hover {
+          background: #ef4444;
+          color: white;
+          transform: translateY(-2px);
+          box-shadow: 0 4px 12px rgba(239, 68, 68, 0.2);
+        }
+
+        @keyframes fadeUp {
+          from {
+            opacity: 0;
+            transform: translateY(12px);
+          }
+          to {
+            opacity: 1;
+            transform: translateY(0);
+          }
+        }
+      `}</style>
+
       {/* HEADER */}
-      <div style={styles.header}>
-        <div style={styles.headerLeft}>
-          <div style={styles.logo}>
-            <div style={styles.logoIcon}>H</div>
-            <span style={styles.logoText}>HireRight</span>
+      <div className="dashboard-header">
+        <div className="logo-container">
+          <div className="logo-icon">
+            {user?.profilePhoto ? (
+              <img
+                src={user.profilePhoto}
+                alt={user?.name || 'Profile'}
+                className="logo-icon-img"
+              />
+            ) : (
+              user?.name
+                ? user.name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase()
+                : 'H'
+            )}
           </div>
+          <span className="logo-text">HireRight</span>
         </div>
 
-        <div style={styles.headerRight}>
-          <div style={styles.iconWrapper}>
-            <Bell size={20} color="#64748b" />
-            <div style={styles.notificationDot}></div>
-          </div>
+        <div className="header-right">
           <div
-            style={styles.iconButton}
+            className="icon-btn notification-bell-btn"
+            onClick={() => setActiveTab('posts')}
+            title={pendingOfferCount > 0 ? 'New provider offers' : 'Notifications'}
+          >
+            <Bell size={20} color={pendingOfferCount > 0 ? '#ea580c' : '#64748b'} />
+            {pendingOfferCount > 0 && (
+              <span className="notification-bell-dot">
+                {pendingOfferCount > 9 ? '9+' : pendingOfferCount}
+              </span>
+            )}
+          </div>
+
+          <div
+            className="icon-btn"
             onClick={() => navigate("/customer-settings")}
           >
             <Settings size={20} color="#64748b" />
           </div>
 
-          <div onClick={() => navigate('/login')} style={styles.logoutButton}>
+          <div onClick={() => navigate('/login')} className="logout-btn">
             <LogOut size={18} />
             <span>Logout</span>
           </div>
@@ -148,27 +1243,77 @@ const CustomerDashboard = () => {
       </div>
 
       {/* CONTAINER */}
-      <div style={styles.container}>
+      <div className="dashboard-container">
+        {reviewThanks && (
+          <div style={{
+            marginBottom: '20px',
+            padding: '14px 16px',
+            borderRadius: '12px',
+            background: '#ecfdf5',
+            border: '1px solid #bbf7d0',
+            color: '#166534',
+            fontSize: '14px',
+            fontWeight: '600'
+          }}>
+            {reviewThanks}
+          </div>
+        )}
+
+        {pendingOfferCount > 0 && activeTab !== 'posts' && (
+          <div
+            className="offer-alert-banner"
+            onClick={() => setActiveTab('posts')}
+            role="button"
+            tabIndex={0}
+            onKeyDown={(e) => e.key === 'Enter' && setActiveTab('posts')}
+          >
+            <div>
+              <div className="offer-alert-title">
+                {pendingOfferCount === 1 ? 'New provider offer waiting' : `${pendingOfferCount} new provider offers waiting`}
+              </div>
+              <div className="offer-alert-text">
+                {pendingOffers[0]?.providerProfile?.fullName || pendingOffers[0]?.providerId?.name
+                  ? `${pendingOffers[0].providerProfile?.fullName || pendingOffers[0].providerId.name} sent an offer for "${pendingOffers[0].serviceTitle}"`
+                  : 'Open My Posts to review and respond to provider offers.'}
+              </div>
+            </div>
+            <button type="button" className="offer-alert-action" onClick={(e) => { e.stopPropagation(); setActiveTab('posts'); }}>
+              View offers
+            </button>
+          </div>
+        )}
         {/* USER INFO */}
-        <div style={styles.userSection}>
-          <div style={styles.avatar}>JD</div>
+        <div className="user-section-card">
+          <div className="user-avatar">
+            {user?.profilePhoto ? (
+              <img
+                src={user.profilePhoto}
+                alt={user?.name || 'Profile'}
+                className="user-avatar-img"
+              />
+            ) : (
+              user?.name
+                ? user.name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase()
+                : 'JD'
+            )}
+          </div>
           <div>
-            <div style={styles.userName}>John Doe</div>
-            <div style={styles.userRole}>Customer Account</div>
+            <div className="user-name-title">Welcome, {user?.name || 'Customer'}</div>
+            <div className="user-role-badge">Customer Account</div>
           </div>
         </div>
 
         {/* STATS */}
-        <div style={styles.statsGrid}>
+        <div className="stats-container">
           {stats.map((s, i) => (
-            <div key={i} style={styles.statCard}>
-              <div style={styles.statCardInner}>
-                <div style={styles.statContent}>
-                  <div style={styles.statLabel}>{s.label}</div>
-                  <div style={styles.statValue}>{s.value}</div>
+            <div key={i} className="stat-card-item">
+              <div className="stat-card-inner-flex">
+                <div className="stat-info-col">
+                  <div className="stat-card-label">{s.label}</div>
+                  <div className="stat-card-value">{s.value}</div>
                 </div>
-                <div style={{ ...styles.statIcon, background: s.bg }}>
-                  <span style={styles.statEmoji}>{s.icon}</span>
+                <div className="stat-icon-badge" style={{ background: s.bg }}>
+                  <span>{s.icon}</span>
                 </div>
               </div>
             </div>
@@ -176,101 +1321,124 @@ const CustomerDashboard = () => {
         </div>
 
         {/* POST BUTTON */}
-        <button onClick={() => navigate('/service-request')} style={styles.postButton}>
-          <span style={styles.postButtonIcon}>+</span>
+        <button onClick={() => navigate('/service-request')} className="post-request-btn">
+          <span>+</span>
           <span>Post New Service Request</span>
         </button>
 
         {/* TABS */}
-        <div style={styles.tabsContainer}>
-          <div style={styles.tabs}>
+        <div className="tabs-navigation">
+          <div className="tabs-nav-box">
             <button
               onClick={() => setActiveTab("active")}
-              style={activeTab === "active" ? { ...styles.tab, ...styles.activeTab } : styles.tab}
+              className={`tab-nav-button ${activeTab === "active" ? "tab-nav-button-active" : ""}`}
             >
               Active Bookings
             </button>
             <button
               onClick={() => setActiveTab("completed")}
-              style={activeTab === "completed" ? { ...styles.tab, ...styles.activeTab } : styles.tab}
+              className={`tab-nav-button ${activeTab === "completed" ? "tab-nav-button-active" : ""}`}
             >
               Completed
             </button>
             <button
               onClick={() => setActiveTab("posts")}
-              style={activeTab === "posts" ? { ...styles.tab, ...styles.activeTab } : styles.tab}
+              className={`tab-nav-button ${activeTab === "posts" ? "tab-nav-button-active" : ""}`}
             >
-              My Posts
+              <span className="tab-nav-button-wrap">
+                My Posts
+                {pendingOfferCount > 0 && (
+                  <span className="tab-notification-dot">
+                    {pendingOfferCount > 9 ? '9+' : pendingOfferCount}
+                  </span>
+                )}
+              </span>
             </button>
           </div>
         </div>
 
         {/* BOOKINGS GRID */}
         {activeTab === "posts" ? (
-          <div style={styles.bookingsGrid}>
-            {serviceRequests.map((request) => (
-              <div key={request._id} style={styles.postCard}>
+          <div className="dashboard-grid">
+            {pendingPosts.map((request) => (
+              <div
+                key={request._id}
+                className={`item-card ${isPendingProviderOffer(request) ? 'item-card-has-offer' : ''}`}
+              >
+                {isPendingProviderOffer(request) && (
+                  <div className="offer-new-badge">
+                    <span className="offer-new-badge-dot" />
+                    NEW OFFER
+                  </div>
+                )}
                 {/* HEADER */}
-                <div style={styles.postCardHeader}>
-                  <div style={styles.serviceTitle}>{request.serviceTitle}</div>
-                  <button onClick={() => handleEdit(request)} style={styles.editBtn}>
-                    <Edit size={16} />
-                  </button>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '12px' }}>
+                  <div className="item-card-title">{request.serviceTitle}</div>
+                  {request.userId === user?.id && (
+                    <button onClick={() => handleEdit(request)} className="edit-icon-btn">
+                      <Edit size={16} />
+                    </button>
+                  )}
                 </div>
 
                 {/* CATEGORY BADGE */}
-                <div style={styles.categoryBadge}>{request.serviceCategory}</div>
+                <div className="item-card-category">{request.serviceCategory}</div>
 
                 {/* DESCRIPTION */}
-                <div style={styles.description}>{request.description}</div>
+                <div className="item-card-desc">{request.description}</div>
 
                 {/* DETAILS */}
-                <div style={styles.detailsList}>
-                  <div style={styles.detailRow}>
+                <div className="item-details-list">
+                  <div className="item-detail-row">
                     <Calendar size={16} color="#3b82f6" />
                     <span>{request.preferredDate} at {request.preferredTime}</span>
                   </div>
                   {request.estimatedDuration && (
-                    <div style={styles.detailRow}>
+                    <div className="item-detail-row">
                       <Clock size={16} color="#3b82f6" />
                       <span>{request.estimatedDuration}</span>
                     </div>
                   )}
-                  <div style={styles.detailRow}>
+                  <div className="item-detail-row">
                     <MapPin size={16} color="#3b82f6" />
-                    <span>{request.location}</span>
+                    <span>{formatLocationDisplay(request.location)}</span>
                   </div>
                 </div>
 
                 {/* FOOTER */}
-                <div style={styles.postCardFooter}>
-                  <div style={styles.budgetSection}>
-                    <span style={styles.budgetLabel}>Budget</span>
-                    <span style={styles.budgetValue}>Rs.{request.budget}</span>
+                <div className="item-card-footer-flex">
+                  <div className="item-budget-box">
+                    <span className="item-budget-lbl">Budget</span>
+                    <span className="item-budget-val">Rs.{request.budget}</span>
                   </div>
-                  <div style={styles.statusBadge}>{request.status}</div>
+                  <div className="item-status-badge" style={isPendingProviderOffer(request) ? {
+                    background: '#ffedd5',
+                    color: '#c2410c',
+                    fontWeight: 800,
+                  } : undefined}>
+                    {getStatusDisplay(request.status)}
+                  </div>
                 </div>
 
                 {/* PROVIDER OFFER SECTION */}
                 {request.status === 'OfferSent' && request.providerOffer && (
-                  <div style={{
-                    marginTop: '16px',
-                    padding: '16px',
-                    background: 'linear-gradient(135deg, #e0f2fe, #dbeafe)',
-                    borderRadius: '12px',
-                    border: '2px solid #3b82f6'
-                  }}>
-                    <div style={{ fontSize: '15px', fontWeight: '700', color: '#1e3a8a', marginBottom: '12px' }}>
+                  <div className="offer-card-section">
+                    <div className="offer-title-lbl">
                       🎯 Provider Offer Received!
                     </div>
 
+                    <ProviderOfferProfile
+                      providerUser={request.providerId}
+                      providerProfile={request.providerProfile}
+                    />
+
                     {request.providerOffer.message && (
-                      <div style={{ fontSize: '14px', color: '#1e40af', marginBottom: '8px', fontStyle: 'italic' }}>
+                      <div className="offer-msg-bubble">
                         "{request.providerOffer.message}"
                       </div>
                     )}
 
-                    <div style={{ display: 'flex', gap: '16px', marginBottom: '12px', fontSize: '14px' }}>
+                    <div className="offer-details-row">
                       <div>
                         <span style={{ color: '#64748b' }}>Proposed Price: </span>
                         <span style={{ fontWeight: '700', color: '#1e293b' }}>Rs.{request.providerOffer.proposedPrice}</span>
@@ -285,39 +1453,13 @@ const CustomerDashboard = () => {
                       <div style={{ display: 'flex', gap: '12px' }}>
                         <button
                           onClick={() => handleAcceptOffer(request._id)}
-                          style={{
-                            flex: 1,
-                            padding: '10px',
-                            borderRadius: '8px',
-                            border: 'none',
-                            background: 'linear-gradient(135deg, #10b981, #059669)',
-                            color: 'white',
-                            fontSize: '14px',
-                            fontWeight: '700',
-                            cursor: 'pointer',
-                            transition: 'transform 0.2s'
-                          }}
-                          onMouseEnter={(e) => e.target.style.transform = 'scale(1.02)'}
-                          onMouseLeave={(e) => e.target.style.transform = 'scale(1)'}
+                          className="offer-btn-accept"
                         >
                           ✓ Accept Offer
                         </button>
                         <button
                           onClick={() => handleRejectOffer(request._id)}
-                          style={{
-                            flex: 1,
-                            padding: '10px',
-                            borderRadius: '8px',
-                            border: '2px solid #ef4444',
-                            background: 'white',
-                            color: '#ef4444',
-                            fontSize: '14px',
-                            fontWeight: '700',
-                            cursor: 'pointer',
-                            transition: 'transform 0.2s'
-                          }}
-                          onMouseEnter={(e) => e.target.style.transform = 'scale(1.02)'}
-                          onMouseLeave={(e) => e.target.style.transform = 'scale(1)'}
+                          className="offer-btn-reject"
                         >
                           ✗ Reject Offer
                         </button>
@@ -325,28 +1467,92 @@ const CustomerDashboard = () => {
                     )}
                   </div>
                 )}
+
+                {/* DIRECT BOOKING RESPONSE SECTION */}
+                {request.bookingType === 'direct' && (
+                  <div style={{
+                    marginTop: '16px',
+                    padding: '16px',
+                    background: request.providerResponse?.status === 'accepted'
+                      ? 'linear-gradient(135deg, #dcfce7, #bbf7d0)'
+                      : request.providerResponse?.status === 'rejected'
+                        ? 'linear-gradient(135deg, #fee2e2, #fecaca)'
+                        : 'linear-gradient(135deg, #f3e8ff, #e9d5ff)',
+                    borderRadius: '12px',
+                    border: '2px solid ' + (
+                      request.providerResponse?.status === 'accepted'
+                        ? '#10b981'
+                        : request.providerResponse?.status === 'rejected'
+                          ? '#ef4444'
+                          : '#a78bfa'
+                    )
+                  }}>
+                    <div style={{ fontSize: '15px', fontWeight: '700', color: '#1e293b', marginBottom: '12px' }}>
+                      {request.providerResponse?.status === 'pending' && '⏳ Provider Reviewing...'}
+                      {request.providerResponse?.status === 'accepted' && '✓ Booking Confirmed!'}
+                      {request.providerResponse?.status === 'rejected' && '✗ Booking Rejected'}
+                    </div>
+
+                    {request.providerResponse?.responseMessage && (
+                      <div style={{ fontSize: '14px', color: '#374151', fontStyle: 'italic', marginBottom: '8px' }}>
+                        "{request.providerResponse.responseMessage}"
+                      </div>
+                    )}
+
+                    {request.providerResponse?.respondedAt && (
+                      <div style={{ fontSize: '12px', color: '#64748b', marginBottom: request.providerResponse?.status === 'rejected' ? '12px' : '0' }}>
+                        Responded at: {new Date(request.providerResponse.respondedAt).toLocaleString()}
+                      </div>
+                    )}
+
+                    {request.providerResponse?.status === 'rejected' && (
+                      <button
+                        onClick={() => navigate('/services')}
+                        style={{
+                          width: '100%',
+                          backgroundColor: '#ef4444',
+                          color: '#fff',
+                          border: 'none',
+                          padding: '10px 16px',
+                          borderRadius: '8px',
+                          fontSize: '14px',
+                          fontWeight: '600',
+                          cursor: 'pointer',
+                          transition: 'all 0.2s ease',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          gap: '6px'
+                        }}
+                      >
+                        Book Another Provider
+                      </button>
+                    )}
+                  </div>
+                )}
               </div>
             ))}
           </div>
         ) : (
-          <div style={styles.bookingsGrid}>
-            {bookings.map((b) => (
-              <div key={b.id} style={styles.bookingCard}>
+          <div className="dashboard-grid">
+            {(activeTab === 'active' ? bookings : completedCards).map((b) => (
+              <div key={b.id} className="item-card">
                 {/* PROVIDER */}
-                <div style={styles.providerRow}>
-                  <div style={styles.providerAvatar}>
+                <div className="provider-profile-flex">
+                  <div className="provider-avatar-circle">
                     {b.provider.split(" ").map((n) => n[0]).join("")}
                   </div>
-                  <div style={styles.providerInfo}>
-                    <div style={styles.providerName}>{b.provider}</div>
-                    <div style={styles.ratingRow}>
-                      <span>⭐</span>
-                      <span style={styles.ratingText}>{b.rating}</span>
-                    </div>
+                  <div className="provider-info-box">
+                    <div className="provider-name-txt">{b.provider}</div>
+                    {b.phone && (
+                      <div className="provider-phone-txt">
+                        <span>📞 {b.phone}</span>
+                      </div>
+                    )}
                   </div>
                   <div
+                    className="card-status-badge"
                     style={{
-                      ...styles.statusTag,
                       color: b.statusColor,
                       backgroundColor: b.statusBg,
                     }}
@@ -356,33 +1562,45 @@ const CustomerDashboard = () => {
                 </div>
 
                 {/* SERVICE TITLE */}
-                <div style={styles.serviceTitle}>{b.service}</div>
+                <div className="item-card-title" style={{ color: '#2563eb', marginBottom: '16px' }}>{b.service}</div>
 
                 {/* DETAILS */}
-                <div style={styles.detailsList}>
-                  <div style={styles.detailRow}>
+                <div className="item-details-list">
+                  <div className="item-detail-row">
                     <Calendar size={16} color="#3b82f6" />
                     <span>{b.date}</span>
                   </div>
-                  <div style={styles.detailRow}>
+                  <div className="item-detail-row">
                     <Clock size={16} color="#3b82f6" />
                     <span>{b.duration}</span>
                   </div>
-                  <div style={styles.detailRow}>
+                  <div className="item-detail-row">
                     <MapPin size={16} color="#3b82f6" />
                     <span>{b.location}</span>
                   </div>
                 </div>
 
                 {/* AMOUNT */}
-                <div style={styles.amountRow}>
-                  <span style={styles.amountLabel}>Total Amount</span>
-                  <span style={styles.amountValue}>{b.amount}</span>
+                <div className="booking-amount-flex">
+                  <span className="booking-amount-lbl">Total Amount</span>
+                  <span className="booking-amount-val">{b.amount}</span>
                 </div>
 
                 {/* ACTION BUTTONS */}
-                <div style={styles.actionButtons}>
-                  {b.canPayNow && (
+                <div className="btn-actions-row">
+                  {b.canComplete && (
+                    <button className="secondary-action-btn" onClick={() => handleCompleteBooking(b.id)}>
+                      Mark Task Completed
+                    </button>
+                  )}
+                  {b.customerCompleted && !b.canComplete && (
+                    <button className="secondary-action-btn" style={{ opacity: 0.7, cursor: 'default' }} disabled>
+                      {b.paymentReleased
+                        ? `Payment successfully transferred to ${b.provider}`
+                        : 'Awaiting Provider Confirmation'}
+                    </button>
+                  )}
+                  {b.canPayNow ? (
                     <button
                       onClick={() => navigate('/payment', {
                         state: {
@@ -390,24 +1608,31 @@ const CustomerDashboard = () => {
                           fromDashboard: true
                         }
                       })}
-                      style={styles.payNow}
+                      className="primary-action-btn"
                     >
                       Pay Now
                     </button>
-                  )}
-                  {b.canComplete && (
-                    <button style={styles.completeBtn}>Mark Complete</button>
-                  )}
+                  ) : b.isPaid ? (
+                    <button className="primary-action-btn" style={{ background: '#10b981', color: 'white', opacity: 0.9, cursor: 'default', boxShadow: 'none' }} disabled>
+                      ✓ Paid
+                    </button>
+                  ) : null}
                 </div>
                 {b.canReport && (
                   <button
-                    style={styles.reportBtn}
+                    className="danger-action-btn"
                     onClick={() => navigate("/report-issue", { state: { booking: b } })}
                   >
-                    Report Issue
+                    {b.complaintStatus === 'resolved' ? 'Issue Resolved' : 'Report Issue'}
                   </button>
                 )}
-
+                {activeTab === 'active' && b.providerUserId && (
+                  <CustomerProviderTracking
+                    providerUserId={b.providerUserId}
+                    customerLocation={b.customerLocation}
+                    enabled
+                  />
+                )}
               </div>
             ))}
           </div>
@@ -489,15 +1714,10 @@ const CustomerDashboard = () => {
                   style={styles.input}
                 />
               </div>
-              <div style={styles.formGroup}>
-                <label style={styles.label}>Location</label>
-                <input
-                  type="text"
-                  value={formData.location || ''}
-                  onChange={(e) => setFormData({ ...formData, location: e.target.value })}
-                  style={styles.input}
-                />
-              </div>
+              <LocationPicker
+                value={formData.location || { address: '' }}
+                onChange={(location) => setFormData((prev) => ({ ...prev, location }))}
+              />
               <div style={styles.formGroup}>
                 <label style={styles.label}>Specific Requirements</label>
                 <textarea
@@ -510,6 +1730,67 @@ const CustomerDashboard = () => {
             <div style={styles.modalFooter}>
               <button onClick={handleCancel} style={styles.cancelBtn}>Cancel</button>
               <button onClick={handleSave} style={styles.saveBtn}>Save Changes</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {reviewModalOpen && reviewTarget && (
+        <div style={styles.modalOverlay}>
+          <div style={styles.modal}>
+            <div style={styles.modalHeader}>
+              <h2 style={styles.modalTitle}>Rate Your Provider</h2>
+              <button onClick={handleReviewRemindLater} style={styles.closeBtn}>
+                <X size={24} />
+              </button>
+            </div>
+            <div style={styles.modalBody}>
+              <div style={{ marginBottom: '12px', fontWeight: 600 }}>
+                {reviewTarget.provider}
+              </div>
+              <div style={{ marginBottom: '16px', color: '#64748b' }}>
+                {reviewTarget.service}
+              </div>
+
+              <div style={{ display: 'flex', gap: '8px', marginBottom: '16px' }}>
+                {[1, 2, 3, 4, 5].map((value) => (
+                  <button
+                    key={value}
+                    onClick={() => setReviewRating(value)}
+                    style={{
+                      width: '40px',
+                      height: '40px',
+                      borderRadius: '12px',
+                      border: '1px solid #e2e8f0',
+                      background: value <= reviewRating ? '#fbbf24' : '#fff',
+                      color: value <= reviewRating ? '#fff' : '#94a3b8',
+                      fontWeight: 700,
+                      cursor: 'pointer'
+                    }}
+                    type="button"
+                  >
+                    ★
+                  </button>
+                ))}
+              </div>
+
+              <div style={{ marginBottom: '16px' }}>
+                <label style={styles.label}>Review</label>
+                <textarea
+                  value={reviewComment}
+                  onChange={(e) => setReviewComment(e.target.value)}
+                  style={styles.textarea}
+                  placeholder="Share your experience..."
+                />
+              </div>
+            </div>
+            <div style={styles.modalFooter}>
+              <button onClick={handleReviewRemindLater} style={styles.cancelBtn}>
+                Remind Me Later
+              </button>
+              <button onClick={handleReviewSubmit} style={styles.saveBtn} disabled={reviewSaving}>
+                {reviewSaving ? 'Submitting...' : 'Submit Review'}
+              </button>
             </div>
           </div>
         </div>

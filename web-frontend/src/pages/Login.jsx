@@ -27,7 +27,14 @@ export default function Login() {
       const data = await loginUser(email, password);
       login(data.user, data.token);
 
-      if (data.user.role === "provider") {
+      if (location.state?.bookingIntent) {
+        if (data.user.role === "customer") {
+          navigate("/services", { state: { bookingIntent: location.state.bookingIntent } });
+        } else {
+          alert("Only customers can book services");
+          navigate("/provider-dashboard");
+        }
+      } else if (data.user.role === "provider") {
         navigate("/provider-dashboard");
       } else if (data.user.role === "customer") {
         navigate("/customer-dashboard");
@@ -35,14 +42,14 @@ export default function Login() {
         navigate("/");
       }
     } catch (err) {
-  console.log("Login error:", err.response);
+      console.log("Login error:", err.response);
 
-  if (err.response?.status === 400) {
-    setError("Invalid email or password");
-  } else {
-    setError(err.response?.data?.message || "Login failed. Try again.");
-  }
-}
+      if (err.response?.status === 400) {
+        setError("Invalid email or password");
+      } else {
+        setError(err.response?.data?.message || "Login failed. Try again.");
+      }
+    }
 
   };
 

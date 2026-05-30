@@ -1,50 +1,139 @@
-import React, { useState } from 'react';
+import React, { useEffect, useMemo, useState, useContext } from 'react';
 import { ArrowLeft, CreditCard, Lock } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
+import { AuthContext } from '../context/AuthContext';
+import { getPayhereHash } from '../api/payment';
 
 const PaymentPage = () => {
     const navigate = useNavigate();
     const location = useLocation();
-    const [cardNumber, setCardNumber] = useState('');
-    const [expiry, setExpiry] = useState('');
-    const [cvc, setCvc] = useState('');
-    const [name, setName] = useState('');
     const [isProcessing, setIsProcessing] = useState(false);
+    const [isPayhereReady, setIsPayhereReady] = useState(false);
+    const { user } = useContext(AuthContext);
 
     // Get booking details from navigation state or default
     const booking = location.state?.booking || {
-        provider: "Sarah Johnson",
-        service: "House Cleaning",
-        amount: "Rs8500.00",
-        date: "Dec 2, 2024 at 2:00 PM"
+        orderId: 'order_001',
+        provider: 'Provider',
+        providerUserId: null,
+        service: 'Service',
+        amount: 'Rs.0.00',
+        date: 'N/A'
     };
 
-    const handleSubmit = async (e) => {
-        e.preventDefault();
-        setIsProcessing(true);
+    const amountValue = useMemo(() => {
+        if (typeof booking.amountValue === 'number') return booking.amountValue;
+        if (typeof booking.amount === 'number') return booking.amount;
+        const cleaned = String(booking.amount || '').replace(/[^0-9.]/g, '');
+        return Number(cleaned || 0);
+    }, [booking.amount, booking.amountValue]);
 
-        // Simulate API call
-        await new Promise(resolve => setTimeout(resolve, 1500));
+    const customerName = user?.name || 'Customer';
+    const [firstName, ...restName] = customerName.split(' ');
+    const lastName = restName.join(' ') || 'Customer';
 
-        alert('Payment successful!');
-        navigate('/customer-dashboard', { state: { paymentSuccess: true } });
-    };
+    useEffect(() => {
+        const setupPayhereHandlers = () => {
+            if (!window.payhere) return;
 
-    const formatCardNumber = (value) => {
-        const v = value.replace(/\s+/g, '').replace(/[^0-9]/gi, '');
-        const matches = v.match(/\d{4,16}/g);
-        const match = (matches && matches[0]) || '';
-        const parts = [];
-        for (let i = 0; i < match.length; i += 4) parts.push(match.substring(i, i + 4));
-        return parts.length ? parts.join(' ') : value;
-    };
+            window.payhere.onCompleted = function onCompleted(orderId) {
+                alert(`Payment completed. Order: ${orderId}`);
+                navigate('/customer-dashboard', { state: { paymentSuccess: true } });
+            };
 
-    const handleCardNumberChange = (e) => setCardNumber(formatCardNumber(e.target.value));
+            window.payhere.onDismissed = function onDismissed() {
+                alert('Payment dismissed');
+            };
 
-    const handleExpiryChange = (e) => {
-        let value = e.target.value.replace(/\D/g, '');
-        if (value.length >= 2) value = value.slice(0, 2) + '/' + value.slice(2, 4);
-        setExpiry(value);
+            window.payhere.onError = function onError(error) {
+                alert(`Payment error: ${error}`);
+            };
+        };
+
+        if (window.payhere) {
+            setIsPayhereReady(true);
+            setupPayhereHandlers();
+            return;
+        }
+
+        const scriptUrls = [
+            'https://www.payhere.lk/lib/payhere.js',
+            'https://sandbox.payhere.lk/lib/payhere.js'
+        ];
+
+        let currentIndex = 0;
+
+        const loadNext = () => {
+            if (currentIndex >= scriptUrls.length) {
+                setIsPayhereReady(false);
+                return;
+            }
+
+            const script = document.createElement('script');
+            script.src = scriptUrls[currentIndex];
+            script.async = true;
+            script.onload = () => {
+                setIsPayhereReady(Boolean(window.payhere));
+                setupPayhereHandlers();
+            };
+            script.onerror = () => {
+                currentIndex += 1;
+                loadNext();
+            };
+            document.body.appendChild(script);
+        };
+
+        loadNext();
+    }, [navigate]);
+
+    const handlePayNow = async () => {
+        try {
+            setIsProcessing(true);
+
+            if (!window.payhere) {
+                alert('Payment system is still loading. Please try again in a moment.');
+                return;
+            }
+
+            const orderId = booking.orderId || booking.id || 'order_001';
+            const currency = 'LKR';
+
+            const { merchant_id, hash, notify_url } = await getPayhereHash({
+                order_id: orderId,
+                amount: amountValue.toFixed(2),
+                currency
+            });
+
+            const apiBaseUrl = process.env.REACT_APP_API_URL || 'http://localhost:5000';
+            const payment = {
+                sandbox: true,
+                merchant_id,
+                return_url: `${window.location.origin}/customer-dashboard`,
+                cancel_url: `${window.location.origin}/customer-dashboard`,
+                notify_url: notify_url || `${apiBaseUrl}/api/payment/notify`,
+                order_id: orderId,
+                items: booking.service,
+                amount: amountValue.toFixed(2),
+                currency,
+                hash,
+                first_name: firstName,
+                last_name: lastName,
+                email: user?.email || 'customer@example.com',
+                phone: user?.phone || '',
+                address: booking.location || 'N/A',
+                city: booking.location || 'N/A',
+                country: 'Sri Lanka',
+                custom_1: user?.id || '',
+                custom_2: booking.providerUserId || ''
+            };
+
+            window.payhere.startPayment(payment);
+        } catch (error) {
+            console.error('Payment error:', error);
+            alert('Failed to start payment');
+        } finally {
+            setIsProcessing(false);
+        }
     };
 
     return (
@@ -69,7 +158,7 @@ const PaymentPage = () => {
                             <h1 style={styles.title}>Payment Details</h1>
                         </div>
 
-                        <form onSubmit={handleSubmit} style={styles.form}>
+                        <div style={styles.form}>
                             {/* Service Info */}
                             <div style={styles.serviceInfo}>
                                 <div style={styles.serviceInfoRow}>
@@ -86,73 +175,25 @@ const PaymentPage = () => {
                                 </div>
                                 <div style={styles.serviceInfoRow}>
                                     <span>Amount:</span>
-                                    <span style={styles.amount}>{booking.amount}</span>
+                                    <span style={styles.amount}>Rs.{amountValue.toFixed(2)}</span>
                                 </div>
                             </div>
 
-                            {/* Card Details */}
-                            <div style={styles.formGroup}>
-                                <label style={styles.label}>Card Number</label>
-                                <input
-                                    type="text"
-                                    placeholder="1234 5678 9012 3456"
-                                    value={cardNumber}
-                                    onChange={handleCardNumberChange}
-                                    maxLength={19}
-                                    style={styles.input}
-                                    required
-                                />
-                            </div>
-
-                            <div style={styles.formRow}>
-                                <div style={styles.formGroup}>
-                                    <label style={styles.label}>Expiry Date</label>
-                                    <input
-                                        type="text"
-                                        placeholder="MM/YY"
-                                        value={expiry}
-                                        onChange={handleExpiryChange}
-                                        maxLength={5}
-                                        style={styles.input}
-                                        required
-                                    />
-                                </div>
-                                <div style={styles.formGroup}>
-                                    <label style={styles.label}>CVC</label>
-                                    <input
-                                        type="text"
-                                        placeholder="123"
-                                        value={cvc}
-                                        onChange={(e) => setCvc(e.target.value.replace(/\D/g, '').slice(0, 4))}
-                                        maxLength={4}
-                                        style={styles.input}
-                                        required
-                                    />
-                                </div>
-                            </div>
-
-                            <div style={styles.formGroup}>
-                                <label style={styles.label}>Name on Card</label>
-                                <input
-                                    type="text"
-                                    placeholder="John Doe"
-                                    value={name}
-                                    onChange={(e) => setName(e.target.value)}
-                                    style={styles.input}
-                                    required
-                                />
-                            </div>
-
-                            <button type="submit" style={styles.submitButton} disabled={isProcessing}>
-                                {isProcessing ? 'Processing...' : `Pay ${booking.amount}`}
+                            <button type="button" onClick={handlePayNow} style={styles.submitButton} disabled={isProcessing || !isPayhereReady}>
+                                {isProcessing ? 'Processing...' : `Pay Rs.${amountValue.toFixed(2)}`}
                                 <Lock size={16} />
                             </button>
+                            {!isPayhereReady && (
+                                <div style={{ marginTop: '10px', fontSize: '12px', color: '#64748b' }}>
+                                    Loading payment system...
+                                </div>
+                            )}
 
                             <div style={styles.securityNote}>
                                 <Lock size={14} color="#64748b" />
                                 <span>Your payment is secured with 256-bit SSL encryption</span>
                             </div>
-                        </form>
+                        </div>
                     </div>
 
                     {/* Right Column - Summary */}
@@ -161,7 +202,7 @@ const PaymentPage = () => {
                             <h2 style={styles.summaryTitle}>Order Summary</h2>
                             <div style={styles.summaryItem}>
                                 <span>Service Fee</span>
-                                <span>{booking.amount}</span>
+                                <span>Rs.{amountValue.toFixed(2)}</span>
                             </div>
                             <div style={styles.summaryItem}>
                                 <span>Platform Fee</span>
@@ -175,7 +216,7 @@ const PaymentPage = () => {
                             <div style={styles.summaryTotal}>
                                 <span>Total Amount</span>
                                 <span style={styles.totalAmount}>
-                                    Rs.{(parseFloat(booking.amount.replace('Rs', '2300')) + 0 + 0).toFixed(2)}
+                                    Rs.{amountValue.toFixed(2)}
                                 </span>
                             </div>
                             <div style={styles.features}>

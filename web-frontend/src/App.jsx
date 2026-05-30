@@ -12,11 +12,13 @@ import CustomerDashboard from "./pages/CustomerDashboard";
 import AdminLogin from './pages/AdminLogin';
 import AdminDashboard from './pages/AdminDashboard';
 import ProviderDashboard from './pages/ProviderDashboard';
+import ProviderRegistration from './pages/ProviderRegistration';
 import Register from "./pages/Register";
 import ServiceRequestPage from './pages/ServiceRequest';
 import PaymentPage from './pages/PaymentPage';
 import ReportIssue from "./pages/ReportIssue";
 import CustomerSettings from "./pages/CustomerSettings";
+import ProviderSettings from "./pages/ProviderSettings";
 
 
 function App() {
@@ -29,6 +31,7 @@ function App() {
           <Route path="/how-it-works" element={<HowItWorks />} />
           <Route path="/services" element={<Services />} />
           <Route path="/become-a-worker" element={<BecomeWorker />} />
+          <Route path="/provider-registration" element={<ProviderRegistration />} />
           <Route path="/login" element={<Login />} />
           <Route path="/signup" element={<Register />} />
           <Route path="/customer-dashboard" element={<ProtectedRoute><CustomerDashboard /></ProtectedRoute>} />
@@ -48,6 +51,15 @@ function App() {
             element={
               <ProtectedRoute>
                 <CustomerSettings />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/provider-settings"
+            element={
+              <ProtectedRoute>
+                <ProviderSettings />
               </ProtectedRoute>
             }
           />
