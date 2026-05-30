@@ -18,6 +18,7 @@ import ServiceRequestPage from './pages/ServiceRequest';
 import PaymentPage from './pages/PaymentPage';
 import ReportIssue from "./pages/ReportIssue";
 import CustomerSettings from "./pages/CustomerSettings";
+import ProviderSettings from "./pages/ProviderSettings";
 
 
 function App() {
@@ -50,6 +51,15 @@ function App() {
             element={
               <ProtectedRoute>
                 <CustomerSettings />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/provider-settings"
+            element={
+              <ProtectedRoute>
+                <ProviderSettings />
               </ProtectedRoute>
             }
           />
