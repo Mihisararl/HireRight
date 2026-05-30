@@ -1,12 +1,13 @@
 import React, { useState, useEffect, useContext } from 'react';
-import { Search, Wrench, Home, Paintbrush, Truck, Sparkles, MapPin, Clock, Star, X } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { Search, Wrench, Home, Paintbrush, Truck, Sparkles, MapPin, Phone, Star, X } from 'lucide-react';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { AuthContext } from '../context/AuthContext';
 import { getApprovedProviders, getProvidersByCategory } from '../api/provider';
 import { createServiceRequest } from '../api/service';
 
 export default function Services() {
   const navigate = useNavigate();
+  const location = useLocation();
   const { user } = useContext(AuthContext);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('All Services');
@@ -56,25 +57,47 @@ export default function Services() {
     fetchProviders();
   }, []);
 
+  useEffect(() => {
+    if (location.state?.bookingIntent && user) {
+      handleBook(location.state.bookingIntent);
+      navigate('/services', { replace: true, state: {} });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [location.state, user]);
+
+  const formatDisplayDate = (dateStr) => {
+    if (!dateStr) return '';
+    const d = new Date(`${dateStr}T00:00:00`);
+    if (Number.isNaN(d.getTime())) return dateStr;
+    return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  };
+
   // Transform providers to service format
-  const services = providers.map((provider, index) => ({
-    id: provider._id,
-    providerId: provider.userId,
-    title: `${provider.serviceCategory} Service`,
-    provider: `${provider.firstName} ${provider.lastName}`,
-    image: provider.portfolioPhoto || 'https://images.unsplash.com/photo-1581578731548-c64695cc6952?w=400&h=300&fit=crop',
-    location: `${provider.city}`,
-    rating: provider.rating,
-    reviews: provider.totalReviews,
-    price: provider.hourlyRate,
-    responseTime: '1 hour',
-    category: provider.serviceCategory,
-    experience: provider.yearsOfExperience,
-    bio: provider.professionalBio,
-    email: provider.email,
-    phone: provider.phone,
-    district: provider.district
-  }));
+  const services = providers.map((provider) => {
+    const bookedDates = provider.bookedDates || [];
+
+    return {
+      id: provider._id,
+      providerId: provider.userId,
+      title: `${provider.serviceCategory} Service`,
+      provider: `${provider.firstName} ${provider.lastName}`,
+      image: provider.portfolioPhoto || provider.profilePhoto || 'https://images.unsplash.com/photo-1581578731548-c64695cc6952?w=400&h=300&fit=crop',
+      location: `${provider.city}`,
+      rating: provider.rating,
+      reviews: provider.totalReviews,
+      price: provider.hourlyRate,
+      responseTime: '1 hour',
+      category: provider.serviceCategory,
+      experience: provider.yearsOfExperience,
+      bio: provider.professionalBio,
+      email: provider.email,
+      phone: provider.phone,
+      district: provider.district,
+      isAvailableToday: Boolean(provider.isAvailableToday),
+      bookedDates,
+      bookedToday: Boolean(provider.bookedToday)
+    };
+  });
 
   const filteredServices = services.filter(service =>
     (selectedCategory === 'All Services' || service.category === selectedCategory) &&
@@ -90,10 +113,28 @@ export default function Services() {
     return 0;
   });
 
+  const getParsedHours = (val) => {
+    if (!val) return 0;
+    const match = val.match(/(\d+(\.\d+)?)/);
+    return match ? parseFloat(match[0]) : 0;
+  };
+
+  const handleDurationChange = (duration) => {
+    const hours = getParsedHours(duration);
+    const hourlyRate = bookingModal ? parseFloat(bookingModal.price) : 0;
+    const calculatedBudget = hours > 0 ? (hours * hourlyRate).toString() : hourlyRate.toString();
+
+    setBookingForm(prev => ({
+      ...prev,
+      estimatedDuration: duration,
+      budget: calculatedBudget
+    }));
+  };
+
   const handleBook = (service) => {
     if (!user) {
       // Not logged in, redirect to login
-      navigate('/login', { state: { from: '/services', message: 'Please login to book a service' } });
+      navigate('/login', { state: { from: '/services', message: 'Please login to book a service', bookingIntent: service } });
       return;
     }
 
@@ -139,6 +180,7 @@ export default function Services() {
 
       await createServiceRequest(payload);
       alert('Service request sent successfully! The provider will review your booking request.');
+      navigate('/customer-dashboard', { state: { tab: 'posts' } });
       setBookingModal(null);
       setBookingForm({
         serviceTitle: '',
@@ -481,7 +523,7 @@ export default function Services() {
                     }}>
                       <Star size={14} fill="#fbbf24" color="#fbbf24" />
                       <span style={{ fontSize: '13px', fontWeight: '600', color: '#374151' }}>
-                        {service.rating}
+                        {service.reviews > 0 ? service.rating : 'New'}
                       </span>
                     </div>
                   </div>
@@ -499,10 +541,63 @@ export default function Services() {
                     <p style={{
                       fontSize: '14px',
                       color: '#6b7280',
-                      marginBottom: '16px'
+                      marginBottom: '12px'
                     }}>
                       {service.provider}
                     </p>
+
+                    <div style={{
+                      display: 'flex',
+                      flexWrap: 'wrap',
+                      gap: '8px',
+                      marginBottom: '16px'
+                    }}>
+                      {service.isAvailableToday && (
+                        <span style={{
+                          fontSize: '12px',
+                          fontWeight: '600',
+                          padding: '4px 10px',
+                          borderRadius: '20px',
+                          backgroundColor: '#dcfce7',
+                          color: '#166534'
+                        }}>
+                          Available today
+                        </span>
+                      )}
+                      {!service.isAvailableToday && (
+                        <span style={{
+                          fontSize: '12px',
+                          fontWeight: '600',
+                          padding: '4px 10px',
+                          borderRadius: '20px',
+                          backgroundColor: '#fef2f2',
+                          color: '#b91c1c'
+                        }}>
+                          Not available today
+                        </span>
+                      )}
+                    </div>
+                    {service.bookedDates.length > 0 && (
+                      <p style={{
+                        fontSize: '12px',
+                        color: '#9a3412',
+                        margin: '0 0 12px',
+                        lineHeight: 1.5
+                      }}>
+                        <strong>All booked dates:</strong>{' '}
+                        {service.bookedDates.map(formatDisplayDate).join(' · ')}
+                        {service.isAvailableToday && service.bookedToday && (
+                          <span style={{ color: '#059669', display: 'block', marginTop: '4px' }}>
+                            Still available today for other time slots — booked dates shown above
+                          </span>
+                        )}
+                        {!service.isAvailableToday && (
+                          <span style={{ color: '#64748b', display: 'block', marginTop: '4px' }}>
+                            Available on other days — not taking new jobs today
+                          </span>
+                        )}
+                      </p>
+                    )}
 
                     <div style={{
                       display: 'flex',
@@ -517,9 +612,9 @@ export default function Services() {
                         </span>
                       </div>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                        <Clock size={14} color="#9ca3af" />
+                        <Phone size={14} color="#9ca3af" />
                         <span style={{ fontSize: '13px', color: '#6b7280' }}>
-                          Responds in {service.responseTime}
+                          {service.phone || 'Not provided'}
                         </span>
                       </div>
                     </div>
@@ -535,16 +630,10 @@ export default function Services() {
                         <span style={{
                           fontSize: '24px',
                           fontWeight: 'bold',
-                          color: '#1f2937'
+                          color: '#1f2937',
+                          whiteSpace: 'nowrap'
                         }}>
-                          ${service.price}
-                        </span>
-                        <span style={{
-                          fontSize: '14px',
-                          color: '#9ca3af',
-                          marginLeft: '2px'
-                        }}>
-                          /hr
+                          Rs. {service.price} per hour
                         </span>
                       </div>
                       <button
@@ -699,8 +788,8 @@ export default function Services() {
                   {bookingModal.category}
                 </div>
                 <div style={{ fontSize: '14px', color: '#6b7280', marginBottom: '4px' }}>Hourly Rate</div>
-                <div style={{ fontSize: '16px', fontWeight: '600', color: '#1f2937' }}>
-                  Rs.{bookingModal.price}/hr
+                <div style={{ fontSize: '16px', fontWeight: '600', color: '#1f2937', whiteSpace: 'nowrap' }}>
+                  Rs. {bookingModal.price} per hour
                 </div>
               </div>
 
@@ -796,7 +885,7 @@ export default function Services() {
                     type="text"
                     placeholder="e.g., 2 hours"
                     value={bookingForm.estimatedDuration}
-                    onChange={(e) => setBookingForm({ ...bookingForm, estimatedDuration: e.target.value })}
+                    onChange={(e) => handleDurationChange(e.target.value)}
                     style={{
                       width: '100%',
                       padding: '12px',
@@ -826,6 +915,11 @@ export default function Services() {
                       boxSizing: 'border-box'
                     }}
                   />
+                  {getParsedHours(bookingForm.estimatedDuration) > 0 && (
+                    <div style={{ fontSize: '12px', color: '#0066ff', marginTop: '6px', fontWeight: '600' }}>
+                      Total Cost: {getParsedHours(bookingForm.estimatedDuration)} hours × Rs. {bookingModal?.price} = Rs. {bookingForm.budget}
+                    </div>
+                  )}
                 </div>
               </div>
 
