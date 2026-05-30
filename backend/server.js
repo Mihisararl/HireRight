@@ -10,6 +10,9 @@ import authRoutes from './routes/authRoutes.js';
 import serviceRequestRoutes from './routes/serviceRequestRoutes.js';
 import adminRoutes from './routes/adminRoutes.js';
 import providerRoutes from './routes/providerRoutes.js';
+import paymentRoutes from './routes/paymentRoutes.js';
+import complaintRoutes from './routes/complaintRoutes.js';
+import reviewRoutes from './routes/reviewRoutes.js';
 import User from './models/User.js';
 
 const app = express();
@@ -31,6 +34,9 @@ app.use('/api/auth', authRoutes);
 app.use('/api', serviceRequestRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/provider', providerRoutes);
+app.use('/api/payment', paymentRoutes);
+app.use('/api/complaints', complaintRoutes);
+app.use('/api/reviews', reviewRoutes);
 
 // ✅ Start server
 const start = async () => {

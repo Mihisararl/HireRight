@@ -10,7 +10,8 @@ import {
   Calendar,
   User,
   CheckCircle,
-  LogOut
+  LogOut,
+  Settings
 } from 'lucide-react';
 import {
   getAvailableServiceRequests,
@@ -21,8 +22,12 @@ import {
   acceptDirectBooking,
   rejectDirectBooking
 } from '../api/service';
-import { registerProvider } from '../api/provider';
+import { registerProvider, getMyAvailability, updateAvailability } from '../api/provider';
+import { getProviderPayments } from '../api/payment';
+import { getProviderReviews } from '../api/review';
 import { AuthContext } from '../context/AuthContext';
+import ProviderJobTracking from '../components/location/ProviderJobTracking';
+import { formatLocationDisplay } from '../utils/locationHelpers';
 
 const fileToDataUrl = (file) => new Promise((resolve, reject) => {
   const reader = new FileReader();
@@ -38,8 +43,13 @@ const ProviderDashboard = () => {
   const [availableRequests, setAvailableRequests] = useState([]);
   const [myRequests, setMyRequests] = useState([]);
   const [bookingRequests, setBookingRequests] = useState([]);
+  const [payments, setPayments] = useState([]);
+  const [reviews, setReviews] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [isAvailableToday, setIsAvailableToday] = useState(true);
+  const [bookedDates, setBookedDates] = useState([]);
+  const [availabilitySaving, setAvailabilitySaving] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [regStep, setRegStep] = useState(1);
   const [regForm, setRegForm] = useState({
@@ -56,6 +66,10 @@ const ProviderDashboard = () => {
     city: '',
     district: '',
     idDocument: null,
+    bankName: '',
+    accountNumber: '',
+    branch: '',
+    accountHolderName: '',
     agreedToBackgroundCheck: false
   });
   const [regErrors, setRegErrors] = useState({});
@@ -63,8 +77,14 @@ const ProviderDashboard = () => {
   useEffect(() => {
     if (activeSection === 'findWork') {
       loadAvailableRequests();
-    } else if (['myRequests', 'upcoming', 'history', 'earnings'].includes(activeSection)) {
+    } else if (['myRequests', 'upcoming', 'history', 'earnings', 'reviews'].includes(activeSection)) {
       loadMyRequests();
+      if (activeSection === 'earnings') {
+        loadPayments();
+      }
+      if (activeSection === 'reviews') {
+        loadReviews();
+      }
     } else if (activeSection === 'bookingRequests') {
       loadBookingRequests();
     }
@@ -123,14 +143,81 @@ const ProviderDashboard = () => {
     }
   };
 
-  const loadBookingRequests = async () => {
-    setLoading(true);
+  const loadBookingRequests = async (showLoading = true) => {
+    if (showLoading) setLoading(true);
     setError('');
     try {
       const data = await getDirectBookingRequests();
       setBookingRequests(data);
     } catch (err) {
       setError('Failed to load booking requests');
+      console.error(err);
+    } finally {
+      if (showLoading) setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!user || user.role !== 'provider') return;
+    loadBookingRequests(false);
+    const intervalId = setInterval(() => {
+      loadBookingRequests(false);
+    }, 30000);
+    return () => clearInterval(intervalId);
+  }, [user]);
+
+  const loadAvailability = async () => {
+    if (user?.providerStatus !== 'approved') return;
+    try {
+      const data = await getMyAvailability();
+      setIsAvailableToday(Boolean(data.isAvailableToday));
+      setBookedDates(data.bookedDates || []);
+    } catch (err) {
+      console.error('Failed to load availability', err);
+    }
+  };
+
+  useEffect(() => {
+    if (!user || user.role !== 'provider' || user.providerStatus !== 'approved') return;
+    loadAvailability();
+  }, [user?.providerStatus, user?.id]);
+
+  const handleAvailabilityToggle = async () => {
+    setAvailabilitySaving(true);
+    try {
+      const next = !isAvailableToday;
+      const data = await updateAvailability(next);
+      setIsAvailableToday(Boolean(data.isAvailableToday));
+      setBookedDates(data.bookedDates || []);
+    } catch (err) {
+      alert(err.response?.data?.message || 'Failed to update availability');
+    } finally {
+      setAvailabilitySaving(false);
+    }
+  };
+
+  const loadPayments = async () => {
+    setLoading(true);
+    setError('');
+    try {
+      const data = await getProviderPayments();
+      setPayments(data || []);
+    } catch (err) {
+      setError('Failed to load payments');
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const loadReviews = async () => {
+    setLoading(true);
+    setError('');
+    try {
+      const data = await getProviderReviews();
+      setReviews(data || []);
+    } catch (err) {
+      setError('Failed to load reviews');
       console.error(err);
     } finally {
       setLoading(false);
@@ -209,9 +296,13 @@ const ProviderDashboard = () => {
     window.location.href = '/login';
   };
 
-  const upcomingRequests = myRequests.filter(req => req.status === 'Accepted');
+  const upcomingRequests = myRequests.filter(req => ['Accepted', 'Confirmed'].includes(req.status));
   const historyRequests = myRequests.filter(req => req.status === 'Completed');
-  const totalEarnings = historyRequests.reduce((sum, req) => sum + (req.budget || 0), 0);
+  const paidPayments = payments.filter((payment) => payment.payoutStatus === 'paid');
+  const totalEarnings = paidPayments.reduce((sum, payment) => sum + (payment.amount || 0), 0);
+  const averageRating = reviews.length
+    ? (reviews.reduce((sum, review) => sum + (review.rating || 0), 0) / reviews.length).toFixed(2)
+    : '0.00';
 
   const handleRegChange = (e) => {
     const { name, value, type, checked } = e.target;
@@ -283,6 +374,10 @@ const ProviderDashboard = () => {
     const errs = {};
     if (!regForm.city.trim()) errs.city = 'City is required';
     if (!regForm.district.trim()) errs.district = 'District is required';
+    if (!regForm.bankName.trim()) errs.bankName = 'Bank name is required';
+    if (!regForm.accountNumber.trim()) errs.accountNumber = 'Account number is required';
+    if (!regForm.branch.trim()) errs.branch = 'Branch is required';
+    if (!regForm.accountHolderName.trim()) errs.accountHolderName = 'Account holder name is required';
     if (!regForm.idDocument) {
       errs.idDocument = 'ID document (NIC/Driving License) is required';
     }
@@ -330,6 +425,10 @@ const ProviderDashboard = () => {
           professionalBio: regForm.professionalBio,
           city: regForm.city,
           district: regForm.district,
+          bankName: regForm.bankName,
+          accountNumber: regForm.accountNumber,
+          branch: regForm.branch,
+          accountHolderName: regForm.accountHolderName,
           agreedToBackgroundCheck: regForm.agreedToBackgroundCheck,
           portfolioPhoto: regForm.portfolioPhoto ? await fileToDataUrl(regForm.portfolioPhoto) : '',
           idDocument: regForm.idDocument ? await fileToDataUrl(regForm.idDocument) : ''
@@ -353,6 +452,10 @@ const ProviderDashboard = () => {
           city: '',
           district: '',
           idDocument: null,
+          bankName: '',
+          accountNumber: '',
+          branch: '',
+          accountHolderName: '',
           agreedToBackgroundCheck: false
         });
         setRegErrors({});
@@ -522,18 +625,34 @@ const ProviderDashboard = () => {
                 alignItems: 'center',
                 justifyContent: 'center',
                 color: 'white',
-                fontSize: '24px',
+                fontSize: '20px',
                 fontWeight: '700',
-                boxShadow: '0 4px 12px rgba(59, 130, 246, 0.3)'
+                boxShadow: '0 4px 12px rgba(59, 130, 246, 0.3)',
+                overflow: 'hidden',
+                flexShrink: 0
               }}>
-                H
+                {user?.profilePhoto ? (
+                  <img
+                    src={user.profilePhoto}
+                    alt={user?.name || 'Profile'}
+                    style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                  />
+                ) : (
+                  (user?.name || 'P')
+                    .split(' ')
+                    .filter(Boolean)
+                    .map((n) => n[0])
+                    .join('')
+                    .substring(0, 2)
+                    .toUpperCase()
+                )}
               </div>
               <div>
                 <h1 style={{ fontSize: '28px', fontWeight: '700', color: '#1e293b', margin: 0 }}>
                   Hire Right
                 </h1>
                 <p style={{ fontSize: '14px', color: '#64748b', margin: '4px 0 0 0' }}>
-                  Provider Dashboard
+                  Welcome, {user?.name || 'Provider'}
                 </p>
               </div>
             </div>
@@ -562,21 +681,87 @@ const ProviderDashboard = () => {
               )}
 
               {user?.providerStatus === 'approved' && (
-                <div style={{
-                  padding: '10px 20px',
-                  borderRadius: '8px',
-                  background: 'linear-gradient(135deg, #10b981, #059669)',
-                  color: 'white',
-                  fontSize: '14px',
-                  fontWeight: '600',
+                <>
+                  <div style={{
+                    padding: '10px 20px',
+                    borderRadius: '8px',
+                    background: 'linear-gradient(135deg, #10b981, #059669)',
+                    color: 'white',
+                    fontSize: '14px',
+                    fontWeight: '600',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px'
+                  }}>
+                    <CheckCircle size={18} />
+                    Profile Approved
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleAvailabilityToggle}
+                    disabled={availabilitySaving}
+                    style={{
+                      padding: '10px 20px',
+                      borderRadius: '8px',
+                      border: 'none',
+                      background: isAvailableToday
+                        ? '#e2e8f0'
+                        : 'linear-gradient(135deg, #ef4444, #dc2626)',
+                      color: isAvailableToday ? '#475569' : 'white',
+                      fontSize: '14px',
+                      fontWeight: '600',
+                      cursor: availabilitySaving ? 'wait' : 'pointer',
+                      opacity: availabilitySaving ? 0.7 : 1
+                    }}
+                  >
+                    {availabilitySaving
+                      ? 'Updating...'
+                      : isAvailableToday
+                        ? 'Mark unavailable today'
+                        : 'Mark available today'}
+                  </button>
+                  {bookedDates.length > 0 && (
+                    <div style={{
+                      padding: '8px 14px',
+                      borderRadius: '8px',
+                      backgroundColor: '#fff7ed',
+                      border: '1px solid #fed7aa',
+                      color: '#9a3412',
+                      fontSize: '13px',
+                      fontWeight: '500',
+                      maxWidth: '320px'
+                    }}>
+                      Booked dates: {bookedDates.map((d) => {
+                        const parsed = new Date(`${d}T00:00:00`);
+                        return Number.isNaN(parsed.getTime())
+                          ? d
+                          : parsed.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+                      }).join(', ')}
+                    </div>
+                  )}
+                </>
+              )}
+
+              <button
+                onClick={() => navigate('/provider-settings')}
+                style={{
                   display: 'flex',
                   alignItems: 'center',
-                  gap: '8px'
-                }}>
-                  <CheckCircle size={18} />
-                  Profile Approved
-                </div>
-              )}
+                  gap: '8px',
+                  padding: '10px 20px',
+                  borderRadius: '8px',
+                  border: '1px solid #e2e8f0',
+                  backgroundColor: 'white',
+                  color: '#64748b',
+                  fontSize: '14px',
+                  fontWeight: '600',
+                  cursor: 'pointer',
+                  transition: 'all 0.3s ease'
+                }}
+              >
+                <Settings size={18} />
+                Settings
+              </button>
 
               <button
                 onClick={handleLogout}
@@ -652,9 +837,26 @@ const ProviderDashboard = () => {
                 <div
                   className={`sidebar-item ${activeSection === 'bookingRequests' ? 'sidebar-item-active' : ''}`}
                   onClick={() => setActiveSection('bookingRequests')}
+                  style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}
                 >
-                  <Briefcase size={20} />
-                  <span>Booking Requests</span>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                    <Briefcase size={20} />
+                    <span>Booking Requests</span>
+                  </div>
+                  {bookingRequests.length > 0 && (
+                    <span style={{
+                      backgroundColor: activeSection === 'bookingRequests' ? '#fff' : '#ef4444',
+                      color: activeSection === 'bookingRequests' ? '#ef4444' : '#fff',
+                      borderRadius: '50%',
+                      padding: '2px 8px',
+                      fontSize: '11px',
+                      fontWeight: '700',
+                      minWidth: '16px',
+                      textAlign: 'center'
+                    }}>
+                      {bookingRequests.length}
+                    </span>
+                  )}
                 </div>
 
                 <div
@@ -687,6 +889,14 @@ const ProviderDashboard = () => {
                 >
                   <DollarSign size={20} />
                   <span>Earnings</span>
+                </div>
+
+                <div
+                  className={`sidebar-item ${activeSection === 'reviews' ? 'sidebar-item-active' : ''}`}
+                  onClick={() => setActiveSection('reviews')}
+                >
+                  <CheckCircle size={20} />
+                  <span>Reviews</span>
                 </div>
               </div>
             </div>
@@ -754,7 +964,7 @@ const ProviderDashboard = () => {
                             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                               <MapPin size={16} color="#64748b" />
                               <span style={{ fontSize: '14px', color: '#475569' }}>
-                                {request.location}
+                                {formatLocationDisplay(request.location)}
                               </span>
                             </div>
 
@@ -876,7 +1086,7 @@ const ProviderDashboard = () => {
                             </div>
                             <div>
                               <span style={{ color: '#64748b' }}>📍 Location:</span>
-                              <div style={{ fontWeight: '600', color: '#1e293b' }}>{booking.location}</div>
+                              <div style={{ fontWeight: '600', color: '#1e293b' }}>{formatLocationDisplay(booking.location)}</div>
                             </div>
                             <div>
                               <span style={{ color: '#64748b' }}>💰 Budget:</span>
@@ -1013,7 +1223,7 @@ const ProviderDashboard = () => {
                             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                               <MapPin size={16} color="#64748b" />
                               <span style={{ fontSize: '14px', color: '#475569' }}>
-                                {request.location}
+                                {formatLocationDisplay(request.location)}
                               </span>
                             </div>
 
@@ -1037,7 +1247,7 @@ const ProviderDashboard = () => {
                               {request.serviceCategory}
                             </div>
 
-                            {request.status === 'Accepted' && (
+                            {(['Accepted', 'Confirmed'].includes(request.status) && !request.providerCompleted) && (
                               <button
                                 className="btn-success"
                                 onClick={() => handleCompleteJob(request._id)}
@@ -1047,6 +1257,14 @@ const ProviderDashboard = () => {
                               </button>
                             )}
                           </div>
+                          <ProviderJobTracking
+                            serviceRequest={request}
+                            onJourneyChange={(updated) => {
+                              setMyRequests((prev) => prev.map((r) => (
+                                r._id === updated._id ? { ...r, ...updated } : r
+                              )));
+                            }}
+                          />
                         </div>
                       ))}
                     </div>
@@ -1113,7 +1331,7 @@ const ProviderDashboard = () => {
                               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                                 <MapPin size={16} color="#64748b" />
                                 <span style={{ fontSize: '14px', color: '#475569' }}>
-                                  {request.location}
+                                  {formatLocationDisplay(request.location)}
                                 </span>
                               </div>
 
@@ -1137,14 +1355,24 @@ const ProviderDashboard = () => {
                                 {request.serviceCategory}
                               </div>
 
-                              <button
-                                className="btn-success"
-                                onClick={() => handleCompleteJob(request._id)}
-                              >
-                                <CheckCircle size={16} style={{ marginRight: '6px', display: 'inline' }} />
-                                Mark Complete
-                              </button>
+                              {(!request.providerCompleted && ['Accepted', 'Confirmed'].includes(request.status)) && (
+                                <button
+                                  className="btn-success"
+                                  onClick={() => handleCompleteJob(request._id)}
+                                >
+                                  <CheckCircle size={16} style={{ marginRight: '6px', display: 'inline' }} />
+                                  Mark Complete
+                                </button>
+                              )}
                             </div>
+                            <ProviderJobTracking
+                              serviceRequest={request}
+                              onJourneyChange={(updated) => {
+                                setMyRequests((prev) => prev.map((r) => (
+                                  r._id === updated._id ? { ...r, ...updated } : r
+                                )));
+                              }}
+                            />
                           </div>
                         ))}
                     </div>
@@ -1221,7 +1449,7 @@ const ProviderDashboard = () => {
                             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                               <MapPin size={16} color="#64748b" />
                               <span style={{ fontSize: '14px', color: '#475569' }}>
-                                {request.location}
+                                {formatLocationDisplay(request.location)}
                               </span>
                             </div>
 
@@ -1300,14 +1528,14 @@ const ProviderDashboard = () => {
                     <div style={{ textAlign: 'center', padding: '40px', color: '#64748b' }}>
                       Loading...
                     </div>
-                  ) : historyRequests.length === 0 ? (
+                  ) : paidPayments.length === 0 ? (
                     <div style={{ textAlign: 'center', padding: '40px', color: '#64748b' }}>
-                      No earnings yet. Complete jobs to start earning!
+                      No paid earnings yet. Once admin releases funds, they will appear here.
                     </div>
                   ) : (
                     <div style={{ display: 'grid', gap: '12px' }}>
-                      {historyRequests.map((request) => (
-                        <div key={request._id} style={{
+                      {paidPayments.map((payment) => (
+                        <div key={payment._id} style={{
                           background: 'white',
                           borderRadius: '10px',
                           padding: '16px',
@@ -1319,19 +1547,19 @@ const ProviderDashboard = () => {
                         }}>
                           <div style={{ flex: 1 }}>
                             <h4 style={{ fontSize: '16px', fontWeight: '600', color: '#1e293b', marginBottom: '6px' }}>
-                              {request.serviceTitle}
+                              Payment Released
                             </h4>
                             <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap' }}>
                               <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                                 <MapPin size={14} color="#64748b" />
                                 <span style={{ fontSize: '13px', color: '#64748b' }}>
-                                  {request.location}
+                                  {payment.currency || 'LKR'}
                                 </span>
                               </div>
                               <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                                 <Calendar size={14} color="#64748b" />
                                 <span style={{ fontSize: '13px', color: '#64748b' }}>
-                                  {request.completedAt ? new Date(request.completedAt).toLocaleDateString() : 'N/A'}
+                                  {payment.approvedAt ? new Date(payment.approvedAt).toLocaleDateString() : 'N/A'}
                                 </span>
                               </div>
                             </div>
@@ -1342,7 +1570,57 @@ const ProviderDashboard = () => {
                             color: '#10b981',
                             marginLeft: '16px'
                           }}>
-                            Rs. {request.budget?.toLocaleString()}
+                            Rs. {payment.amount?.toLocaleString()}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {activeSection === 'reviews' && (
+                <div>
+                  <div style={{ marginBottom: '24px' }}>
+                    <h2 style={{ fontSize: '24px', fontWeight: '700', color: '#1e293b', marginBottom: '8px' }}>
+                      Reviews
+                    </h2>
+                    <p style={{ fontSize: '14px', color: '#64748b' }}>
+                      Average rating: {averageRating} / 5
+                    </p>
+                  </div>
+
+                  {loading ? (
+                    <div style={{ textAlign: 'center', padding: '40px', color: '#64748b' }}>
+                      Loading...
+                    </div>
+                  ) : reviews.length === 0 ? (
+                    <div style={{ textAlign: 'center', padding: '40px', color: '#64748b' }}>
+                      No reviews yet.
+                    </div>
+                  ) : (
+                    <div style={{ display: 'grid', gap: '12px' }}>
+                      {reviews.map((review) => (
+                        <div key={review._id} style={{
+                          background: 'white',
+                          borderRadius: '10px',
+                          padding: '16px',
+                          boxShadow: '0 2px 6px rgba(0, 0, 0, 0.04)',
+                          border: '1px solid #e2e8f0'
+                        }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                            <div style={{ fontWeight: '600', color: '#1e293b' }}>
+                              {review.userId?.name || 'Customer'}
+                            </div>
+                            <div style={{ fontWeight: '700', color: '#f59e0b' }}>
+                              {review.rating} / 5
+                            </div>
+                          </div>
+                          <div style={{ fontSize: '13px', color: '#64748b', marginBottom: '6px' }}>
+                            {review.createdAt ? new Date(review.createdAt).toLocaleDateString() : ''}
+                          </div>
+                          <div style={{ fontSize: '14px', color: '#475569' }}>
+                            {review.comment || 'No comment provided.'}
                           </div>
                         </div>
                       ))}
@@ -1576,6 +1854,51 @@ const ProviderDashboard = () => {
                         {sriLankanDistricts.map(dist => <option key={dist} value={dist}>{dist}</option>)}
                       </select>
                       {regErrors.district && <div style={{ color: '#ef4444', fontSize: '12px', marginTop: '4px' }}>{regErrors.district}</div>}
+                    </div>
+
+                    <div style={{ background: 'linear-gradient(135deg, #fff7ed, #ffedd5)', border: '2px solid #fdba74', borderRadius: '12px', padding: '20px', marginTop: '8px' }}>
+                      <div style={{ display: 'flex', gap: '12px' }}>
+                        <div style={{ flexShrink: 0 }}>
+                          <svg style={{ width: '24px', height: '24px', color: '#ea580c' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 7h16M4 11h16M4 15h10m-7 4h6" />
+                          </svg>
+                        </div>
+                        <div style={{ flex: 1 }}>
+                          <h4 style={{ fontSize: '15px', fontWeight: '700', color: '#9a3412', marginBottom: '12px' }}>Bank Account Details</h4>
+                          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                            <div>
+                              <label style={{ display: 'block', fontSize: '13px', fontWeight: '600', color: '#334155', marginBottom: '6px' }}>
+                                Bank Name <span style={{ color: '#ef4444' }}>*</span>
+                              </label>
+                              <input name="bankName" value={regForm.bankName} onChange={handleRegChange} placeholder="Bank of Ceylon" style={{ width: '100%', padding: '10px 12px', borderRadius: '8px', border: `2px solid ${regErrors.bankName ? '#fca5a5' : '#e2e8f0'}`, fontSize: '14px', outline: 'none' }} />
+                              {regErrors.bankName && <div style={{ color: '#ef4444', fontSize: '12px', marginTop: '4px' }}>{regErrors.bankName}</div>}
+                            </div>
+                            <div>
+                              <label style={{ display: 'block', fontSize: '13px', fontWeight: '600', color: '#334155', marginBottom: '6px' }}>
+                                Branch <span style={{ color: '#ef4444' }}>*</span>
+                              </label>
+                              <input name="branch" value={regForm.branch} onChange={handleRegChange} placeholder="Colombo" style={{ width: '100%', padding: '10px 12px', borderRadius: '8px', border: `2px solid ${regErrors.branch ? '#fca5a5' : '#e2e8f0'}`, fontSize: '14px', outline: 'none' }} />
+                              {regErrors.branch && <div style={{ color: '#ef4444', fontSize: '12px', marginTop: '4px' }}>{regErrors.branch}</div>}
+                            </div>
+                          </div>
+                          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', marginTop: '12px' }}>
+                            <div>
+                              <label style={{ display: 'block', fontSize: '13px', fontWeight: '600', color: '#334155', marginBottom: '6px' }}>
+                                Account Number <span style={{ color: '#ef4444' }}>*</span>
+                              </label>
+                              <input name="accountNumber" value={regForm.accountNumber} onChange={handleRegChange} placeholder="1234567890" style={{ width: '100%', padding: '10px 12px', borderRadius: '8px', border: `2px solid ${regErrors.accountNumber ? '#fca5a5' : '#e2e8f0'}`, fontSize: '14px', outline: 'none' }} />
+                              {regErrors.accountNumber && <div style={{ color: '#ef4444', fontSize: '12px', marginTop: '4px' }}>{regErrors.accountNumber}</div>}
+                            </div>
+                            <div>
+                              <label style={{ display: 'block', fontSize: '13px', fontWeight: '600', color: '#334155', marginBottom: '6px' }}>
+                                Account Holder Name <span style={{ color: '#ef4444' }}>*</span>
+                              </label>
+                              <input name="accountHolderName" value={regForm.accountHolderName} onChange={handleRegChange} placeholder="Kasun Silva" style={{ width: '100%', padding: '10px 12px', borderRadius: '8px', border: `2px solid ${regErrors.accountHolderName ? '#fca5a5' : '#e2e8f0'}`, fontSize: '14px', outline: 'none' }} />
+                              {regErrors.accountHolderName && <div style={{ color: '#ef4444', fontSize: '12px', marginTop: '4px' }}>{regErrors.accountHolderName}</div>}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
                     </div>
 
                     {/* ID Document Upload Section */}
