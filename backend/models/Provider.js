@@ -84,6 +84,30 @@ const providerSchema = new mongoose.Schema(
       required: true
     },
 
+    bankName: {
+      type: String,
+      required: true,
+      trim: true
+    },
+
+    accountNumber: {
+      type: String,
+      required: true,
+      trim: true
+    },
+
+    branch: {
+      type: String,
+      required: true,
+      trim: true
+    },
+
+    accountHolderName: {
+      type: String,
+      required: true,
+      trim: true
+    },
+
     approvedAt: {
       type: Date,
       required: true
@@ -101,7 +125,7 @@ const providerSchema = new mongoose.Schema(
 
     rating: {
       type: Number,
-      default: 4.8,
+      default: 0,
       min: 0,
       max: 5
     },
@@ -110,7 +134,23 @@ const providerSchema = new mongoose.Schema(
       type: Number,
       default: 0,
       min: 0
-    }
+    },
+
+    // Daily availability (provider sets each day)
+    availabilityDate: {
+      type: String,
+      trim: true
+    },
+    isAvailableToday: {
+      type: Boolean,
+      default: true
+    },
+
+    location: {
+      lat: { type: Number },
+      lng: { type: Number },
+      updatedAt: { type: Date },
+    },
   },
   { timestamps: true }
 );
