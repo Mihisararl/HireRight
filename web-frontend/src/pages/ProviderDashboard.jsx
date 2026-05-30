@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useContext } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 import {
   Search,
@@ -27,6 +28,7 @@ import { getProviderPayments } from '../api/payment';
 import { getProviderReviews } from '../api/review';
 import { AuthContext } from '../context/AuthContext';
 import ProviderJobTracking from '../components/location/ProviderJobTracking';
+import LanguageSwitcher from '../components/LanguageSwitcher';
 import { formatLocationDisplay } from '../utils/locationHelpers';
 
 const fileToDataUrl = (file) => new Promise((resolve, reject) => {
@@ -37,6 +39,7 @@ const fileToDataUrl = (file) => new Promise((resolve, reject) => {
 });
 
 const ProviderDashboard = () => {
+  const { t } = useTranslation();
   const { user, refreshUser, logout } = useContext(AuthContext);
   const navigate = useNavigate();
   const [activeSection, setActiveSection] = useState('findWork');
@@ -122,7 +125,7 @@ const ProviderDashboard = () => {
       const data = await getAvailableServiceRequests();
       setAvailableRequests(data);
     } catch (err) {
-      setError('Failed to load available requests');
+      setError(t('provider.errors.loadAvailable'));
       console.error(err);
     } finally {
       setLoading(false);
@@ -136,7 +139,7 @@ const ProviderDashboard = () => {
       const data = await getProviderServiceRequests();
       setMyRequests(data);
     } catch (err) {
-      setError('Failed to load your requests');
+      setError(t('provider.errors.loadMyRequests'));
       console.error(err);
     } finally {
       setLoading(false);
@@ -150,7 +153,7 @@ const ProviderDashboard = () => {
       const data = await getDirectBookingRequests();
       setBookingRequests(data);
     } catch (err) {
-      setError('Failed to load booking requests');
+      setError(t('provider.errors.loadBookingRequests'));
       console.error(err);
     } finally {
       if (showLoading) setLoading(false);
@@ -190,7 +193,7 @@ const ProviderDashboard = () => {
       setIsAvailableToday(Boolean(data.isAvailableToday));
       setBookedDates(data.bookedDates || []);
     } catch (err) {
-      alert(err.response?.data?.message || 'Failed to update availability');
+      alert(err.response?.data?.message || t('provider.alerts.failedUpdateAvailability'));
     } finally {
       setAvailabilitySaving(false);
     }
@@ -203,7 +206,7 @@ const ProviderDashboard = () => {
       const data = await getProviderPayments();
       setPayments(data || []);
     } catch (err) {
-      setError('Failed to load payments');
+      setError(t('provider.errors.loadPayments'));
       console.error(err);
     } finally {
       setLoading(false);
@@ -217,7 +220,7 @@ const ProviderDashboard = () => {
       const data = await getProviderReviews();
       setReviews(data || []);
     } catch (err) {
-      setError('Failed to load reviews');
+      setError(t('provider.errors.loadReviews'));
       console.error(err);
     } finally {
       setLoading(false);
@@ -226,14 +229,14 @@ const ProviderDashboard = () => {
 
   const handleAcceptBooking = async (requestId) => {
     try {
-      const responseMessage = prompt('Add a message for the customer (optional):');
+      const responseMessage = prompt(t('provider.prompts.acceptMessage'));
       if (responseMessage === null) return; // User cancelled
 
       await acceptDirectBooking(requestId, responseMessage);
       loadBookingRequests();
-      alert('Booking accepted successfully!');
+      alert(t('provider.alerts.bookingAccepted'));
     } catch (err) {
-      const errorMsg = err.response?.data?.message || 'Failed to accept booking';
+      const errorMsg = err.response?.data?.message || t('provider.alerts.failedAcceptBooking');
       alert(errorMsg);
       console.error(err);
     }
@@ -241,14 +244,14 @@ const ProviderDashboard = () => {
 
   const handleRejectBooking = async (requestId) => {
     try {
-      const responseMessage = prompt('Why are you rejecting this booking? (optional):');
+      const responseMessage = prompt(t('provider.prompts.rejectReason'));
       if (responseMessage === null) return; // User cancelled
 
       await rejectDirectBooking(requestId, responseMessage);
       loadBookingRequests();
-      alert('Booking rejected successfully!');
+      alert(t('provider.alerts.bookingRejected'));
     } catch (err) {
-      const errorMsg = err.response?.data?.message || 'Failed to reject booking';
+      const errorMsg = err.response?.data?.message || t('provider.alerts.failedRejectBooking');
       alert(errorMsg);
       console.error(err);
     }
@@ -257,9 +260,9 @@ const ProviderDashboard = () => {
   const handleAcceptJob = async (requestId, budget, preferredDate) => {
     try {
       // Simple prompt for offer details - can be enhanced with a modal later
-      const message = prompt('Add a message for the customer (optional):');
-      const proposedPriceStr = prompt(`Enter your proposed price (Rs.):`, budget);
-      const proposedDate = prompt(`Enter proposed date:`, preferredDate);
+      const message = prompt(t('provider.prompts.offerMessage'));
+      const proposedPriceStr = prompt(t('provider.prompts.proposedPrice'), budget);
+      const proposedDate = prompt(t('provider.prompts.proposedDate'), preferredDate);
 
       if (proposedPriceStr === null) return; // User cancelled
 
@@ -272,9 +275,9 @@ const ProviderDashboard = () => {
       });
 
       loadAvailableRequests();
-      alert('Offer sent to customer successfully!');
+      alert(t('provider.alerts.offerSent'));
     } catch (err) {
-      const errorMsg = err.response?.data?.message || 'Failed to send offer';
+      const errorMsg = err.response?.data?.message || t('provider.alerts.failedSendOffer');
       alert(errorMsg);
       console.error(err);
     }
@@ -284,9 +287,9 @@ const ProviderDashboard = () => {
     try {
       await completeServiceRequest(requestId);
       loadMyRequests();
-      alert('Job marked as completed!');
+      alert(t('provider.alerts.jobCompleted'));
     } catch (err) {
-      alert('Failed to complete job');
+      alert(t('provider.alerts.failedCompleteJob'));
       console.error(err);
     }
   };
@@ -435,7 +438,7 @@ const ProviderDashboard = () => {
         };
 
         await registerProvider(payload);
-        alert('Registration submitted — admin review is pending.');
+        alert(t('provider.alerts.registrationSubmitted'));
         setIsModalOpen(false);
         setRegStep(1);
         setRegForm({
@@ -460,7 +463,7 @@ const ProviderDashboard = () => {
         });
         setRegErrors({});
       } catch (error) {
-        alert(error.response?.data?.message || 'Failed to submit registration');
+        alert(error.response?.data?.message || t('provider.alerts.failedSubmitRegistration'));
       }
     }
   };
@@ -634,7 +637,7 @@ const ProviderDashboard = () => {
                 {user?.profilePhoto ? (
                   <img
                     src={user.profilePhoto}
-                    alt={user?.name || 'Profile'}
+                    alt={user?.name || t('provider.profile')}
                     style={{ width: '100%', height: '100%', objectFit: 'cover' }}
                   />
                 ) : (
@@ -649,10 +652,10 @@ const ProviderDashboard = () => {
               </div>
               <div>
                 <h1 style={{ fontSize: '28px', fontWeight: '700', color: '#1e293b', margin: 0 }}>
-                  Hire Right
+                  {t('common.appName')}
                 </h1>
                 <p style={{ fontSize: '14px', color: '#64748b', margin: '4px 0 0 0' }}>
-                  Welcome, {user?.name || 'Provider'}
+                  {t('provider.welcome', { name: user?.name || t('provider.providerFallback') })}
                 </p>
               </div>
             </div>
@@ -676,7 +679,7 @@ const ProviderDashboard = () => {
                     transition: 'all 0.3s ease'
                   }}
                 >
-                  Create Worker Profile
+                  {t('provider.createWorkerProfile')}
                 </button>
               )}
 
@@ -694,7 +697,7 @@ const ProviderDashboard = () => {
                     gap: '8px'
                   }}>
                     <CheckCircle size={18} />
-                    Profile Approved
+                    {t('provider.profileApproved')}
                   </div>
                   <button
                     type="button"
@@ -715,10 +718,10 @@ const ProviderDashboard = () => {
                     }}
                   >
                     {availabilitySaving
-                      ? 'Updating...'
+                      ? t('provider.updating')
                       : isAvailableToday
-                        ? 'Mark unavailable today'
-                        : 'Mark available today'}
+                        ? t('provider.markUnavailableToday')
+                        : t('provider.markAvailableToday')}
                   </button>
                   {bookedDates.length > 0 && (
                     <div style={{
@@ -731,7 +734,7 @@ const ProviderDashboard = () => {
                       fontWeight: '500',
                       maxWidth: '320px'
                     }}>
-                      Booked dates: {bookedDates.map((d) => {
+                      {t('provider.bookedDates')}: {bookedDates.map((d) => {
                         const parsed = new Date(`${d}T00:00:00`);
                         return Number.isNaN(parsed.getTime())
                           ? d
@@ -741,6 +744,8 @@ const ProviderDashboard = () => {
                   )}
                 </>
               )}
+
+              <LanguageSwitcher />
 
               <button
                 onClick={() => navigate('/provider-settings')}
@@ -760,7 +765,7 @@ const ProviderDashboard = () => {
                 }}
               >
                 <Settings size={18} />
-                Settings
+                {t('provider.settings')}
               </button>
 
               <button
@@ -781,7 +786,7 @@ const ProviderDashboard = () => {
                 }}
               >
                 <LogOut size={18} />
-                Logout
+                {t('provider.logout')}
               </button>
             </div>
           </div>
@@ -798,8 +803,8 @@ const ProviderDashboard = () => {
               fontWeight: '600'
             }}>
               {isRejected
-                ? 'Your worker registration was rejected. Please resubmit your profile.'
-                : 'Your worker profile is under review. You will be able to send offers after approval.'}
+                ? t('provider.registrationRejected')
+                : t('provider.registrationPending')}
             </div>
           )}
 
@@ -821,7 +826,7 @@ const ProviderDashboard = () => {
             }}>
               <div style={{ marginBottom: '10px', paddingLeft: '8px' }}>
                 <h3 style={{ fontSize: '16px', fontWeight: '600', color: '#1e293b' }}>
-                  Navigation
+                  {t('provider.navigation')}
                 </h3>
               </div>
 
@@ -831,7 +836,7 @@ const ProviderDashboard = () => {
                   onClick={() => setActiveSection('findWork')}
                 >
                   <Search size={20} />
-                  <span>Find Work</span>
+                  <span>{t('provider.findWork')}</span>
                 </div>
 
                 <div
@@ -841,7 +846,7 @@ const ProviderDashboard = () => {
                 >
                   <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                     <Briefcase size={20} />
-                    <span>Booking Requests</span>
+                    <span>{t('provider.bookingRequests')}</span>
                   </div>
                   {bookingRequests.length > 0 && (
                     <span style={{
@@ -864,7 +869,7 @@ const ProviderDashboard = () => {
                   onClick={() => setActiveSection('myRequests')}
                 >
                   <Briefcase size={20} />
-                  <span>My Requests</span>
+                  <span>{t('provider.myRequests')}</span>
                 </div>
 
                 <div
@@ -872,7 +877,7 @@ const ProviderDashboard = () => {
                   onClick={() => setActiveSection('upcoming')}
                 >
                   <Clock size={20} />
-                  <span>Upcoming</span>
+                  <span>{t('provider.upcoming')}</span>
                 </div>
 
                 <div
@@ -880,7 +885,7 @@ const ProviderDashboard = () => {
                   onClick={() => setActiveSection('history')}
                 >
                   <HistoryIcon size={20} />
-                  <span>History</span>
+                  <span>{t('provider.history')}</span>
                 </div>
 
                 <div
@@ -888,7 +893,7 @@ const ProviderDashboard = () => {
                   onClick={() => setActiveSection('earnings')}
                 >
                   <DollarSign size={20} />
-                  <span>Earnings</span>
+                  <span>{t('provider.earnings')}</span>
                 </div>
 
                 <div
@@ -896,7 +901,7 @@ const ProviderDashboard = () => {
                   onClick={() => setActiveSection('reviews')}
                 >
                   <CheckCircle size={20} />
-                  <span>Reviews</span>
+                  <span>{t('provider.reviews')}</span>
                 </div>
               </div>
             </div>
@@ -908,16 +913,16 @@ const ProviderDashboard = () => {
                 <div>
                   <div style={{ marginBottom: '24px' }}>
                     <h2 style={{ fontSize: '24px', fontWeight: '700', color: '#1e293b', marginBottom: '8px' }}>
-                      Find Work
+                      {t('provider.findWorkTitle')}
                     </h2>
                     <p style={{ fontSize: '14px', color: '#64748b' }}>
-                      Browse and accept available service requests
+                      {t('provider.findWorkSubtitle')}
                     </p>
                   </div>
 
                   {loading ? (
                     <div style={{ textAlign: 'center', padding: '40px', color: '#64748b' }}>
-                      Loading...
+                      {t('provider.loading')}
                     </div>
                   ) : error ? (
                     <div style={{ textAlign: 'center', padding: '40px', color: '#ef4444' }}>
@@ -925,7 +930,7 @@ const ProviderDashboard = () => {
                     </div>
                   ) : availableRequests.length === 0 ? (
                     <div style={{ textAlign: 'center', padding: '40px', color: '#64748b' }}>
-                      No available service requests at the moment.
+                      {t('provider.noAvailableRequests')}
                     </div>
                   ) : (
                     <div style={{ display: 'grid', gap: '16px' }}>
@@ -957,7 +962,7 @@ const ProviderDashboard = () => {
                             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                               <User size={16} color="#64748b" />
                               <span style={{ fontSize: '14px', color: '#475569' }}>
-                                {request.userId?.name || 'Customer'}
+                                {request.userId?.name || t('provider.customer')}
                               </span>
                             </div>
 
@@ -994,7 +999,7 @@ const ProviderDashboard = () => {
                               disabled={!isApproved}
                               style={!isApproved ? { opacity: 0.6, cursor: 'not-allowed' } : undefined}
                             >
-                              Send Offer
+                              {t('provider.sendOffer')}
                             </button>
                           </div>
                         </div>
@@ -1009,16 +1014,16 @@ const ProviderDashboard = () => {
                 <div>
                   <div style={{ marginBottom: '24px' }}>
                     <h2 style={{ fontSize: '24px', fontWeight: '700', color: '#1e293b', marginBottom: '8px' }}>
-                      Booking Requests
+                      {t('provider.bookingRequestsTitle')}
                     </h2>
                     <p style={{ fontSize: '14px', color: '#64748b' }}>
-                      Direct booking requests from customers via Services page
+                      {t('provider.bookingRequestsSubtitle')}
                     </p>
                   </div>
 
                   {loading ? (
                     <div style={{ textAlign: 'center', padding: '40px', color: '#64748b' }}>
-                      Loading booking requests...
+                      {t('provider.loadingBookingRequests')}
                     </div>
                   ) : bookingRequests.length === 0 ? (
                     <div style={{
@@ -1029,8 +1034,8 @@ const ProviderDashboard = () => {
                       color: '#64748b'
                     }}>
                       <Briefcase size={32} style={{ margin: '0 auto 16px', opacity: 0.5 }} />
-                      <p style={{ fontSize: '16px' }}>No booking requests yet</p>
-                      <p style={{ fontSize: '14px' }}>Customers who book you through the Services page will appear here</p>
+                      <p style={{ fontSize: '16px' }}>{t('provider.noBookingRequests')}</p>
+                      <p style={{ fontSize: '14px' }}>{t('provider.noBookingRequestsHint')}</p>
                     </div>
                   ) : (
                     <div style={{
@@ -1051,10 +1056,10 @@ const ProviderDashboard = () => {
                                 {booking.serviceTitle}
                               </h3>
                               <p style={{ fontSize: '14px', color: '#64748b', margin: '0 0 4px 0' }}>
-                                <strong>Customer:</strong> {booking.userId?.name || 'Unknown'}
+                                <strong>{t('provider.customer')}:</strong> {booking.userId?.name || t('provider.unknown')}
                               </p>
                               <p style={{ fontSize: '14px', color: '#64748b', margin: '0' }}>
-                                <strong>Contact:</strong> {booking.userId?.phone}
+                                <strong>{t('provider.contact')}:</strong> {booking.userId?.phone}
                               </p>
                             </div>
                             <div style={{
@@ -1077,33 +1082,33 @@ const ProviderDashboard = () => {
                             fontSize: '14px'
                           }}>
                             <div>
-                              <span style={{ color: '#64748b' }}>📅 Date:</span>
+                              <span style={{ color: '#64748b' }}>📅 {t('provider.date')}:</span>
                               <div style={{ fontWeight: '600', color: '#1e293b' }}>{booking.preferredDate}</div>
                             </div>
                             <div>
-                              <span style={{ color: '#64748b' }}>🕐 Time:</span>
+                              <span style={{ color: '#64748b' }}>🕐 {t('provider.time')}:</span>
                               <div style={{ fontWeight: '600', color: '#1e293b' }}>{booking.preferredTime}</div>
                             </div>
                             <div>
-                              <span style={{ color: '#64748b' }}>📍 Location:</span>
+                              <span style={{ color: '#64748b' }}>📍 {t('provider.location')}:</span>
                               <div style={{ fontWeight: '600', color: '#1e293b' }}>{formatLocationDisplay(booking.location)}</div>
                             </div>
                             <div>
-                              <span style={{ color: '#64748b' }}>💰 Budget:</span>
+                              <span style={{ color: '#64748b' }}>💰 {t('provider.budget')}:</span>
                               <div style={{ fontWeight: '600', color: '#1e293b' }}>Rs.{booking.budget}</div>
                             </div>
                           </div>
 
                           {booking.description && (
                             <div style={{ marginBottom: '16px' }}>
-                              <div style={{ fontSize: '12px', color: '#64748b', marginBottom: '4px' }}>Description:</div>
+                              <div style={{ fontSize: '12px', color: '#64748b', marginBottom: '4px' }}>{t('provider.description')}:</div>
                               <p style={{ fontSize: '14px', color: '#475569', margin: '0' }}>{booking.description}</p>
                             </div>
                           )}
 
                           {booking.specificRequirements && (
                             <div style={{ marginBottom: '16px' }}>
-                              <div style={{ fontSize: '12px', color: '#64748b', marginBottom: '4px' }}>Special Requirements:</div>
+                              <div style={{ fontSize: '12px', color: '#64748b', marginBottom: '4px' }}>{t('provider.specialRequirements')}:</div>
                               <p style={{ fontSize: '14px', color: '#475569', margin: '0' }}>{booking.specificRequirements}</p>
                             </div>
                           )}
@@ -1124,7 +1129,7 @@ const ProviderDashboard = () => {
                                 cursor: 'pointer'
                               }}
                             >
-                              ✓ Accept Booking
+                              ✓ {t('provider.acceptBooking')}
                             </button>
                             <button
                               onClick={() => handleRejectBooking(booking._id)}
@@ -1140,7 +1145,7 @@ const ProviderDashboard = () => {
                                 cursor: 'pointer'
                               }}
                             >
-                              ✗ Reject Booking
+                              ✗ {t('provider.rejectBooking')}
                             </button>
                           </div>
                         </div>
@@ -1155,16 +1160,16 @@ const ProviderDashboard = () => {
                 <div>
                   <div style={{ marginBottom: '24px' }}>
                     <h2 style={{ fontSize: '24px', fontWeight: '700', color: '#1e293b', marginBottom: '8px' }}>
-                      My Requests
+                      {t('provider.myRequestsTitle')}
                     </h2>
                     <p style={{ fontSize: '14px', color: '#64748b' }}>
-                      All service requests you've accepted
+                      {t('provider.myRequestsSubtitle')}
                     </p>
                   </div>
 
                   {loading ? (
                     <div style={{ textAlign: 'center', padding: '40px', color: '#64748b' }}>
-                      Loading...
+                      {t('provider.loading')}
                     </div>
                   ) : error ? (
                     <div style={{ textAlign: 'center', padding: '40px', color: '#ef4444' }}>
@@ -1172,7 +1177,7 @@ const ProviderDashboard = () => {
                     </div>
                   ) : myRequests.length === 0 ? (
                     <div style={{ textAlign: 'center', padding: '40px', color: '#64748b' }}>
-                      You haven't accepted any requests yet.
+                      {t('provider.noAcceptedRequests')}
                     </div>
                   ) : (
                     <div style={{ display: 'grid', gap: '16px' }}>
@@ -1216,7 +1221,7 @@ const ProviderDashboard = () => {
                             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                               <User size={16} color="#64748b" />
                               <span style={{ fontSize: '14px', color: '#475569' }}>
-                                {request.userId?.name || 'Customer'}
+                                {request.userId?.name || t('provider.customer')}
                               </span>
                             </div>
 
@@ -1253,7 +1258,7 @@ const ProviderDashboard = () => {
                                 onClick={() => handleCompleteJob(request._id)}
                               >
                                 <CheckCircle size={16} style={{ marginRight: '6px', display: 'inline' }} />
-                                Mark Complete
+                                {t('provider.completeJob')}
                               </button>
                             )}
                           </div>
@@ -1277,20 +1282,20 @@ const ProviderDashboard = () => {
                 <div>
                   <div style={{ marginBottom: '24px' }}>
                     <h2 style={{ fontSize: '24px', fontWeight: '700', color: '#1e293b', marginBottom: '8px' }}>
-                      Upcoming Jobs
+                      {t('provider.upcomingJobs')}
                     </h2>
                     <p style={{ fontSize: '14px', color: '#64748b' }}>
-                      Accepted jobs that are not yet completed
+                      {t('provider.upcomingSubtitle')}
                     </p>
                   </div>
 
                   {loading ? (
                     <div style={{ textAlign: 'center', padding: '40px', color: '#64748b' }}>
-                      Loading...
+                      {t('provider.loading')}
                     </div>
                   ) : upcomingRequests.length === 0 ? (
                     <div style={{ textAlign: 'center', padding: '40px', color: '#64748b' }}>
-                      No upcoming jobs.
+                      {t('provider.noUpcomingJobs')}
                     </div>
                   ) : (
                     <div style={{ display: 'grid', gap: '16px' }}>
@@ -1324,7 +1329,7 @@ const ProviderDashboard = () => {
                               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                                 <User size={16} color="#64748b" />
                                 <span style={{ fontSize: '14px', color: '#475569' }}>
-                                  {request.userId?.name || 'Customer'}
+                                  {request.userId?.name || t('provider.customer')}
                                 </span>
                               </div>
 
@@ -1338,7 +1343,7 @@ const ProviderDashboard = () => {
                               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                                 <Calendar size={16} color="#64748b" />
                                 <span style={{ fontSize: '14px', color: '#475569' }}>
-                                  {request.preferredDate} at {request.preferredTime}
+                                  {request.preferredDate} {t('provider.at')} {request.preferredTime}
                                 </span>
                               </div>
                             </div>
@@ -1361,7 +1366,7 @@ const ProviderDashboard = () => {
                                   onClick={() => handleCompleteJob(request._id)}
                                 >
                                   <CheckCircle size={16} style={{ marginRight: '6px', display: 'inline' }} />
-                                  Mark Complete
+                                  {t('provider.completeJob')}
                                 </button>
                               )}
                             </div>
@@ -1385,20 +1390,20 @@ const ProviderDashboard = () => {
                 <div>
                   <div style={{ marginBottom: '24px' }}>
                     <h2 style={{ fontSize: '24px', fontWeight: '700', color: '#1e293b', marginBottom: '8px' }}>
-                      Job History
+                      {t('provider.jobHistory')}
                     </h2>
                     <p style={{ fontSize: '14px', color: '#64748b' }}>
-                      Completed service requests
+                      {t('provider.jobHistorySubtitle')}
                     </p>
                   </div>
 
                   {loading ? (
                     <div style={{ textAlign: 'center', padding: '40px', color: '#64748b' }}>
-                      Loading...
+                      {t('provider.loading')}
                     </div>
                   ) : historyRequests.length === 0 ? (
                     <div style={{ textAlign: 'center', padding: '40px', color: '#64748b' }}>
-                      No completed jobs yet.
+                      {t('provider.noCompletedJobs')}
                     </div>
                   ) : (
                     <div style={{ display: 'grid', gap: '16px' }}>
@@ -1418,7 +1423,7 @@ const ProviderDashboard = () => {
                                   fontSize: '12px',
                                   fontWeight: '600'
                                 }}>
-                                  Completed
+                                  {t('provider.completed')}
                                 </div>
                               </div>
                               <p style={{ fontSize: '14px', color: '#64748b', marginBottom: '12px' }}>
@@ -1442,7 +1447,7 @@ const ProviderDashboard = () => {
                             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                               <User size={16} color="#64748b" />
                               <span style={{ fontSize: '14px', color: '#475569' }}>
-                                {request.userId?.name || 'Customer'}
+                                {request.userId?.name || t('provider.customer')}
                               </span>
                             </div>
 
@@ -1456,7 +1461,11 @@ const ProviderDashboard = () => {
                             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                               <Calendar size={16} color="#64748b" />
                               <span style={{ fontSize: '14px', color: '#475569' }}>
-                                Completed: {request.completedAt ? new Date(request.completedAt).toLocaleDateString() : 'N/A'}
+                                {t('provider.completedOn', {
+                                  date: request.completedAt
+                                    ? new Date(request.completedAt).toLocaleDateString()
+                                    : t('provider.notAvailable'),
+                                })}
                               </span>
                             </div>
                           </div>
@@ -1484,10 +1493,10 @@ const ProviderDashboard = () => {
                 <div>
                   <div style={{ marginBottom: '24px' }}>
                     <h2 style={{ fontSize: '24px', fontWeight: '700', color: '#1e293b', marginBottom: '8px' }}>
-                      Earnings
+                      {t('provider.earningsTitle')}
                     </h2>
                     <p style={{ fontSize: '14px', color: '#64748b' }}>
-                      Your earnings from completed jobs
+                      {t('provider.earningsSubtitle')}
                     </p>
                   </div>
 
@@ -1511,13 +1520,13 @@ const ProviderDashboard = () => {
                       </div>
                       <div style={{ flex: 1 }}>
                         <p style={{ fontSize: '14px', color: '#64748b', marginBottom: '4px' }}>
-                          Total Earnings
+                          {t('provider.totalEarnings')}
                         </p>
                         <h2 style={{ fontSize: '36px', fontWeight: '700', color: '#1e293b', marginBottom: '4px' }}>
                           Rs. {totalEarnings.toLocaleString()}
                         </h2>
                         <p style={{ fontSize: '13px', color: '#10b981', fontWeight: '600' }}>
-                          {historyRequests.length} completed {historyRequests.length === 1 ? 'job' : 'jobs'}
+                          {t('provider.completedJobsCount', { count: historyRequests.length })}
                         </p>
                       </div>
                     </div>
@@ -1526,11 +1535,11 @@ const ProviderDashboard = () => {
                   {/* Earnings List */}
                   {loading ? (
                     <div style={{ textAlign: 'center', padding: '40px', color: '#64748b' }}>
-                      Loading...
+                      {t('provider.loading')}
                     </div>
                   ) : paidPayments.length === 0 ? (
                     <div style={{ textAlign: 'center', padding: '40px', color: '#64748b' }}>
-                      No paid earnings yet. Once admin releases funds, they will appear here.
+                      {t('provider.noPaidEarnings')}
                     </div>
                   ) : (
                     <div style={{ display: 'grid', gap: '12px' }}>
@@ -1547,7 +1556,7 @@ const ProviderDashboard = () => {
                         }}>
                           <div style={{ flex: 1 }}>
                             <h4 style={{ fontSize: '16px', fontWeight: '600', color: '#1e293b', marginBottom: '6px' }}>
-                              Payment Released
+                              {t('provider.paymentReleased')}
                             </h4>
                             <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap' }}>
                               <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
@@ -1559,7 +1568,7 @@ const ProviderDashboard = () => {
                               <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                                 <Calendar size={14} color="#64748b" />
                                 <span style={{ fontSize: '13px', color: '#64748b' }}>
-                                  {payment.approvedAt ? new Date(payment.approvedAt).toLocaleDateString() : 'N/A'}
+                                  {payment.approvedAt ? new Date(payment.approvedAt).toLocaleDateString() : t('provider.notAvailable')}
                                 </span>
                               </div>
                             </div>
@@ -1583,20 +1592,20 @@ const ProviderDashboard = () => {
                 <div>
                   <div style={{ marginBottom: '24px' }}>
                     <h2 style={{ fontSize: '24px', fontWeight: '700', color: '#1e293b', marginBottom: '8px' }}>
-                      Reviews
+                      {t('provider.reviewsTitle')}
                     </h2>
                     <p style={{ fontSize: '14px', color: '#64748b' }}>
-                      Average rating: {averageRating} / 5
+                      {t('provider.averageRating', { rating: averageRating })}
                     </p>
                   </div>
 
                   {loading ? (
                     <div style={{ textAlign: 'center', padding: '40px', color: '#64748b' }}>
-                      Loading...
+                      {t('provider.loading')}
                     </div>
                   ) : reviews.length === 0 ? (
                     <div style={{ textAlign: 'center', padding: '40px', color: '#64748b' }}>
-                      No reviews yet.
+                      {t('provider.noReviews')}
                     </div>
                   ) : (
                     <div style={{ display: 'grid', gap: '12px' }}>
@@ -1610,7 +1619,7 @@ const ProviderDashboard = () => {
                         }}>
                           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
                             <div style={{ fontWeight: '600', color: '#1e293b' }}>
-                              {review.userId?.name || 'Customer'}
+                              {review.userId?.name || t('provider.customer')}
                             </div>
                             <div style={{ fontWeight: '700', color: '#f59e0b' }}>
                               {review.rating} / 5
@@ -1620,7 +1629,7 @@ const ProviderDashboard = () => {
                             {review.createdAt ? new Date(review.createdAt).toLocaleDateString() : ''}
                           </div>
                           <div style={{ fontSize: '14px', color: '#475569' }}>
-                            {review.comment || 'No comment provided.'}
+                            {review.comment || t('provider.noComment')}
                           </div>
                         </div>
                       ))}

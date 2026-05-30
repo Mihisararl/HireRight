@@ -1,10 +1,13 @@
 import React, { useState, useEffect, useContext } from "react";
+import { useTranslation } from "react-i18next";
 import api from "../utils/api";
 import { AuthContext } from "../context/AuthContext";
 import { useNavigate } from "react-router-dom";
 import { getMyAvailability, updateAvailability } from "../api/provider";
+import LanguageSwitcher from "../components/LanguageSwitcher";
 
 const ProviderSettings = () => {
+    const { t } = useTranslation();
     const { user, refreshUser } = useContext(AuthContext);
     const navigate = useNavigate();
 
@@ -85,7 +88,7 @@ const ProviderSettings = () => {
             setBookedDates(data.bookedDates || []);
             await refreshUser();
         } catch (error) {
-            alert(error.response?.data?.message || 'Failed to update availability');
+            alert(error.response?.data?.message || t('provider.alerts.failedUpdateAvailability'));
         } finally {
             setAvailabilitySaving(false);
         }
@@ -120,9 +123,9 @@ const ProviderSettings = () => {
                 ...bankData
             });
             await refreshUser();
-            alert("Provider profile updated successfully!");
+            alert(t('provider.settingsPage.profileUpdated'));
         } catch (error) {
-            alert(error.response?.data?.message || "Failed to update profile");
+            alert(error.response?.data?.message || t('provider.settingsPage.failedUpdateProfile'));
         } finally {
             setSaving(false);
         }
@@ -152,20 +155,23 @@ const ProviderSettings = () => {
     return (
         <div style={{ padding: "40px", maxWidth: "720px", margin: "0 auto", fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "24px" }}>
-                <h2 style={{ margin: 0 }}>Worker Profile Settings</h2>
-                <button
-                    onClick={() => navigate("/provider-dashboard")}
-                    style={{
-                        background: "none",
-                        border: "1px solid #ccc",
-                        padding: "8px 16px",
-                        borderRadius: "8px",
-                        cursor: "pointer",
-                        fontWeight: 600
-                    }}
-                >
-                    Back to Dashboard
-                </button>
+                <h2 style={{ margin: 0 }}>{t('provider.settingsPage.title')}</h2>
+                <div style={{ display: "flex", gap: "12px", alignItems: "center" }}>
+                    <LanguageSwitcher />
+                    <button
+                        onClick={() => navigate("/provider-dashboard")}
+                        style={{
+                            background: "none",
+                            border: "1px solid #ccc",
+                            padding: "8px 16px",
+                            borderRadius: "8px",
+                            cursor: "pointer",
+                            fontWeight: 600
+                        }}
+                    >
+                        {t('provider.settingsPage.backToDashboard')}
+                    </button>
+                </div>
             </div>
 
             <div style={{ marginBottom: "24px", display: "flex", alignItems: "center", gap: "16px" }}>
@@ -184,7 +190,7 @@ const ProviderSettings = () => {
                     {photoPreview ? (
                         <img
                             src={photoPreview}
-                            alt="Profile"
+                            alt={t('provider.profile')}
                             style={{ width: "100%", height: "100%", objectFit: "cover" }}
                         />
                     ) : (
@@ -192,14 +198,14 @@ const ProviderSettings = () => {
                     )}
                 </div>
                 <div>
-                    <label style={{ display: "block", marginBottom: "8px", fontWeight: 600 }}>Profile Photo</label>
+                    <label style={{ display: "block", marginBottom: "8px", fontWeight: 600 }}>{t('provider.settingsPage.profilePhoto')}</label>
                     <input type="file" accept="image/*" onChange={handlePhotoChange} />
                 </div>
             </div>
 
-            <h3 style={{ marginBottom: "16px", borderBottom: "1px solid #eee", paddingBottom: "8px" }}>Basic Data</h3>
+            <h3 style={{ marginBottom: "16px", borderBottom: "1px solid #eee", paddingBottom: "8px" }}>{t('provider.settingsPage.basicData')}</h3>
             <div style={{ marginBottom: "16px" }}>
-                <label style={{ display: "block", marginBottom: "8px", fontWeight: 600 }}>Full Name</label>
+                <label style={{ display: "block", marginBottom: "8px", fontWeight: 600 }}>{t('provider.settingsPage.fullName')}</label>
                 <input
                     name="name"
                     value={formData.name}
@@ -208,7 +214,7 @@ const ProviderSettings = () => {
                 />
             </div>
             <div style={{ marginBottom: "16px" }}>
-                <label style={{ display: "block", marginBottom: "8px", fontWeight: 600 }}>Email Address</label>
+                <label style={{ display: "block", marginBottom: "8px", fontWeight: 600 }}>{t('provider.settingsPage.emailAddress')}</label>
                 <input
                     name="email"
                     type="email"
@@ -218,7 +224,7 @@ const ProviderSettings = () => {
                 />
             </div>
             <div style={{ marginBottom: "16px" }}>
-                <label style={{ display: "block", marginBottom: "8px", fontWeight: 600 }}>Phone Number</label>
+                <label style={{ display: "block", marginBottom: "8px", fontWeight: 600 }}>{t('provider.settingsPage.phoneNumber')}</label>
                 <input
                     name="phone"
                     value={formData.phone}
@@ -227,7 +233,7 @@ const ProviderSettings = () => {
                 />
             </div>
             <div style={{ marginBottom: "16px" }}>
-                <label style={{ display: "block", marginBottom: "8px", fontWeight: 600 }}>Street Address</label>
+                <label style={{ display: "block", marginBottom: "8px", fontWeight: 600 }}>{t('provider.settingsPage.streetAddress')}</label>
                 <input
                     name="address"
                     value={formData.address}
@@ -237,7 +243,7 @@ const ProviderSettings = () => {
             </div>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px", marginBottom: "16px" }}>
                 <div>
-                    <label style={{ display: "block", marginBottom: "8px", fontWeight: 600 }}>City</label>
+                    <label style={{ display: "block", marginBottom: "8px", fontWeight: 600 }}>{t('provider.settingsPage.city')}</label>
                     <input
                         name="city"
                         value={formData.city}
@@ -246,7 +252,7 @@ const ProviderSettings = () => {
                     />
                 </div>
                 <div>
-                    <label style={{ display: "block", marginBottom: "8px", fontWeight: 600 }}>District</label>
+                    <label style={{ display: "block", marginBottom: "8px", fontWeight: 600 }}>{t('provider.settingsPage.district')}</label>
                     <select
                         name="district"
                         value={formData.district}
@@ -261,7 +267,7 @@ const ProviderSettings = () => {
                 </div>
             </div>
             <div style={{ marginBottom: "24px" }}>
-                <label style={{ display: "block", marginBottom: "8px", fontWeight: 600 }}>Postal Code</label>
+                <label style={{ display: "block", marginBottom: "8px", fontWeight: 600 }}>{t('provider.settingsPage.postalCode')}</label>
                 <input
                     name="postalCode"
                     value={formData.postalCode}
@@ -270,9 +276,9 @@ const ProviderSettings = () => {
                 />
             </div>
 
-            <h3 style={{ marginBottom: "16px", borderBottom: "1px solid #eee", paddingBottom: "8px" }}>Professional Details</h3>
+            <h3 style={{ marginBottom: "16px", borderBottom: "1px solid #eee", paddingBottom: "8px" }}>{t('provider.settingsPage.professionalInfo')}</h3>
             <div style={{ marginBottom: "16px" }}>
-                <label style={{ display: "block", marginBottom: "8px", fontWeight: 600 }}>Service Category</label>
+                <label style={{ display: "block", marginBottom: "8px", fontWeight: 600 }}>{t('provider.settingsPage.serviceCategory')}</label>
                 <select
                     name="serviceCategory"
                     value={formData.serviceCategory}
@@ -287,7 +293,7 @@ const ProviderSettings = () => {
             </div>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px", marginBottom: "16px" }}>
                 <div>
-                    <label style={{ display: "block", marginBottom: "8px", fontWeight: 600 }}>Years of Experience</label>
+                    <label style={{ display: "block", marginBottom: "8px", fontWeight: 600 }}>{t('provider.settingsPage.yearsOfExperience')}</label>
                     <input
                         name="yearsOfExperience"
                         type="number"
@@ -297,7 +303,7 @@ const ProviderSettings = () => {
                     />
                 </div>
                 <div>
-                    <label style={{ display: "block", marginBottom: "8px", fontWeight: 600 }}>Hourly Rate (Rs.)</label>
+                    <label style={{ display: "block", marginBottom: "8px", fontWeight: 600 }}>{t('provider.settingsPage.hourlyRate')}</label>
                     <input
                         name="hourlyRate"
                         type="number"
@@ -308,7 +314,7 @@ const ProviderSettings = () => {
                 </div>
             </div>
             <div style={{ marginBottom: "24px" }}>
-                <label style={{ display: "block", marginBottom: "8px", fontWeight: 600 }}>Professional Bio</label>
+                <label style={{ display: "block", marginBottom: "8px", fontWeight: 600 }}>{t('provider.settingsPage.professionalBio')}</label>
                 <textarea
                     name="professionalBio"
                     value={formData.professionalBio}
@@ -320,7 +326,7 @@ const ProviderSettings = () => {
 
             {user?.providerStatus === 'approved' && (
                 <>
-                    <h3 style={{ marginBottom: "16px", borderBottom: "1px solid #eee", paddingBottom: "8px" }}>Today&apos;s Availability</h3>
+                    <h3 style={{ marginBottom: "16px", borderBottom: "1px solid #eee", paddingBottom: "8px" }}>{t('provider.settingsPage.availability')}</h3>
                     <div style={{
                         marginBottom: "24px",
                         padding: "20px",
@@ -328,9 +334,6 @@ const ProviderSettings = () => {
                         border: "1px solid #e2e8f0",
                         backgroundColor: "#f8fafc"
                     }}>
-                        <p style={{ margin: "0 0 16px", color: "#64748b", fontSize: "14px" }}>
-                            You are available today by default. Mark yourself unavailable only when you cannot take new jobs today. All confirmed booking dates are listed below.
-                        </p>
                         <button
                             type="button"
                             onClick={handleAvailabilityToggle}
@@ -347,10 +350,10 @@ const ProviderSettings = () => {
                             }}
                         >
                             {availabilitySaving
-                                ? "Updating..."
+                                ? t('provider.updating')
                                 : isAvailableToday
-                                    ? "Available today — mark unavailable"
-                                    : "Not available today — mark available"}
+                                    ? t('provider.settingsPage.availableToday')
+                                    : t('provider.settingsPage.unavailableToday')}
                         </button>
                         <div style={{
                             marginTop: "16px",
@@ -361,7 +364,7 @@ const ProviderSettings = () => {
                             color: bookedDates.length > 0 ? "#9a3412" : "#64748b",
                             fontSize: "14px"
                         }}>
-                            <strong>Booked dates:</strong>{" "}
+                            <strong>{t('provider.bookedDates')}:</strong>{" "}
                             {bookedDates.length > 0
                                 ? bookedDates.map((d) => {
                                     const parsed = new Date(`${d}T00:00:00`);
@@ -369,20 +372,15 @@ const ProviderSettings = () => {
                                         ? d
                                         : parsed.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
                                 }).join(", ")
-                                : "No confirmed bookings yet"}
-                            {!isAvailableToday && bookedDates.length > 0 && (
-                                <div style={{ marginTop: "8px", color: "#64748b" }}>
-                                    You are not taking new jobs today, but customers can book you on your other open dates.
-                                </div>
-                            )}
+                                : t('provider.notAvailable')}
                         </div>
                     </div>
                 </>
             )}
 
-            <h3 style={{ marginBottom: "16px", borderBottom: "1px solid #eee", paddingBottom: "8px" }}>Payment / Bank Details</h3>
+            <h3 style={{ marginBottom: "16px", borderBottom: "1px solid #eee", paddingBottom: "8px" }}>{t('provider.settingsPage.bankDetails')}</h3>
             <div style={{ marginBottom: "16px" }}>
-                <label style={{ display: "block", marginBottom: "8px", fontWeight: 600 }}>Bank Name</label>
+                <label style={{ display: "block", marginBottom: "8px", fontWeight: 600 }}>{t('provider.settingsPage.bankName')}</label>
                 <input
                     name="bankName"
                     value={bankData.bankName}
@@ -391,7 +389,7 @@ const ProviderSettings = () => {
                 />
             </div>
             <div style={{ marginBottom: "16px" }}>
-                <label style={{ display: "block", marginBottom: "8px", fontWeight: 600 }}>Account Number</label>
+                <label style={{ display: "block", marginBottom: "8px", fontWeight: 600 }}>{t('provider.settingsPage.accountNumber')}</label>
                 <input
                     name="accountNumber"
                     value={bankData.accountNumber}
@@ -400,7 +398,7 @@ const ProviderSettings = () => {
                 />
             </div>
             <div style={{ marginBottom: "16px" }}>
-                <label style={{ display: "block", marginBottom: "8px", fontWeight: 600 }}>Account Holder Name</label>
+                <label style={{ display: "block", marginBottom: "8px", fontWeight: 600 }}>{t('provider.settingsPage.accountHolderName')}</label>
                 <input
                     name="accountHolderName"
                     value={bankData.accountHolderName}
@@ -409,7 +407,7 @@ const ProviderSettings = () => {
                 />
             </div>
             <div style={{ marginBottom: "24px" }}>
-                <label style={{ display: "block", marginBottom: "8px", fontWeight: 600 }}>Branch</label>
+                <label style={{ display: "block", marginBottom: "8px", fontWeight: 600 }}>{t('provider.settingsPage.branch')}</label>
                 <input
                     name="branch"
                     value={bankData.branch}
@@ -434,7 +432,7 @@ const ProviderSettings = () => {
                     boxShadow: "0 4px 12px rgba(59, 130, 246, 0.2)"
                 }}
             >
-                {saving ? "Saving Changes..." : "Save Changes"}
+                {saving ? t('provider.settingsPage.saving') : t('provider.settingsPage.saveChanges')}
             </button>
         </div>
     );
