@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useContext, useCallback, useRef } from "react";
+import { useTranslation } from "react-i18next";
 import { Bell, Settings, LogOut, Calendar, Clock, MapPin, Edit, X, CheckCircle, CreditCard, Plus, FileText, Briefcase } from "lucide-react";
 import { useNavigate, useLocation } from 'react-router-dom';
 import { getUserServiceRequests, updateServiceRequest, acceptProviderOffer, rejectProviderOffer, completeServiceRequestByCustomer } from '../api/service';
@@ -9,6 +10,7 @@ import { AuthContext } from "../context/AuthContext";
 import LocationPicker from '../components/location/LocationPicker';
 import CustomerProviderTracking from '../components/location/CustomerProviderTracking';
 import ProviderOfferProfile from '../components/offers/ProviderOfferProfile';
+import LanguageSwitcher from '../components/LanguageSwitcher';
 import { formatLocationDisplay, hasCoordinates } from '../utils/locationHelpers';
 import '../styles/CustomerDashboard.css';
 
@@ -18,6 +20,7 @@ const isPendingProviderOffer = (request) => (
 );
 
 const CustomerDashboard = () => {
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const location = useLocation();
   const { user } = useContext(AuthContext);
@@ -48,14 +51,13 @@ const CustomerDashboard = () => {
     }
   }, []);
 
-  // Helper function to display the correct status label
   const getStatusDisplay = (status) => {
     const statusMap = {
-      'Accepted': 'Confirmed',
-      'OfferSent': 'Offer Received',
-      'Pending': 'Pending',
-      'Completed': 'Completed',
-      'Rejected': 'Rejected'
+      'Accepted': t('customer.status.confirmed'),
+      'OfferSent': t('customer.status.offerReceived'),
+      'Pending': t('customer.status.pending'),
+      'Completed': t('customer.status.completed'),
+      'Rejected': t('customer.status.rejected')
     };
     return statusMap[status] || status;
   };
@@ -136,7 +138,7 @@ const CustomerDashboard = () => {
 
   const handleSave = async () => {
     if (formData.location && !hasCoordinates(formData.location)) {
-      alert('Please select a map location with coordinates before saving.');
+      alert(t('customer.alerts.selectMapLocation'));
       return;
     }
     try {
@@ -162,10 +164,10 @@ const CustomerDashboard = () => {
       await acceptProviderOffer(requestId);
       const requests = await refreshServiceRequests();
       if (requests) setServiceRequests(requests);
-      alert('Provider offer accepted successfully!');
+      alert(t('customer.alerts.offerAccepted'));
     } catch (error) {
       console.error('Failed to accept offer:', error);
-      alert('Failed to accept offer');
+      alert(t('customer.alerts.failedAcceptOffer'));
     }
   };
 
@@ -174,10 +176,10 @@ const CustomerDashboard = () => {
       await rejectProviderOffer(requestId);
       const requests = await refreshServiceRequests();
       if (requests) setServiceRequests(requests);
-      alert('Provider offer rejected. Request is now available for other providers.');
+      alert(t('customer.alerts.offerRejected'));
     } catch (error) {
       console.error('Failed to reject offer:', error);
-      alert('Failed to reject offer');
+      alert(t('customer.alerts.failedRejectOffer'));
     }
   };
 
@@ -186,10 +188,10 @@ const CustomerDashboard = () => {
       await completeServiceRequestByCustomer(requestId);
       const requests = await getUserServiceRequests();
       setServiceRequests(requests);
-      alert('Completion recorded. Waiting for provider confirmation.');
+      alert(t('customer.alerts.completionRecorded'));
     } catch (error) {
       console.error('Failed to complete request:', error);
-      alert(error.response?.data?.message || 'Failed to mark as completed');
+      alert(error.response?.data?.message || t('customer.alerts.failedComplete'));
     }
   };
 
@@ -202,15 +204,15 @@ const CustomerDashboard = () => {
   const totalSpent = completedBookings.reduce((sum, request) => sum + (Number(request.budget) || 0), 0);
 
   const stats = [
-    { key: 'active', label: 'Active', value: String(activeBookings.length) },
-    { key: 'completed', label: 'Completed', value: String(completedBookings.length) },
-    { key: 'spent', label: 'Total spent', value: `Rs.${totalSpent.toLocaleString()}` },
+    { key: 'active', label: t('customer.stats.active'), value: String(activeBookings.length) },
+    { key: 'completed', label: t('customer.stats.completed'), value: String(completedBookings.length) },
+    { key: 'spent', label: t('customer.stats.totalSpent'), value: `Rs.${totalSpent.toLocaleString()}` },
   ];
 
   const tabDescriptions = {
-    active: 'Jobs in progress — pay your provider, track their location, or mark work complete.',
-    completed: 'Finished jobs and your payment history.',
-    posts: 'Service requests you posted — review provider offers and manage bookings.',
+    active: t('customer.tabDesc.active'),
+    completed: t('customer.tabDesc.completed'),
+    posts: t('customer.tabDesc.posts'),
   };
 
   const userInitials = user?.name
@@ -226,7 +228,7 @@ const CustomerDashboard = () => {
   );
 
   const toBookingCard = (request) => {
-    const providerName = request.providerId?.name || 'Provider';
+    const providerName = request.providerId?.name || t('customer.providerFallback');
     const statusLabel = getStatusDisplay(request.status);
     const isConfirmed = request.status === 'Accepted' || request.status === 'Confirmed';
     const payment = payments.find((item) => String(item.serviceRequestId) === String(request._id));
@@ -244,7 +246,7 @@ const CustomerDashboard = () => {
       statusColor: isConfirmed ? "#1d4ed8" : "#ca8a04",
       statusBg: isConfirmed ? "#dbeafe" : "#fef3c7",
       date: `${request.preferredDate} at ${request.preferredTime}`,
-      duration: request.estimatedDuration || 'N/A',
+      duration: request.estimatedDuration || t('common.notAvailable'),
       location: formatLocationDisplay(request.location),
       customerLocation: request.location,
       amount: `Rs.${request.budget || 0}`,
@@ -272,10 +274,10 @@ const CustomerDashboard = () => {
       setReviews(reviewList || []);
       setReviewModalOpen(false);
       setReviewTarget(null);
-      setReviewThanks('Thank you for your feedback!');
+      setReviewThanks(t('customer.reviewThanks'));
       setTimeout(() => setReviewThanks(''), 4000);
     } catch (error) {
-      alert(error.response?.data?.message || 'Failed to submit review');
+      alert(error.response?.data?.message || t('customer.alerts.failedReview'));
     } finally {
       setReviewSaving(false);
     }
@@ -300,14 +302,14 @@ const CustomerDashboard = () => {
   const offersInitializedRef = useRef(false);
 
   useEffect(() => {
-    const baseTitle = 'HireRight — Customer Dashboard';
+    const baseTitle = t('customer.dashboardTitle');
     document.title = pendingOfferCount > 0
-      ? `(${pendingOfferCount}) New offer${pendingOfferCount > 1 ? 's' : ''} — HireRight`
+      ? t('customer.dashboardTitleWithOffers', { count: pendingOfferCount })
       : baseTitle;
     return () => {
-      document.title = 'HireRight';
+      document.title = t('common.appName');
     };
-  }, [pendingOfferCount]);
+  }, [pendingOfferCount, t]);
 
   useEffect(() => {
     if (!offersInitializedRef.current) {
@@ -1214,10 +1216,12 @@ const CustomerDashboard = () => {
         </div>
 
         <div className="header-right">
+          <LanguageSwitcher style={{ marginRight: 4 }} />
+
           <div
             className="icon-btn notification-bell-btn"
             onClick={() => setActiveTab('posts')}
-            title={pendingOfferCount > 0 ? 'New provider offers' : 'Notifications'}
+            title={pendingOfferCount > 0 ? t('customer.newProviderOffers') : t('customer.notifications')}
           >
             <Bell size={20} color={pendingOfferCount > 0 ? '#ea580c' : '#64748b'} />
             {pendingOfferCount > 0 && (
@@ -1236,7 +1240,7 @@ const CustomerDashboard = () => {
 
           <div onClick={() => navigate('/login')} className="logout-btn">
             <LogOut size={18} />
-            <span>Logout</span>
+            <span>{t('logout')}</span>
           </div>
         </div>
       </div>
@@ -1268,16 +1272,21 @@ const CustomerDashboard = () => {
           >
             <div>
               <div className="offer-alert-title">
-                {pendingOfferCount === 1 ? 'New provider offer waiting' : `${pendingOfferCount} new provider offers waiting`}
+                {pendingOfferCount === 1
+                  ? t('customer.offers.newOfferWaiting')
+                  : t('customer.offers.newOffersWaiting', { count: pendingOfferCount })}
               </div>
               <div className="offer-alert-text">
                 {pendingOffers[0]?.providerProfile?.fullName || pendingOffers[0]?.providerId?.name
-                  ? `${pendingOffers[0].providerProfile?.fullName || pendingOffers[0].providerId.name} sent an offer for "${pendingOffers[0].serviceTitle}"`
-                  : 'Open My Posts to review and respond to provider offers.'}
+                  ? t('customer.offers.providerSentOffer', {
+                      provider: pendingOffers[0].providerProfile?.fullName || pendingOffers[0].providerId.name,
+                      title: pendingOffers[0].serviceTitle,
+                    })
+                  : t('customer.offers.openPostsHint')}
               </div>
             </div>
             <button type="button" className="offer-alert-action" onClick={(e) => { e.stopPropagation(); setActiveTab('posts'); }}>
-              View offers
+              {t('customer.offers.viewOffers')}
             </button>
           </div>
         )}
@@ -1286,8 +1295,10 @@ const CustomerDashboard = () => {
           <div className="dashboard-hero-left">
             <div className="dashboard-hero-avatar">{renderAvatar()}</div>
             <div>
-              <h1 className="dashboard-hero-title">Hi, {user?.name?.split(' ')[0] || 'there'}</h1>
-              <p className="dashboard-hero-subtitle">Manage your bookings, posts, and provider offers in one place.</p>
+              <h1 className="dashboard-hero-title">
+                {t('customer.welcome', { name: user?.name?.split(' ')[0] || t('customer.welcomeFallback') })}
+              </h1>
+              <p className="dashboard-hero-subtitle">{t('customer.heroSubtitle')}</p>
             </div>
           </div>
           <div className="dashboard-hero-right">
@@ -1304,7 +1315,7 @@ const CustomerDashboard = () => {
             ))}
             <button type="button" className="dashboard-primary-btn" onClick={() => navigate('/service-request')}>
               <Plus size={18} />
-              New request
+              {t('customer.newRequest')}
             </button>
           </div>
         </div>
@@ -1318,7 +1329,7 @@ const CustomerDashboard = () => {
               className={`dashboard-tab ${activeTab === 'active' ? 'dashboard-tab-active' : ''}`}
             >
               <Briefcase size={16} />
-              Active bookings
+              {t('customer.activeBookings')}
             </button>
             <button
               type="button"
@@ -1326,7 +1337,7 @@ const CustomerDashboard = () => {
               className={`dashboard-tab ${activeTab === 'completed' ? 'dashboard-tab-active' : ''}`}
             >
               <CheckCircle size={16} />
-              Completed
+              {t('customer.completed')}
             </button>
             <button
               type="button"
@@ -1334,7 +1345,7 @@ const CustomerDashboard = () => {
               className={`dashboard-tab ${activeTab === 'posts' ? 'dashboard-tab-active' : ''}`}
             >
               <FileText size={16} />
-              My posts
+              {t('customer.myPosts')}
               {pendingOfferCount > 0 && (
                 <span className="dashboard-tab-badge">
                   {pendingOfferCount > 9 ? '9+' : pendingOfferCount}
@@ -1348,17 +1359,17 @@ const CustomerDashboard = () => {
         {activeTab === 'posts' && pendingPosts.length === 0 && (
           <div className="dashboard-empty">
             <div className="dashboard-empty-icon">📝</div>
-            <h3 className="dashboard-empty-title">No open posts</h3>
+            <h3 className="dashboard-empty-title">{t('customer.empty.noOpenPosts')}</h3>
             <p className="dashboard-empty-text">
-              Post a service request and providers in your area can send you offers with their price and availability.
+              {t('customer.empty.noOpenPostsText')}
             </p>
             <div className="dashboard-empty-actions">
               <button type="button" className="dashboard-primary-btn" onClick={() => navigate('/service-request')}>
                 <Plus size={16} />
-                Post a request
+                {t('customer.empty.postRequest')}
               </button>
               <button type="button" className="dashboard-secondary-btn" onClick={() => navigate('/services')}>
-                Browse providers
+                {t('customer.empty.browseProviders')}
               </button>
             </div>
           </div>
@@ -1367,16 +1378,16 @@ const CustomerDashboard = () => {
         {activeTab === 'active' && bookings.length === 0 && (
           <div className="dashboard-empty">
             <div className="dashboard-empty-icon">📋</div>
-            <h3 className="dashboard-empty-title">No active bookings</h3>
+            <h3 className="dashboard-empty-title">{t('customer.empty.noActiveBookings')}</h3>
             <p className="dashboard-empty-text">
-              When you accept a provider offer or confirm a booking, it will show up here so you can pay and track the job.
+              {t('customer.empty.noActiveBookingsText')}
             </p>
             <div className="dashboard-empty-actions">
               <button type="button" className="dashboard-secondary-btn" onClick={() => setActiveTab('posts')}>
-                Check my posts
+                {t('customer.empty.checkMyPosts')}
               </button>
               <button type="button" className="dashboard-primary-btn" onClick={() => navigate('/services')}>
-                Book a provider
+                {t('customer.empty.bookProvider')}
               </button>
             </div>
           </div>
@@ -1385,9 +1396,9 @@ const CustomerDashboard = () => {
         {activeTab === 'completed' && completedCards.length === 0 && (
           <div className="dashboard-empty">
             <div className="dashboard-empty-icon">✓</div>
-            <h3 className="dashboard-empty-title">No completed jobs yet</h3>
+            <h3 className="dashboard-empty-title">{t('customer.empty.noCompletedJobs')}</h3>
             <p className="dashboard-empty-text">
-              Finished services will appear here with payment details and the option to leave a review.
+              {t('customer.empty.noCompletedJobsText')}
             </p>
           </div>
         )}
@@ -1402,7 +1413,7 @@ const CustomerDashboard = () => {
                 {isPendingProviderOffer(request) && (
                   <div className="offer-new-badge">
                     <span className="offer-new-badge-dot" />
-                    NEW OFFER
+                    {t('customer.offers.newOfferBadge')}
                   </div>
                 )}
                 {/* HEADER */}
@@ -1442,7 +1453,7 @@ const CustomerDashboard = () => {
                 {/* FOOTER */}
                 <div className="item-card-footer-flex">
                   <div className="item-budget-box">
-                    <span className="item-budget-lbl">Budget</span>
+                    <span className="item-budget-lbl">{t('customer.budget')}</span>
                     <span className="item-budget-val">Rs.{request.budget}</span>
                   </div>
                   <div className="item-status-badge" style={isPendingProviderOffer(request) ? {
@@ -1458,7 +1469,7 @@ const CustomerDashboard = () => {
                 {request.status === 'OfferSent' && request.providerOffer && (
                   <div className="offer-card-section">
                     <div className="offer-title-lbl">
-                      🎯 Provider Offer Received!
+                      🎯 {t('customer.offers.receivedTitle')}
                     </div>
 
                     <ProviderOfferProfile
@@ -1474,11 +1485,11 @@ const CustomerDashboard = () => {
 
                     <div className="offer-details-row">
                       <div>
-                        <span style={{ color: '#64748b' }}>Proposed Price: </span>
+                        <span style={{ color: '#64748b' }}>{t('customer.offers.proposedPrice')} </span>
                         <span style={{ fontWeight: '700', color: '#1e293b' }}>Rs.{request.providerOffer.proposedPrice}</span>
                       </div>
                       <div>
-                        <span style={{ color: '#64748b' }}>Proposed Date: </span>
+                        <span style={{ color: '#64748b' }}>{t('customer.offers.proposedDate')} </span>
                         <span style={{ fontWeight: '600', color: '#1e293b' }}>{request.providerOffer.proposedDate}</span>
                       </div>
                     </div>
@@ -1489,13 +1500,13 @@ const CustomerDashboard = () => {
                           onClick={() => handleAcceptOffer(request._id)}
                           className="offer-btn-accept"
                         >
-                          ✓ Accept Offer
+                          ✓ {t('customer.offers.acceptOffer')}
                         </button>
                         <button
                           onClick={() => handleRejectOffer(request._id)}
                           className="offer-btn-reject"
                         >
-                          ✗ Reject Offer
+                          ✗ {t('customer.offers.rejectOffer')}
                         </button>
                       </div>
                     )}
@@ -1522,9 +1533,9 @@ const CustomerDashboard = () => {
                     )
                   }}>
                     <div style={{ fontSize: '15px', fontWeight: '700', color: '#1e293b', marginBottom: '12px' }}>
-                      {request.providerResponse?.status === 'pending' && '⏳ Provider Reviewing...'}
-                      {request.providerResponse?.status === 'accepted' && '✓ Booking Confirmed!'}
-                      {request.providerResponse?.status === 'rejected' && '✗ Booking Rejected'}
+                      {request.providerResponse?.status === 'pending' && `⏳ ${t('customer.providerReviewing')}`}
+                      {request.providerResponse?.status === 'accepted' && `✓ ${t('customer.bookingConfirmed')}`}
+                      {request.providerResponse?.status === 'rejected' && `✗ ${t('customer.bookingRejected')}`}
                     </div>
 
                     {request.providerResponse?.responseMessage && (
@@ -1535,7 +1546,7 @@ const CustomerDashboard = () => {
 
                     {request.providerResponse?.respondedAt && (
                       <div style={{ fontSize: '12px', color: '#64748b', marginBottom: request.providerResponse?.status === 'rejected' ? '12px' : '0' }}>
-                        Responded at: {new Date(request.providerResponse.respondedAt).toLocaleString()}
+                        {t('customer.respondedAt')} {new Date(request.providerResponse.respondedAt).toLocaleString()}
                       </div>
                     )}
 
@@ -1559,7 +1570,7 @@ const CustomerDashboard = () => {
                           gap: '6px'
                         }}
                       >
-                        Book Another Provider
+                        {t('customer.bookAnotherProvider')}
                       </button>
                     )}
                   </div>
@@ -1616,7 +1627,7 @@ const CustomerDashboard = () => {
 
                 {/* AMOUNT */}
                 <div className="booking-amount-flex">
-                  <span className="booking-amount-lbl">Total Amount</span>
+                  <span className="booking-amount-lbl">{t('customer.totalAmount')}</span>
                   <span className="booking-amount-val">{b.amount}</span>
                 </div>
 
@@ -1624,14 +1635,14 @@ const CustomerDashboard = () => {
                 <div className="btn-actions-row">
                   {b.canComplete && (
                     <button className="secondary-action-btn" onClick={() => handleCompleteBooking(b.id)}>
-                      Mark Task Completed
+                      {t('customer.markTaskCompleted')}
                     </button>
                   )}
                   {b.customerCompleted && !b.canComplete && (
                     <button className="secondary-action-btn" style={{ opacity: 0.7, cursor: 'default' }} disabled>
                       {b.paymentReleased
-                        ? `Payment successfully transferred to ${b.provider}`
-                        : 'Awaiting Provider Confirmation'}
+                        ? t('customer.paymentTransferred', { provider: b.provider })
+                        : t('customer.awaitingProvider')}
                     </button>
                   )}
                   {b.canPayNow ? (
@@ -1644,11 +1655,11 @@ const CustomerDashboard = () => {
                       })}
                       className="primary-action-btn"
                     >
-                      Pay Now
+                      {t('customer.payNow')}
                     </button>
                   ) : b.isPaid ? (
                     <button className="primary-action-btn" style={{ background: '#10b981', color: 'white', opacity: 0.9, cursor: 'default', boxShadow: 'none' }} disabled>
-                      ✓ Paid
+                      ✓ {t('customer.paid')}
                     </button>
                   ) : null}
                 </div>
@@ -1657,7 +1668,7 @@ const CustomerDashboard = () => {
                     className="danger-action-btn"
                     onClick={() => navigate("/report-issue", { state: { booking: b } })}
                   >
-                    {b.complaintStatus === 'resolved' ? 'Issue Resolved' : 'Report Issue'}
+                    {b.complaintStatus === 'resolved' ? t('customer.issueResolved') : t('customer.reportIssue')}
                   </button>
                 )}
                 {activeTab === 'active' && b.providerUserId && (
@@ -1679,14 +1690,14 @@ const CustomerDashboard = () => {
         <div style={styles.modalOverlay}>
           <div style={styles.modal}>
             <div style={styles.modalHeader}>
-              <h2 style={styles.modalTitle}>Edit Service Request</h2>
+              <h2 style={styles.modalTitle}>{t('customer.editRequest')}</h2>
               <button onClick={handleCancel} style={styles.closeBtn}>
                 <X size={24} />
               </button>
             </div>
             <div style={styles.modalBody}>
               <div style={styles.formGroup}>
-                <label style={styles.label}>Service Title</label>
+                <label style={styles.label}>{t('customer.serviceTitle')}</label>
                 <input
                   type="text"
                   value={formData.serviceTitle || ''}
@@ -1695,7 +1706,7 @@ const CustomerDashboard = () => {
                 />
               </div>
               <div style={styles.formGroup}>
-                <label style={styles.label}>Service Category</label>
+                <label style={styles.label}>{t('customer.serviceCategory')}</label>
                 <input
                   type="text"
                   value={formData.serviceCategory || ''}
@@ -1704,7 +1715,7 @@ const CustomerDashboard = () => {
                 />
               </div>
               <div style={styles.formGroup}>
-                <label style={styles.label}>Description</label>
+                <label style={styles.label}>{t('customer.description')}</label>
                 <textarea
                   value={formData.description || ''}
                   onChange={(e) => setFormData({ ...formData, description: e.target.value })}
@@ -1713,7 +1724,7 @@ const CustomerDashboard = () => {
               </div>
               <div style={styles.formRow}>
                 <div style={styles.formGroup}>
-                  <label style={styles.label}>Preferred Date</label>
+                  <label style={styles.label}>{t('customer.preferredDate')}</label>
                   <input
                     type="date"
                     value={formData.preferredDate || ''}
@@ -1722,7 +1733,7 @@ const CustomerDashboard = () => {
                   />
                 </div>
                 <div style={styles.formGroup}>
-                  <label style={styles.label}>Preferred Time</label>
+                  <label style={styles.label}>{t('customer.preferredTime')}</label>
                   <input
                     type="time"
                     value={formData.preferredTime || ''}
@@ -1732,7 +1743,7 @@ const CustomerDashboard = () => {
                 </div>
               </div>
               <div style={styles.formGroup}>
-                <label style={styles.label}>Estimated Duration</label>
+                <label style={styles.label}>{t('customer.estimatedDuration')}</label>
                 <input
                   type="text"
                   value={formData.estimatedDuration || ''}
@@ -1741,7 +1752,7 @@ const CustomerDashboard = () => {
                 />
               </div>
               <div style={styles.formGroup}>
-                <label style={styles.label}>Budget</label>
+                <label style={styles.label}>{t('customer.budget')}</label>
                 <input
                   type="number"
                   value={formData.budget || ''}
@@ -1754,7 +1765,7 @@ const CustomerDashboard = () => {
                 onChange={(location) => setFormData((prev) => ({ ...prev, location }))}
               />
               <div style={styles.formGroup}>
-                <label style={styles.label}>Specific Requirements</label>
+                <label style={styles.label}>{t('customer.specificRequirements')}</label>
                 <textarea
                   value={formData.specificRequirements || ''}
                   onChange={(e) => setFormData({ ...formData, specificRequirements: e.target.value })}
@@ -1763,8 +1774,8 @@ const CustomerDashboard = () => {
               </div>
             </div>
             <div style={styles.modalFooter}>
-              <button onClick={handleCancel} style={styles.cancelBtn}>Cancel</button>
-              <button onClick={handleSave} style={styles.saveBtn}>Save Changes</button>
+              <button onClick={handleCancel} style={styles.cancelBtn}>{t('common.cancel')}</button>
+              <button onClick={handleSave} style={styles.saveBtn}>{t('common.saveChanges')}</button>
             </div>
           </div>
         </div>
@@ -1774,7 +1785,7 @@ const CustomerDashboard = () => {
         <div style={styles.modalOverlay}>
           <div style={styles.modal}>
             <div style={styles.modalHeader}>
-              <h2 style={styles.modalTitle}>Rate Your Provider</h2>
+              <h2 style={styles.modalTitle}>{t('customer.rateProvider')}</h2>
               <button onClick={handleReviewRemindLater} style={styles.closeBtn}>
                 <X size={24} />
               </button>
@@ -1810,21 +1821,21 @@ const CustomerDashboard = () => {
               </div>
 
               <div style={{ marginBottom: '16px' }}>
-                <label style={styles.label}>Review</label>
+                <label style={styles.label}>{t('customer.review')}</label>
                 <textarea
                   value={reviewComment}
                   onChange={(e) => setReviewComment(e.target.value)}
                   style={styles.textarea}
-                  placeholder="Share your experience..."
+                  placeholder={t('customer.reviewPlaceholder')}
                 />
               </div>
             </div>
             <div style={styles.modalFooter}>
               <button onClick={handleReviewRemindLater} style={styles.cancelBtn}>
-                Remind Me Later
+                {t('customer.remindLater')}
               </button>
               <button onClick={handleReviewSubmit} style={styles.saveBtn} disabled={reviewSaving}>
-                {reviewSaving ? 'Submitting...' : 'Submit Review'}
+                {reviewSaving ? t('customer.submitting') : t('customer.submitReview')}
               </button>
             </div>
           </div>

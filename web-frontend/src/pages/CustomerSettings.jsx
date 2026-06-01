@@ -1,9 +1,14 @@
 // src/pages/CustomerSettings.jsx
 import React, { useState, useEffect, useContext } from "react";
+import { useTranslation } from "react-i18next";
+import { useNavigate } from "react-router-dom";
 import api from "../utils/api";
 import { AuthContext } from "../context/AuthContext";
+import LanguageSwitcher from "../components/LanguageSwitcher";
 
 const CustomerSettings = () => {
+    const { t } = useTranslation();
+    const navigate = useNavigate();
     const { user, refreshUser } = useContext(AuthContext);
     const [formData, setFormData] = useState({
         name: user?.name || "",
@@ -65,7 +70,7 @@ const CustomerSettings = () => {
                 ...bankData
             });
             await refreshUser();
-            alert("Profile updated successfully!");
+            alert(t("customer.settings.profileUpdated"));
             setBankData({
                 bankName: "",
                 accountNumber: "",
@@ -73,7 +78,7 @@ const CustomerSettings = () => {
                 branch: ""
             });
         } catch (error) {
-            alert(error.response?.data?.message || "Failed to update profile");
+            alert(error.response?.data?.message || t("customer.settings.failedUpdateProfile"));
         } finally {
             setSaving(false);
         }
@@ -81,7 +86,19 @@ const CustomerSettings = () => {
 
     return (
         <div style={{ padding: "40px", maxWidth: "720px", margin: "0 auto" }}>
-            <h2 style={{ marginBottom: "24px" }}>Profile Settings</h2>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "24px" }}>
+                <div>
+                    <button
+                        type="button"
+                        onClick={() => navigate("/customer-dashboard")}
+                        style={{ background: "none", border: "none", color: "#2563eb", cursor: "pointer", padding: 0, marginBottom: "8px", fontWeight: 600 }}
+                    >
+                        ← {t("customer.settings.backToDashboard")}
+                    </button>
+                    <h2 style={{ margin: 0 }}>{t("customer.settings.title")}</h2>
+                </div>
+                <LanguageSwitcher />
+            </div>
 
             <div style={{ marginBottom: "24px", display: "flex", alignItems: "center", gap: "16px" }}>
                 <div style={{
@@ -99,7 +116,7 @@ const CustomerSettings = () => {
                     {photoPreview ? (
                         <img
                             src={photoPreview}
-                            alt="Profile"
+                            alt={t("profile")}
                             style={{ width: "100%", height: "100%", objectFit: "cover" }}
                         />
                     ) : (
@@ -107,14 +124,14 @@ const CustomerSettings = () => {
                     )}
                 </div>
                 <div>
-                    <label style={{ display: "block", marginBottom: "8px", fontWeight: 600 }}>Profile Photo</label>
+                    <label style={{ display: "block", marginBottom: "8px", fontWeight: 600 }}>{t("customer.settings.profilePhoto")}</label>
                     <input type="file" accept="image/*" onChange={handlePhotoChange} />
                 </div>
             </div>
 
-            <h3 style={{ marginBottom: "16px" }}>Basic Data</h3>
+            <h3 style={{ marginBottom: "16px" }}>{t("customer.settings.basicData")}</h3>
             <div style={{ marginBottom: "16px" }}>
-                <label style={{ display: "block", marginBottom: "8px" }}>Name</label>
+                <label style={{ display: "block", marginBottom: "8px" }}>{t("common.name")}</label>
                 <input
                     name="name"
                     value={formData.name}
@@ -123,7 +140,7 @@ const CustomerSettings = () => {
                 />
             </div>
             <div style={{ marginBottom: "16px" }}>
-                <label style={{ display: "block", marginBottom: "8px" }}>Email</label>
+                <label style={{ display: "block", marginBottom: "8px" }}>{t("common.email")}</label>
                 <input
                     name="email"
                     type="email"
@@ -133,7 +150,7 @@ const CustomerSettings = () => {
                 />
             </div>
             <div style={{ marginBottom: "16px" }}>
-                <label style={{ display: "block", marginBottom: "8px" }}>Phone</label>
+                <label style={{ display: "block", marginBottom: "8px" }}>{t("common.phone")}</label>
                 <input
                     name="phone"
                     value={formData.phone}
@@ -142,7 +159,7 @@ const CustomerSettings = () => {
                 />
             </div>
             <div style={{ marginBottom: "16px" }}>
-                <label style={{ display: "block", marginBottom: "8px" }}>Address</label>
+                <label style={{ display: "block", marginBottom: "8px" }}>{t("customer.settings.address")}</label>
                 <input
                     name="address"
                     value={formData.address}
@@ -151,7 +168,7 @@ const CustomerSettings = () => {
                 />
             </div>
             <div style={{ marginBottom: "24px" }}>
-                <label style={{ display: "block", marginBottom: "8px" }}>Postal Code</label>
+                <label style={{ display: "block", marginBottom: "8px" }}>{t("auth.postalCode")}</label>
                 <input
                     name="postalCode"
                     value={formData.postalCode}
@@ -160,9 +177,9 @@ const CustomerSettings = () => {
                 />
             </div>
 
-            <h3 style={{ marginBottom: "16px" }}>Payment / Bank Details</h3>
+            <h3 style={{ marginBottom: "16px" }}>{t("customer.settings.paymentBankDetails")}</h3>
             <div style={{ marginBottom: "16px" }}>
-                <label style={{ display: "block", marginBottom: "8px" }}>Bank Name</label>
+                <label style={{ display: "block", marginBottom: "8px" }}>{t("customer.settings.bankName")}</label>
                 <input
                     name="bankName"
                     value={bankData.bankName}
@@ -171,7 +188,7 @@ const CustomerSettings = () => {
                 />
             </div>
             <div style={{ marginBottom: "16px" }}>
-                <label style={{ display: "block", marginBottom: "8px" }}>Account Number</label>
+                <label style={{ display: "block", marginBottom: "8px" }}>{t("customer.settings.accountNumber")}</label>
                 <input
                     name="accountNumber"
                     value={bankData.accountNumber}
@@ -180,7 +197,7 @@ const CustomerSettings = () => {
                 />
             </div>
             <div style={{ marginBottom: "16px" }}>
-                <label style={{ display: "block", marginBottom: "8px" }}>Account Holder Name</label>
+                <label style={{ display: "block", marginBottom: "8px" }}>{t("customer.settings.accountHolderName")}</label>
                 <input
                     name="accountHolderName"
                     value={bankData.accountHolderName}
@@ -189,7 +206,7 @@ const CustomerSettings = () => {
                 />
             </div>
             <div style={{ marginBottom: "24px" }}>
-                <label style={{ display: "block", marginBottom: "8px" }}>Branch</label>
+                <label style={{ display: "block", marginBottom: "8px" }}>{t("customer.settings.branch")}</label>
                 <input
                     name="branch"
                     value={bankData.branch}
@@ -211,7 +228,7 @@ const CustomerSettings = () => {
                     opacity: saving ? 0.7 : 1
                 }}
             >
-                {saving ? "Saving..." : "Save Changes"}
+                {saving ? t("common.saving") : t("common.saveChanges")}
             </button>
         </div>
     );

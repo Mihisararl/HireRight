@@ -1,6 +1,8 @@
 // App.jsx
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import { I18nextProvider } from 'react-i18next';
+import i18n from './i18n';
 import { AuthProvider } from './context/AuthContext';
 import ProtectedRoute from './components/ProtectedRoute';
 import Home from './pages/Home';
@@ -23,6 +25,7 @@ import ProviderSettings from "./pages/ProviderSettings";
 
 function App() {
   return (
+    <I18nextProvider i18n={i18n}>
     <AuthProvider>
       <Router>
         <Routes>
@@ -77,7 +80,7 @@ function App() {
           <Route path="/provider-dashboard" element={<ProtectedRoute><ProviderDashboard /></ProtectedRoute>} /></Routes>
       </Router>
     </AuthProvider>
-
+    </I18nextProvider>
   );
 }
 
