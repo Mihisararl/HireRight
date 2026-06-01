@@ -1,8 +1,9 @@
 import i18n from 'i18next';
 import { initReactI18next } from 'react-i18next';
-import en from './locales/en.json';
-import si from './locales/si.json';
+import en from './locales/en/translation.json';
+import si from './locales/si/translation.json';
 
+/** Web: localStorage. React Native: use AsyncStorage with the same key. */
 export const LANGUAGE_STORAGE_KEY = 'hireright_language';
 
 const SUPPORTED_LANGUAGES = ['en', 'si'];

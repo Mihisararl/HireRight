@@ -2,7 +2,7 @@ import React from 'react';
 import { useTranslation } from 'react-i18next';
 
 const LanguageSwitcher = ({ style = {} }) => {
-  const { i18n } = useTranslation();
+  const { t, i18n } = useTranslation();
   const current = i18n.language?.startsWith('si') ? 'si' : 'en';
 
   const setLanguage = (lng) => {
@@ -26,7 +26,7 @@ const LanguageSwitcher = ({ style = {} }) => {
   return (
     <div
       role="group"
-      aria-label="Language switcher"
+      aria-label={t('language')}
       style={{
         display: 'inline-flex',
         alignItems: 'center',

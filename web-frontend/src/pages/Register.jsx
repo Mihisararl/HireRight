@@ -1,8 +1,11 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 import API from '../utils/api';
+import LanguageSwitcher from '../components/LanguageSwitcher';
 
 export default function Register() {
+  const { t } = useTranslation();
   const navigate = useNavigate();
 
   const [name, setName] = useState('');
@@ -22,12 +25,12 @@ export default function Register() {
     setSuccess("");
 
     if (password !== confirmPassword) {
-      setError("Passwords do not match");
+      setError(t("auth.passwordsNoMatch"));
       return;
     }
 
     try {
-      const res = await API.post('/auth/register', {
+      await API.post('/auth/register', {
         name,
         email,
         phone,
@@ -37,13 +40,10 @@ export default function Register() {
         role,
       });
 
-      setSuccess('Registration successful. You can now log in.');
-      // Optionally redirect to login
+      setSuccess(t("auth.registrationSuccess"));
       setTimeout(() => navigate('/login'), 1200);
-
     } catch (err) {
-      console.error(err);
-      setError(err.response?.data?.message || "Registration failed");
+      setError(err.response?.data?.message || t("auth.registrationFailed"));
     }
   };
 
@@ -56,8 +56,13 @@ export default function Register() {
         minHeight: "100vh",
         background: "linear-gradient(135deg, #e8f0f8 0%, #d0e4f7 100%)",
         padding: "20px",
+        position: "relative",
       }}
     >
+      <div style={{ position: 'absolute', top: 20, right: 20 }}>
+        <LanguageSwitcher />
+      </div>
+
       <div
         style={{
           width: "100%",
@@ -77,59 +82,55 @@ export default function Register() {
             fontWeight: "bold",
           }}
         >
-          Hire Right
+          {t("common.appName")}
         </h2>
 
         <form style={{ display: "flex", flexDirection: "column", gap: "15px" }} onSubmit={handleSubmit}>
-          <input type="text" placeholder="Full Name" value={name}
+          <input type="text" placeholder={t("auth.fullName")} value={name}
             onChange={(e) => setName(e.target.value)} required style={inputStyle} />
 
-          <input type="email" placeholder="Email Address" value={email}
+          <input type="email" placeholder={t("common.email")} value={email}
             onChange={(e) => setEmail(e.target.value)} required style={inputStyle} />
 
-          <input type="tel" placeholder="Phone (07XXXXXXXX)" value={phone}
+          <input type="tel" placeholder={t("common.phone")} value={phone}
             onChange={(e) => setPhone(e.target.value)} required style={inputStyle} />
 
-          <input type="text" placeholder="District" value={district}
+          <input type="text" placeholder={t("auth.district")} value={district}
             onChange={(e) => setDistrict(e.target.value)} style={inputStyle} />
 
-          <input type="text" placeholder="Postal Code" value={postalCode}
+          <input type="text" placeholder={t("auth.postalCode")} value={postalCode}
             onChange={(e) => setPostalCode(e.target.value)} style={inputStyle} />
 
           <select value={role} onChange={(e) => setRole(e.target.value)} style={inputStyle}>
-            <option value="customer">Service Receiver</option>
-            <option value="provider">Service Provider</option>
+            <option value="customer">{t("auth.serviceReceiver")}</option>
+            <option value="provider">{t("auth.serviceProvider")}</option>
           </select>
 
-          <input type="password" placeholder="Create Password" value={password}
+          <input type="password" placeholder={t("auth.createPassword")} value={password}
             onChange={(e) => setPassword(e.target.value)} required style={inputStyle} />
 
-          <input type="password" placeholder="Confirm Password" value={confirmPassword}
+          <input type="password" placeholder={t("auth.confirmPassword")} value={confirmPassword}
             onChange={(e) => setConfirmPassword(e.target.value)} required style={inputStyle} />
 
-          <button type="submit" style={buttonStyle}>Register</button>
+          <button type="submit" style={buttonStyle}>{t("register")}</button>
 
-          {/* Error message */}
           {error && (
             <p style={{ color: "#dc3545", textAlign: "center", margin: "0", fontSize: "14px" }}>
               {error}
             </p>
           )}
 
-          {/* Success message */}
           {success && (
             <p style={{ color: '#28a745', textAlign: 'center', margin: '0', fontSize: '14px' }}>
               {success}
             </p>
           )}
-
         </form>
       </div>
     </div>
   );
 }
 
-// ---------- Styles ----------
 const inputStyle = {
   padding: "14px",
   borderRadius: "8px",

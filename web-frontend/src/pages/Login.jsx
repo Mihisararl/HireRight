@@ -1,10 +1,12 @@
 import { useState, useContext, useEffect } from "react";
-import axios from "axios";
+import { useTranslation } from "react-i18next";
 import { AuthContext } from "../context/AuthContext";
 import { loginUser } from "../api/auth";
 import { useNavigate, useLocation } from "react-router-dom";
+import LanguageSwitcher from "../components/LanguageSwitcher";
 
 export default function Login() {
+  const { t } = useTranslation();
   const { login } = useContext(AuthContext);
   const navigate = useNavigate();
   const location = useLocation();
@@ -17,9 +19,9 @@ export default function Login() {
   useEffect(() => {
     const searchParams = new URLSearchParams(location.search);
     if (searchParams.get("verified") === "true") {
-      setVerifiedMsg("Email verified successfully! Please log in.");
+      setVerifiedMsg(t("auth.emailVerified"));
     }
-  }, [location]);
+  }, [location, t]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -31,7 +33,7 @@ export default function Login() {
         if (data.user.role === "customer") {
           navigate("/services", { state: { bookingIntent: location.state.bookingIntent } });
         } else {
-          alert("Only customers can book services");
+          alert(t("auth.onlyCustomersBook"));
           navigate("/provider-dashboard");
         }
       } else if (data.user.role === "provider") {
@@ -42,15 +44,12 @@ export default function Login() {
         navigate("/");
       }
     } catch (err) {
-      console.log("Login error:", err.response);
-
       if (err.response?.status === 400) {
-        setError("Invalid email or password");
+        setError(t("auth.invalidCredentials"));
       } else {
-        setError(err.response?.data?.message || "Login failed. Try again.");
+        setError(err.response?.data?.message || t("auth.loginFailed"));
       }
     }
-
   };
 
   return (
@@ -60,8 +59,13 @@ export default function Login() {
       alignItems: 'center',
       minHeight: '100vh',
       background: 'linear-gradient(135deg, #a8d5ff 0%, #b8e0ff 100%)',
-      padding: '20px'
+      padding: '20px',
+      position: 'relative',
     }}>
+      <div style={{ position: 'absolute', top: 20, right: 20 }}>
+        <LanguageSwitcher />
+      </div>
+
       <div style={{
         width: '100%',
         maxWidth: '400px',
@@ -84,7 +88,7 @@ export default function Login() {
           fontWeight: 'bold',
           color: '#000'
         }}>
-          Welcome Back
+          {t("auth.welcomeBack")}
         </h2>
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
@@ -96,7 +100,7 @@ export default function Login() {
               fontWeight: '600',
               color: '#333'
             }}>
-              Email Address
+              {t("common.email")}
             </label>
             <input
               type="email"
@@ -123,7 +127,7 @@ export default function Login() {
               fontWeight: '600',
               color: '#333'
             }}>
-              Password
+              {t("common.password")}
             </label>
             <input
               type="password"
@@ -144,7 +148,7 @@ export default function Login() {
 
           <a href="/forgot-password"
             style={{ textAlign: 'left', fontSize: '14px', color: '#666' }}>
-            Forgot password?
+            {t("auth.forgotPassword")}
           </a>
 
           <button onClick={handleSubmit} style={{
@@ -158,7 +162,7 @@ export default function Login() {
             fontSize: '16px',
             fontWeight: '600'
           }}>
-            Log In
+            {t("auth.logIn")}
           </button>
 
           {error && (
