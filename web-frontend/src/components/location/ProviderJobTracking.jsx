@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { ExternalLink, Navigation } from 'lucide-react';
 import TrackingMap from './TrackingMap';
 import { startProviderJourney } from '../../api/location';
@@ -12,6 +13,7 @@ import {
 const ACTIVE_STATUSES = ['Accepted', 'Confirmed'];
 
 const ProviderJobTracking = ({ serviceRequest, onJourneyChange }) => {
+  const { t } = useTranslation();
   const [journeyActive, setJourneyActive] = useState(Boolean(serviceRequest?.journeyActive));
   const [starting, setStarting] = useState(false);
   const [startError, setStartError] = useState('');
@@ -42,7 +44,7 @@ const ProviderJobTracking = ({ serviceRequest, onJourneyChange }) => {
       setJourneyActive(Boolean(data.serviceRequest?.journeyActive));
       onJourneyChange?.(data.serviceRequest);
     } catch (err) {
-      setStartError(err.response?.data?.message || 'Failed to start journey');
+      setStartError(err.response?.data?.message || t('provider.tracking.failedToStart'));
     } finally {
       setStarting(false);
     }
@@ -52,7 +54,7 @@ const ProviderJobTracking = ({ serviceRequest, onJourneyChange }) => {
 
   return (
     <div className="tracking-panel">
-      <h4 className="tracking-panel-title">Navigate to customer</h4>
+      <h4 className="tracking-panel-title">{t('provider.tracking.navigateToCustomer')}</h4>
       <p className="tracking-panel-meta">
         {formatLocationDisplay(customerLocation)}
       </p>
@@ -74,7 +76,7 @@ const ProviderJobTracking = ({ serviceRequest, onJourneyChange }) => {
               style={{ textDecoration: 'none' }}
             >
               <ExternalLink size={16} />
-              Open in Google Maps
+              {t('provider.tracking.openInGoogleMaps')}
             </a>
             {!journeyActive ? (
               <button
@@ -84,19 +86,19 @@ const ProviderJobTracking = ({ serviceRequest, onJourneyChange }) => {
                 disabled={starting}
               >
                 <Navigation size={16} />
-                {starting ? 'Starting…' : 'Start Journey'}
+                {starting ? t('provider.tracking.starting') : t('provider.startJourney')}
               </button>
             ) : (
               <span className="tracking-panel-status">
-                Live tracking active — location sent every 10 seconds
-                {lastSentAt ? ` (last: ${lastSentAt.toLocaleTimeString()})` : ''}
+                {t('provider.tracking.liveTrackingActive')}
+                {lastSentAt ? t('provider.tracking.lastUpdate', { time: lastSentAt.toLocaleTimeString() }) : ''}
               </span>
             )}
           </div>
         </>
       ) : (
         <p className="tracking-panel-error">
-          Customer coordinates are not available. Ask the customer to update their service location.
+          {t('provider.tracking.noCoordinates')}
         </p>
       )}
 

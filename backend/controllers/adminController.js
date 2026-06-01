@@ -6,6 +6,33 @@ import ServiceRequest from '../models/ServiceRequest.js';
 import Complaint from '../models/Complaint.js';
 import UserPaymentDetails from '../models/UserPaymentDetails.js';
 
+/** Customer can reopen a resolved complaint within this window before payment release. */
+const COMPLAINT_REOPEN_WINDOW_MS = 48 * 60 * 60 * 1000;
+
+const loadUserForRegistrationRequest = (email) => User.findOne({ email });
+
+const isPendingProviderRegistration = (user) => (
+    user.role === 'provider' && user.providerStatus === 'pending'
+);
+
+const validateUserForProviderApproval = (user, res) => {
+    if (!user) {
+        res.status(404).json({ message: 'Associated user account not found' });
+        return false;
+    }
+    if (user.role === 'admin') {
+        res.status(403).json({ message: 'Admin accounts cannot be registered as providers' });
+        return false;
+    }
+    if (!isPendingProviderRegistration(user)) {
+        res.status(400).json({
+            message: 'User must have role provider with pending status before approval. They should complete worker registration first.'
+        });
+        return false;
+    }
+    return true;
+};
+
 // Get all users
 export const getUsers = async (req, res) => {
     const users = await User.find().select('-password');
@@ -44,10 +71,13 @@ export const approveProvider = async (req, res) => {
             return res.status(400).json({ message: 'Only pending requests can be approved' });
         }
 
-        // Find the corresponding User account
-        const user = await User.findOne({ email: registrationRequest.email });
-        if (!user) {
-            return res.status(404).json({ message: 'Associated user account not found' });
+        // Find the corresponding User account (same email lookup as rejectProvider)
+        const user = await loadUserForRegistrationRequest(registrationRequest.email);
+        if (!validateUserForProviderApproval(user, res)) return;
+
+        const existingProvider = await Provider.findOne({ userId: user._id });
+        if (existingProvider) {
+            return res.status(400).json({ message: 'Provider profile already exists for this user' });
         }
 
         // Create Provider record (approved provider)
@@ -80,8 +110,7 @@ export const approveProvider = async (req, res) => {
         registrationRequest.reviewedBy = req.user.id;
         await registrationRequest.save();
 
-        // Update User account status
-        user.role = 'provider';
+        // Update User account status (role already provider from registration submission)
         user.providerStatus = 'approved';
         user.approvedAt = new Date();
         await user.save();
@@ -122,9 +151,9 @@ export const rejectProvider = async (req, res) => {
         registrationRequest.reviewNotes = reviewNotes || '';
         await registrationRequest.save();
 
-        // Update User account status
-        const user = await User.findOne({ email: registrationRequest.email, role: 'provider' });
-        if (user) {
+        // Update linked user when they completed worker registration (role: provider, pending)
+        const user = await loadUserForRegistrationRequest(registrationRequest.email);
+        if (user && user.role !== 'admin' && isPendingProviderRegistration(user)) {
             user.providerStatus = 'rejected';
             user.rejectedAt = new Date();
             await user.save();
@@ -221,7 +250,7 @@ export const resolveComplaint = async (req, res) => {
 
     complaint.status = 'resolved';
     complaint.resolvedAt = new Date();
-    complaint.reopenUntil = new Date(Date.now() + 2 * 60 * 1000);
+    complaint.reopenUntil = new Date(Date.now() + COMPLAINT_REOPEN_WINDOW_MS);
     await complaint.save();
 
     if (complaint.serviceRequestId) {

@@ -1,9 +1,11 @@
 import React from 'react';
-import { User, FileText, Headphones, Shield, Briefcase, Code, Camera, PenTool, Mic } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { User, FileText, Headphones, Shield, Sparkles, Wrench, Zap, Hammer, Paintbrush, TreePine, Wind, Truck, LayoutGrid } from 'lucide-react';
 import workerImg from '../assets/worker.jpg';
 
 
 export default function BecomeWorker() {
+  const navigate = useNavigate();
   const features = [
     {
       icon: User,
@@ -46,16 +48,16 @@ export default function BecomeWorker() {
   ];
 
   const categories = [
-    { icon: Code, name: "Design" },
-    { icon: Briefcase, name: "Digital Professional" },
-    { icon: Camera, name: "Writing & Editing" },
-    { icon: PenTool, name: "Handyman Services" },
-    { icon: Mic, name: "Tutoring" },
-    { icon: Code, name: "Marketing" },
-    { icon: Camera, name: "Fitness" },
-    { icon: PenTool, name: "Art Services" },
-    { icon: Mic, name: "Entertainment" },
-    { icon: Briefcase, name: "Business" }
+    { icon: Sparkles, name: 'Home Cleaning' },
+    { icon: Wrench, name: 'Plumbing' },
+    { icon: Zap, name: 'Electrical' },
+    { icon: Hammer, name: 'Carpentry' },
+    { icon: Paintbrush, name: 'Painting' },
+    { icon: TreePine, name: 'Landscaping' },
+    { icon: Wind, name: 'HVAC' },
+    { icon: Wrench, name: 'Handyman' },
+    { icon: Truck, name: 'Moving' },
+    { icon: LayoutGrid, name: 'Other' },
   ];
 
   return (
@@ -137,55 +139,12 @@ export default function BecomeWorker() {
             </h1>
             <p style={{
               fontSize: '20px',
-              marginBottom: '35px',
+              marginBottom: '0',
               opacity: 0.95,
               lineHeight: '1.6'
             }}>
               Join thousands of professionals earning on their own terms
             </p>
-            <div style={{ display: 'flex', gap: '15px', marginBottom: '40px' }}>
-              <a href="/provider-registration" style={{
-                display: 'inline-block',
-                textDecoration: 'none',
-                backgroundColor: '#fff',
-                color: '#0066ff',
-                border: 'none',
-                borderRadius: '8px',
-                padding: '16px 32px',
-                fontSize: '18px',
-                fontWeight: '600',
-                cursor: 'pointer',
-                boxShadow: '0 4px 15px rgba(0,0,0,0.2)'
-              }}>
-                Get Started Now
-              </a>
-              <button style={{
-                backgroundColor: 'transparent',
-                color: '#fff',
-                border: '2px solid #fff',
-                borderRadius: '8px',
-                padding: '16px 32px',
-                fontSize: '18px',
-                fontWeight: '600',
-                cursor: 'pointer'
-              }}>
-                Learn More
-              </button>
-            </div>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '30px' }}>
-              <div>
-                <div style={{ fontSize: '36px', fontWeight: 'bold', marginBottom: '5px' }}>10K+</div>
-                <div style={{ fontSize: '14px', opacity: 0.9 }}>Active Workers</div>
-              </div>
-              <div>
-                <div style={{ fontSize: '36px', fontWeight: 'bold', marginBottom: '5px' }}>Rs.6500</div>
-                <div style={{ fontSize: '14px', opacity: 0.9 }}>Avg. Hourly Rate</div>
-              </div>
-              <div>
-                <div style={{ fontSize: '36px', fontWeight: 'bold', marginBottom: '5px' }}>4.9★</div>
-                <div style={{ fontSize: '14px', opacity: 0.9 }}>Average Rating</div>
-              </div>
-            </div>
           </div>
           <div>
             <img 
@@ -366,7 +325,7 @@ export default function BecomeWorker() {
               fontSize: '18px',
               color: '#718096'
             }}>
-              Choose from hundreds of service categories
+              Offer your skills in these popular home and trade services
             </p>
           </div>
           <div style={{
@@ -438,7 +397,10 @@ export default function BecomeWorker() {
           }}>
             Join thousands of professionals who have already made the switch
           </p>
-          <button style={{
+          <button
+            type="button"
+            onClick={() => navigate('/signup')}
+            style={{
             backgroundColor: '#fff',
             color: '#0066ff',
             border: 'none',
@@ -448,7 +410,8 @@ export default function BecomeWorker() {
             fontWeight: '600',
             cursor: 'pointer',
             boxShadow: '0 8px 20px rgba(0,0,0,0.2)'
-          }}>
+          }}
+          >
             Sign Up Today
           </button>
         </div>

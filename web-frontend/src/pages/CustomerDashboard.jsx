@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useContext, useCallback, useRef } from "react";
-import { Bell, Settings, LogOut, Calendar, Clock, MapPin, Edit, X, CheckCircle, CreditCard } from "lucide-react";
+import { Bell, Settings, LogOut, Calendar, Clock, MapPin, Edit, X, CheckCircle, CreditCard, Plus, FileText, Briefcase } from "lucide-react";
 import { useNavigate, useLocation } from 'react-router-dom';
 import { getUserServiceRequests, updateServiceRequest, acceptProviderOffer, rejectProviderOffer, completeServiceRequestByCustomer } from '../api/service';
 import { getUserPayments } from '../api/payment';
@@ -10,6 +10,7 @@ import LocationPicker from '../components/location/LocationPicker';
 import CustomerProviderTracking from '../components/location/CustomerProviderTracking';
 import ProviderOfferProfile from '../components/offers/ProviderOfferProfile';
 import { formatLocationDisplay, hasCoordinates } from '../utils/locationHelpers';
+import '../styles/CustomerDashboard.css';
 
 const isPendingProviderOffer = (request) => (
   request?.status === 'OfferSent'
@@ -201,10 +202,28 @@ const CustomerDashboard = () => {
   const totalSpent = completedBookings.reduce((sum, request) => sum + (Number(request.budget) || 0), 0);
 
   const stats = [
-    { label: "Active Requests", value: String(activeBookings.length), icon: "📋", bg: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)" },
-    { label: "Completed", value: String(completedBookings.length), icon: "✓", bg: "linear-gradient(135deg, #0ea5e9 0%, #2563eb 100%)" },
-    { label: "Total Spent", value: `Rs.${totalSpent}`, icon: "💳", bg: "linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%)" },
+    { key: 'active', label: 'Active', value: String(activeBookings.length) },
+    { key: 'completed', label: 'Completed', value: String(completedBookings.length) },
+    { key: 'spent', label: 'Total spent', value: `Rs.${totalSpent.toLocaleString()}` },
   ];
+
+  const tabDescriptions = {
+    active: 'Jobs in progress — pay your provider, track their location, or mark work complete.',
+    completed: 'Finished jobs and your payment history.',
+    posts: 'Service requests you posted — review provider offers and manage bookings.',
+  };
+
+  const userInitials = user?.name
+    ? user.name.split(' ').map((n) => n[0]).join('').substring(0, 2).toUpperCase()
+    : 'CU';
+
+  const renderAvatar = (className) => (
+    user?.profilePhoto ? (
+      <img src={user.profilePhoto} alt={user?.name || 'Profile'} />
+    ) : (
+      userInitials
+    )
+  );
 
   const toBookingCard = (request) => {
     const providerName = request.providerId?.name || 'Provider';
@@ -332,33 +351,14 @@ const CustomerDashboard = () => {
 
         .dashboard-page {
           min-height: 100vh;
-          position: relative;
-          overflow-x: hidden;
-          background: linear-gradient(140deg, #f8fafc 0%, #eef2f6 45%, #e2e8f0 100%);
+          background: #f1f5f9;
           font-family: 'Outfit', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
           color: #1e293b;
         }
 
         .dashboard-page::before,
         .dashboard-page::after {
-          content: '';
-          position: absolute;
-          width: 420px;
-          height: 420px;
-          border-radius: 50%;
-          background: radial-gradient(circle, rgba(59, 130, 246, 0.18), rgba(14, 165, 233, 0));
-          filter: blur(10px);
-          z-index: 0;
-        }
-
-        .dashboard-page::before {
-          top: -120px;
-          right: -120px;
-        }
-
-        .dashboard-page::after {
-          bottom: -160px;
-          left: -140px;
+          display: none;
         }
 
         .dashboard-header {
@@ -474,12 +474,11 @@ const CustomerDashboard = () => {
         }
 
         .dashboard-container {
-          max-width: 1280px;
+          max-width: 1100px;
           margin: 0 auto;
-          padding: 40px 24px;
+          padding: 24px 20px 40px;
           position: relative;
           z-index: 1;
-          animation: fadeUp 0.6s ease both;
         }
 
         .user-section-card {
@@ -1282,83 +1281,118 @@ const CustomerDashboard = () => {
             </button>
           </div>
         )}
-        {/* USER INFO */}
-        <div className="user-section-card">
-          <div className="user-avatar">
-            {user?.profilePhoto ? (
-              <img
-                src={user.profilePhoto}
-                alt={user?.name || 'Profile'}
-                className="user-avatar-img"
-              />
-            ) : (
-              user?.name
-                ? user.name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase()
-                : 'JD'
-            )}
-          </div>
-          <div>
-            <div className="user-name-title">Welcome, {user?.name || 'Customer'}</div>
-            <div className="user-role-badge">Customer Account</div>
-          </div>
-        </div>
-
-        {/* STATS */}
-        <div className="stats-container">
-          {stats.map((s, i) => (
-            <div key={i} className="stat-card-item">
-              <div className="stat-card-inner-flex">
-                <div className="stat-info-col">
-                  <div className="stat-card-label">{s.label}</div>
-                  <div className="stat-card-value">{s.value}</div>
-                </div>
-                <div className="stat-icon-badge" style={{ background: s.bg }}>
-                  <span>{s.icon}</span>
-                </div>
-              </div>
+        {/* HERO — welcome, quick stats, primary action */}
+        <div className="dashboard-hero">
+          <div className="dashboard-hero-left">
+            <div className="dashboard-hero-avatar">{renderAvatar()}</div>
+            <div>
+              <h1 className="dashboard-hero-title">Hi, {user?.name?.split(' ')[0] || 'there'}</h1>
+              <p className="dashboard-hero-subtitle">Manage your bookings, posts, and provider offers in one place.</p>
             </div>
-          ))}
+          </div>
+          <div className="dashboard-hero-right">
+            {stats.map((s) => (
+              <button
+                key={s.key}
+                type="button"
+                className="dashboard-stat-pill"
+                onClick={() => setActiveTab(s.key === 'spent' ? 'completed' : s.key)}
+              >
+                <span className="dashboard-stat-pill-value">{s.value}</span>
+                <span className="dashboard-stat-pill-label">{s.label}</span>
+              </button>
+            ))}
+            <button type="button" className="dashboard-primary-btn" onClick={() => navigate('/service-request')}>
+              <Plus size={18} />
+              New request
+            </button>
+          </div>
         </div>
 
-        {/* POST BUTTON */}
-        <button onClick={() => navigate('/service-request')} className="post-request-btn">
-          <span>+</span>
-          <span>Post New Service Request</span>
-        </button>
-
-        {/* TABS */}
-        <div className="tabs-navigation">
-          <div className="tabs-nav-box">
+        {/* MAIN CONTENT */}
+        <div className="dashboard-section">
+          <div className="dashboard-tabs">
             <button
-              onClick={() => setActiveTab("active")}
-              className={`tab-nav-button ${activeTab === "active" ? "tab-nav-button-active" : ""}`}
+              type="button"
+              onClick={() => setActiveTab('active')}
+              className={`dashboard-tab ${activeTab === 'active' ? 'dashboard-tab-active' : ''}`}
             >
-              Active Bookings
+              <Briefcase size={16} />
+              Active bookings
             </button>
             <button
-              onClick={() => setActiveTab("completed")}
-              className={`tab-nav-button ${activeTab === "completed" ? "tab-nav-button-active" : ""}`}
+              type="button"
+              onClick={() => setActiveTab('completed')}
+              className={`dashboard-tab ${activeTab === 'completed' ? 'dashboard-tab-active' : ''}`}
             >
+              <CheckCircle size={16} />
               Completed
             </button>
             <button
-              onClick={() => setActiveTab("posts")}
-              className={`tab-nav-button ${activeTab === "posts" ? "tab-nav-button-active" : ""}`}
+              type="button"
+              onClick={() => setActiveTab('posts')}
+              className={`dashboard-tab ${activeTab === 'posts' ? 'dashboard-tab-active' : ''}`}
             >
-              <span className="tab-nav-button-wrap">
-                My Posts
-                {pendingOfferCount > 0 && (
-                  <span className="tab-notification-dot">
-                    {pendingOfferCount > 9 ? '9+' : pendingOfferCount}
-                  </span>
-                )}
-              </span>
+              <FileText size={16} />
+              My posts
+              {pendingOfferCount > 0 && (
+                <span className="dashboard-tab-badge">
+                  {pendingOfferCount > 9 ? '9+' : pendingOfferCount}
+                </span>
+              )}
             </button>
           </div>
-        </div>
+          <p className="dashboard-section-desc">{tabDescriptions[activeTab]}</p>
 
         {/* BOOKINGS GRID */}
-        {activeTab === "posts" ? (
+        {activeTab === 'posts' && pendingPosts.length === 0 && (
+          <div className="dashboard-empty">
+            <div className="dashboard-empty-icon">📝</div>
+            <h3 className="dashboard-empty-title">No open posts</h3>
+            <p className="dashboard-empty-text">
+              Post a service request and providers in your area can send you offers with their price and availability.
+            </p>
+            <div className="dashboard-empty-actions">
+              <button type="button" className="dashboard-primary-btn" onClick={() => navigate('/service-request')}>
+                <Plus size={16} />
+                Post a request
+              </button>
+              <button type="button" className="dashboard-secondary-btn" onClick={() => navigate('/services')}>
+                Browse providers
+              </button>
+            </div>
+          </div>
+        )}
+
+        {activeTab === 'active' && bookings.length === 0 && (
+          <div className="dashboard-empty">
+            <div className="dashboard-empty-icon">📋</div>
+            <h3 className="dashboard-empty-title">No active bookings</h3>
+            <p className="dashboard-empty-text">
+              When you accept a provider offer or confirm a booking, it will show up here so you can pay and track the job.
+            </p>
+            <div className="dashboard-empty-actions">
+              <button type="button" className="dashboard-secondary-btn" onClick={() => setActiveTab('posts')}>
+                Check my posts
+              </button>
+              <button type="button" className="dashboard-primary-btn" onClick={() => navigate('/services')}>
+                Book a provider
+              </button>
+            </div>
+          </div>
+        )}
+
+        {activeTab === 'completed' && completedCards.length === 0 && (
+          <div className="dashboard-empty">
+            <div className="dashboard-empty-icon">✓</div>
+            <h3 className="dashboard-empty-title">No completed jobs yet</h3>
+            <p className="dashboard-empty-text">
+              Finished services will appear here with payment details and the option to leave a review.
+            </p>
+          </div>
+        )}
+
+        {activeTab === "posts" && pendingPosts.length > 0 ? (
           <div className="dashboard-grid">
             {pendingPosts.map((request) => (
               <div
@@ -1533,7 +1567,7 @@ const CustomerDashboard = () => {
               </div>
             ))}
           </div>
-        ) : (
+        ) : activeTab !== 'posts' && (activeTab === 'active' ? bookings.length > 0 : completedCards.length > 0) ? (
           <div className="dashboard-grid">
             {(activeTab === 'active' ? bookings : completedCards).map((b) => (
               <div key={b.id} className="item-card">
@@ -1636,7 +1670,8 @@ const CustomerDashboard = () => {
               </div>
             ))}
           </div>
-        )}
+        ) : null}
+        </div>
       </div>
 
       {/* EDIT MODAL */}
