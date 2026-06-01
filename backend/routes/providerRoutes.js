@@ -6,6 +6,7 @@ import {
   updateAvailability,
   getMyAvailability
 } from "../controllers/providerController.js";
+import { getProviderServiceRequests } from "../controllers/serviceRequestController.js";
 import {
   updateProviderLocation,
   getProviderLocation,
@@ -20,6 +21,7 @@ router.get('/approved', getApprovedProviders);
 router.get('/category/:category', getProvidersByCategory);
 router.get('/availability/me', auth(), getMyAvailability);
 router.put('/availability', auth(), updateAvailability);
+router.get('/jobs', auth(), getProviderServiceRequests);
 router.post('/update-location', auth(), updateProviderLocation);
 router.post('/start-journey', auth(), startProviderJourney);
 router.get('/:id/location', auth(), getProviderLocation);

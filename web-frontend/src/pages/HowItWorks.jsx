@@ -529,33 +529,25 @@ export default function HowItWorks() {
           }}>
             Join thousands who trust Hire Right. Whether you need help or want to earn, we've got you covered.
           </p>
-          <div style={{ display: 'flex', gap: '20px', justifyContent: 'center', flexWrap: 'wrap' }}>
-            <button style={{
-              backgroundColor: '#fff',
-              color: '#0066ff',
-              border: 'none',
-              borderRadius: '30px',
-              padding: '16px 40px',
-              fontSize: '18px',
-              fontWeight: '600',
-              cursor: 'pointer',
-              transition: 'all 0.3s'
-            }}>
-              Post a Task
-            </button>
-            <button style={{
-              backgroundColor: 'transparent',
-              color: '#fff',
-              border: '2px solid #fff',
-              borderRadius: '30px',
-              padding: '16px 40px',
-              fontSize: '18px',
-              fontWeight: '600',
-              cursor: 'pointer',
-              transition: 'all 0.3s'
-            }}>
-              Become a Worker
-            </button>
+          <div style={{ display: 'flex', justifyContent: 'center' }}>
+            <a
+              href="/services"
+              style={{
+                backgroundColor: '#fff',
+                color: '#0066ff',
+                border: 'none',
+                borderRadius: '30px',
+                padding: '16px 40px',
+                fontSize: '18px',
+                fontWeight: '600',
+                cursor: 'pointer',
+                transition: 'all 0.3s',
+                textDecoration: 'none',
+                display: 'inline-block'
+              }}
+            >
+              Learn More
+            </a>
           </div>
         </div>
       </section>

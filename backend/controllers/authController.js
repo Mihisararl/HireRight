@@ -294,17 +294,43 @@ export const updateProfile = async (req, res) => {
         if (professionalBio !== undefined) providerDoc.professionalBio = professionalBio;
         if (portfolioPhoto !== undefined) providerDoc.portfolioPhoto = portfolioPhoto;
 
-        if (bankName !== undefined) providerDoc.bankName = bankName;
-        if (accountNumber !== undefined) providerDoc.accountNumber = accountNumber;
-        if (branch !== undefined) providerDoc.branch = branch;
-        if (accountHolderName !== undefined) providerDoc.accountHolderName = accountHolderName;
+        const bankFieldsInRequest = [bankName, accountNumber, branch, accountHolderName]
+          .some((value) => value !== undefined);
+        if (bankFieldsInRequest) {
+          const trimmedBank = {
+            bankName: bankName !== undefined ? String(bankName).trim() : undefined,
+            accountNumber: accountNumber !== undefined ? String(accountNumber).trim() : undefined,
+            branch: branch !== undefined ? String(branch).trim() : undefined,
+            accountHolderName: accountHolderName !== undefined ? String(accountHolderName).trim() : undefined
+          };
+          const hasAnyBankValue = Object.values(trimmedBank).some(Boolean);
+          if (hasAnyBankValue) {
+            const missing = Object.entries(trimmedBank)
+              .filter(([, value]) => !value)
+              .map(([key]) => key);
+            if (missing.length > 0) {
+              return res.status(400).json({
+                message: `Missing required bank fields: ${missing.join(', ')}`
+              });
+            }
+            providerDoc.bankName = trimmedBank.bankName;
+            providerDoc.accountNumber = trimmedBank.accountNumber;
+            providerDoc.branch = trimmedBank.branch;
+            providerDoc.accountHolderName = trimmedBank.accountHolderName;
+          }
+        }
 
         await providerDoc.save();
       }
     }
 
-    const bankFields = { bankName, accountNumber, accountHolderName, branch };
-    const hasBankDetails = Object.values(bankFields).some((value) => Boolean(value));
+    const bankFields = {
+      bankName: bankName !== undefined ? String(bankName).trim() : undefined,
+      accountNumber: accountNumber !== undefined ? String(accountNumber).trim() : undefined,
+      accountHolderName: accountHolderName !== undefined ? String(accountHolderName).trim() : undefined,
+      branch: branch !== undefined ? String(branch).trim() : undefined
+    };
+    const hasBankDetails = Object.values(bankFields).some(Boolean);
 
     if (hasBankDetails) {
       const missing = Object.entries(bankFields)
@@ -358,6 +384,10 @@ export const updateProfile = async (req, res) => {
     });
   } catch (err) {
     console.error('updateProfile error:', err);
+    if (err.name === 'ValidationError') {
+      const messages = Object.values(err.errors).map((e) => e.message).join(', ');
+      return res.status(400).json({ message: messages });
+    }
     res.status(500).json({ message: 'Server error' });
   }
 };

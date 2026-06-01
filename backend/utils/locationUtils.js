@@ -44,6 +44,30 @@ export const formatLocationDisplay = (location) => {
   return '—';
 };
 
+/** Backfill missing address on legacy service requests before Mongoose save(). */
+export const ensureStoredLocation = (serviceRequest) => {
+  if (!serviceRequest?.location || typeof serviceRequest.location !== 'object') {
+    serviceRequest.location = { address: 'Address not provided' };
+    return;
+  }
+
+  const loc = serviceRequest.location;
+  const address = String(loc.address || '').trim();
+  if (address) {
+    loc.address = address;
+    return;
+  }
+
+  const lat = Number(loc.lat);
+  const lng = Number(loc.lng);
+  if (Number.isFinite(lat) && Number.isFinite(lng)) {
+    loc.address = `${lat}, ${lng}`;
+    return;
+  }
+
+  loc.address = 'Address not provided';
+};
+
 export const clearProviderLiveLocation = async (userId) => {
   await Provider.updateOne({ userId }, { $unset: { location: '' } });
 };

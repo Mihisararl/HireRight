@@ -1,9 +1,17 @@
 import ServiceRequest from "../models/ServiceRequest.js";
 import User from "../models/User.js";
 import Provider from "../models/Provider.js";
-import { validateServiceLocation } from "../utils/locationUtils.js";
-import { stopJourneyForProvider } from "../utils/locationUtils.js";
+import {
+  validateServiceLocation,
+  stopJourneyForProvider,
+  ensureStoredLocation,
+} from "../utils/locationUtils.js";
 import { attachProviderProfilesToRequests } from "../utils/providerProfileUtils.js";
+
+const saveServiceRequest = async (serviceRequest) => {
+  ensureStoredLocation(serviceRequest);
+  return serviceRequest.save();
+};
 
 // POST - Create service request
 export const createServiceRequest = async (req, res) => {
@@ -168,18 +176,27 @@ export const acceptServiceRequest = async (req, res) => {
       return res.status(400).json({ message: "Service request is not available" });
     }
 
+    if (serviceRequest.bookingType !== 'post') {
+      return res.status(400).json({ message: "This request is not open for offers" });
+    }
+
+    const normalizedPrice = Number(proposedPrice);
+    const offerPrice = Number.isFinite(normalizedPrice) && normalizedPrice > 0
+      ? normalizedPrice
+      : serviceRequest.budget;
+
     // Send offer to customer instead of directly accepting
     serviceRequest.status = "OfferSent";
     serviceRequest.providerId = req.user.id;
     serviceRequest.providerOffer = {
       sendAt: new Date(),
       message: message || '',
-      proposedPrice: proposedPrice || serviceRequest.budget,
+      proposedPrice: offerPrice,
       proposedDate: proposedDate || serviceRequest.preferredDate,
       customerResponse: 'pending'
     };
 
-    await serviceRequest.save();
+    await saveServiceRequest(serviceRequest);
 
     res.status(200).json({
       message: "Offer sent to customer successfully",
@@ -236,7 +253,7 @@ export const completeServiceRequest = async (req, res) => {
     }
 
     serviceRequest.journeyActive = false;
-    await serviceRequest.save();
+    await saveServiceRequest(serviceRequest);
     await stopJourneyForProvider(req.user.id);
 
     res.status(200).json({
@@ -279,7 +296,7 @@ export const completeServiceRequestByCustomer = async (req, res) => {
     }
 
     serviceRequest.journeyActive = false;
-    await serviceRequest.save();
+    await saveServiceRequest(serviceRequest);
 
     if (serviceRequest.status === 'Completed' && serviceRequest.providerId) {
       await stopJourneyForProvider(serviceRequest.providerId);
@@ -321,7 +338,7 @@ export const acceptProviderOffer = async (req, res) => {
     serviceRequest.providerOffer.customerResponse = 'accepted';
     serviceRequest.providerOffer.customerResponseAt = new Date();
 
-    await serviceRequest.save();
+    await saveServiceRequest(serviceRequest);
 
     res.status(200).json({
       message: "Provider offer accepted successfully",
@@ -360,7 +377,7 @@ export const rejectProviderOffer = async (req, res) => {
     serviceRequest.providerOffer.customerResponseAt = new Date();
     serviceRequest.providerId = null;
 
-    await serviceRequest.save();
+    await saveServiceRequest(serviceRequest);
 
     res.status(200).json({
       message: "Provider offer rejected successfully",
@@ -424,7 +441,7 @@ export const acceptDirectBooking = async (req, res) => {
     };
     serviceRequest.acceptedAt = new Date();
 
-    await serviceRequest.save();
+    await saveServiceRequest(serviceRequest);
 
     res.status(200).json({
       message: "Booking accepted successfully",
@@ -466,7 +483,7 @@ export const rejectDirectBooking = async (req, res) => {
       responseMessage: responseMessage || 'Booking rejected'
     };
 
-    await serviceRequest.save();
+    await saveServiceRequest(serviceRequest);
 
     res.status(200).json({
       message: "Booking rejected successfully",
