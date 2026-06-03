@@ -1,7 +1,58 @@
-import React from 'react';
-import { FileText, Users, DollarSign, UserPlus, Search, CheckCircle, Shield, Clock, Star, MessageSquare } from 'lucide-react';
+import React, { useRef, useState } from 'react';
+import { FileText, Users, DollarSign, UserPlus, Search, CheckCircle, Shield, Clock, Star, MessageSquare, CreditCard, UserCheck, Sparkles } from 'lucide-react';
+
+const sectionTitle = {
+  fontSize: '32px',
+  fontWeight: 'bold',
+  color: '#1a202c',
+  marginBottom: '16px',
+  marginTop: '48px',
+};
+
+const sectionSubtitle = {
+  fontSize: '22px',
+  fontWeight: '600',
+  color: '#2d3748',
+  marginBottom: '12px',
+  marginTop: '28px',
+};
+
+const bodyText = {
+  fontSize: '16px',
+  color: '#4a5568',
+  lineHeight: '1.75',
+  marginBottom: '16px',
+};
+
+const bulletList = {
+  listStyle: 'none',
+  padding: 0,
+  margin: '0 0 20px 0',
+};
+
+const bulletItem = (color = '#0066ff') => ({
+  fontSize: '15px',
+  color: '#4a5568',
+  marginBottom: '10px',
+  paddingLeft: '28px',
+  position: 'relative',
+  lineHeight: '1.6',
+});
 
 export default function HowItWorks() {
+  const [showLearnMore, setShowLearnMore] = useState(false);
+  const learnMoreRef = useRef(null);
+
+  const handleLearnMore = () => {
+    const next = !showLearnMore;
+    setShowLearnMore(next);
+    if (next) {
+      setTimeout(() => {
+        learnMoreRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }, 50);
+    }
+  };
+
   const forCustomers = [
     {
       step: '1',
@@ -113,6 +164,60 @@ export default function HowItWorks() {
     }
   ];
 
+  const keyFeatures = [
+    {
+      title: 'Secure Payments',
+      description: 'All transactions are handled safely through the platform. Payments are only released when the customer is satisfied with the work.',
+      icon: CreditCard,
+      color: '#10b981',
+    },
+    {
+      title: 'Verified Workers',
+      description: 'We prioritize safety. Workers go through verification processes to ensure trust and reliability.',
+      icon: UserCheck,
+      color: '#3b82f6',
+    },
+    {
+      title: 'Real Reviews & Ratings',
+      description: 'Make informed decisions by checking genuine feedback from other users.',
+      icon: Star,
+      color: '#f59e0b',
+    },
+    {
+      title: 'Smart Matching',
+      description: 'Our system helps connect the right worker to the right task quickly and efficiently.',
+      icon: Sparkles,
+      color: '#8b5cf6',
+    },
+    {
+      title: 'In-App Communication',
+      description: 'Chat directly with customers or workers to clarify requirements and avoid misunderstandings.',
+      icon: MessageSquare,
+      color: '#6366f1',
+    },
+  ];
+
+  const whyStandOut = [
+    'Easy-to-use platform for everyone',
+    'Saves time compared to traditional hiring',
+    'Transparent pricing with no hidden costs',
+    'Flexible earning opportunities',
+    'Safe and reliable environment',
+  ];
+
+  const whoCanUse = [
+    'Homeowners needing repairs or services',
+    'Busy individuals who need quick help',
+    'Skilled workers looking for extra income',
+    'Freelancers who want flexible jobs',
+  ];
+
+  const getStarted = [
+    'Post your first task in minutes',
+    'Find trusted workers near you',
+    'Start earning with your skills',
+  ];
+
   return (
     <div style={{ minHeight: '100vh', backgroundColor: '#f8f9fa', fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif' }}>
       {/* Header */}
@@ -135,7 +240,7 @@ export default function HowItWorks() {
         }}>
           Hire Right
         </div>
-        
+
         <nav style={{ display: 'flex', gap: '35px', alignItems: 'center' }}>
           <a href="/" style={{ textDecoration: 'none', color: '#333', fontSize: '16px', fontWeight: '500' }}>Home</a>
           <a href="/services" style={{ textDecoration: 'none', color: '#333', fontSize: '16px', fontWeight: '500' }}>Services</a>
@@ -253,7 +358,7 @@ export default function HowItWorks() {
                     </div>
                     <Icon size={55} color={item.color} strokeWidth={2} />
                   </div>
-                  
+
                   <h3 style={{
                     fontSize: '26px',
                     fontWeight: '600',
@@ -262,7 +367,7 @@ export default function HowItWorks() {
                   }}>
                     {item.title}
                   </h3>
-                  
+
                   <p style={{
                     fontSize: '16px',
                     color: '#4a5568',
@@ -368,7 +473,7 @@ export default function HowItWorks() {
                     </div>
                     <Icon size={55} color={item.color} strokeWidth={2} />
                   </div>
-                  
+
                   <h3 style={{
                     fontSize: '26px',
                     fontWeight: '600',
@@ -377,7 +482,7 @@ export default function HowItWorks() {
                   }}>
                     {item.title}
                   </h3>
-                  
+
                   <p style={{
                     fontSize: '16px',
                     color: '#4a5568',
@@ -483,7 +588,7 @@ export default function HowItWorks() {
                   }}>
                     <Icon size={40} color={item.color} strokeWidth={2} />
                   </div>
-                  
+
                   <h3 style={{
                     fontSize: '22px',
                     fontWeight: '600',
@@ -492,7 +597,7 @@ export default function HowItWorks() {
                   }}>
                     {item.title}
                   </h3>
-                  
+
                   <p style={{
                     fontSize: '15px',
                     color: '#718096',
@@ -527,11 +632,12 @@ export default function HowItWorks() {
             marginBottom: '40px',
             opacity: 0.95
           }}>
-            Join thousands who trust Hire Right. Whether you need help or want to earn, we've got you covered.
+            Join thousands who trust Hire Right. Whether you need help or want to earn, we&apos;ve got you covered.
           </p>
-          <div style={{ display: 'flex', justifyContent: 'center' }}>
-            <a
-              href="/services"
+          <div style={{ display: 'flex', justifyContent: 'center', gap: '16px', flexWrap: 'wrap' }}>
+            <button
+              type="button"
+              onClick={handleLearnMore}
               style={{
                 backgroundColor: '#fff',
                 color: '#0066ff',
@@ -542,15 +648,210 @@ export default function HowItWorks() {
                 fontWeight: '600',
                 cursor: 'pointer',
                 transition: 'all 0.3s',
-                textDecoration: 'none',
-                display: 'inline-block'
               }}
             >
-              Learn More
+              {showLearnMore ? 'Show Less' : 'Learn More'}
+            </button>
+            <a
+              href="/services"
+              style={{
+                backgroundColor: 'transparent',
+                color: '#fff',
+                border: '2px solid #fff',
+                borderRadius: '30px',
+                padding: '14px 36px',
+                fontSize: '18px',
+                fontWeight: '600',
+                cursor: 'pointer',
+                textDecoration: 'none',
+                display: 'inline-block',
+              }}
+            >
+              Browse Services
             </a>
           </div>
         </div>
       </section>
+
+      {/* Learn More detailed content */}
+      {showLearnMore && (
+        <section
+          ref={learnMoreRef}
+          id="learn-more-details"
+          style={{
+            padding: '80px 50px',
+            backgroundColor: '#fff',
+            borderTop: '4px solid #0066ff',
+          }}
+        >
+          <div style={{ maxWidth: '800px', margin: '0 auto' }}>
+            <h2 style={{
+              fontSize: '40px',
+              fontWeight: 'bold',
+              color: '#1a202c',
+              marginBottom: '8px',
+              textAlign: 'center',
+            }}>
+              Learn More About Hire Right
+            </h2>
+
+            <h3 style={{ ...sectionTitle, marginTop: '40px' }}>What is Hire Right?</h3>
+            <p style={bodyText}>
+              Hire Right is a smart and simple platform that connects customers with skilled workers for everyday tasks.
+              Whether you need help at home or want to earn using your skills, Hire Right makes the process fast, secure, and reliable.
+            </p>
+            <p style={bodyText}>
+              From posting a task to completing payments, everything happens in one place—saving you time and effort.
+            </p>
+
+            <h3 style={sectionTitle}>How Hire Right Works</h3>
+
+            <h4 style={sectionSubtitle}>For Customers</h4>
+            <p style={bodyText}>Hire Right helps you get things done without stress.</p>
+            <ul style={bulletList}>
+              {['Post tasks within seconds', 'Connect with verified workers', 'Compare prices and ratings', 'Pay securely after completion'].map((item) => (
+                <li key={item} style={bulletItem()}>
+                  <span style={{ position: 'absolute', left: 0, color: '#10b981', fontWeight: 'bold' }}>✓</span>
+                  {item}
+                </li>
+              ))}
+            </ul>
+            <p style={{ ...bodyText, fontStyle: 'italic', color: '#2d3748' }}>You stay in control from start to finish.</p>
+
+            <h4 style={sectionSubtitle}>For Workers</h4>
+            <p style={bodyText}>Turn your free time into income with flexible opportunities.</p>
+            <ul style={bulletList}>
+              {['Create a professional profile', 'Discover tasks that match your skills', 'Communicate directly with clients', 'Get paid securely and build your reputation'].map((item) => (
+                <li key={item} style={bulletItem('#3b82f6')}>
+                  <span style={{ position: 'absolute', left: 0, color: '#3b82f6', fontWeight: 'bold' }}>✓</span>
+                  {item}
+                </li>
+              ))}
+            </ul>
+            <p style={{ ...bodyText, fontStyle: 'italic', color: '#2d3748' }}>Work when you want, where you want.</p>
+
+            <h3 style={sectionTitle}>Key Features</h3>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+              {keyFeatures.map((feature) => {
+                const Icon = feature.icon;
+                return (
+                  <div
+                    key={feature.title}
+                    style={{
+                      display: 'flex',
+                      gap: '20px',
+                      alignItems: 'flex-start',
+                      padding: '24px',
+                      backgroundColor: '#f8fafc',
+                      borderRadius: '12px',
+                      border: '1px solid #e2e8f0',
+                    }}
+                  >
+                    <div style={{
+                      width: '52px',
+                      height: '52px',
+                      borderRadius: '50%',
+                      backgroundColor: feature.color + '20',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      flexShrink: 0,
+                    }}>
+                      <Icon size={26} color={feature.color} strokeWidth={2} />
+                    </div>
+                    <div>
+                      <h4 style={{ fontSize: '18px', fontWeight: '600', color: '#2d3748', marginBottom: '8px' }}>
+                        {feature.title}
+                      </h4>
+                      <p style={{ fontSize: '15px', color: '#4a5568', lineHeight: '1.65', margin: 0 }}>
+                        {feature.description}
+                      </p>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            <h3 style={sectionTitle}>Why Hire Right Stands Out</h3>
+            <ul style={bulletList}>
+              {whyStandOut.map((item) => (
+                <li key={item} style={bulletItem()}>
+                  <span style={{ position: 'absolute', left: 0, color: '#0066ff', fontWeight: 'bold' }}>✔</span>
+                  {item}
+                </li>
+              ))}
+            </ul>
+
+            <h3 style={sectionTitle}>Who Can Use Hire Right?</h3>
+            <p style={bodyText}>Hire Right is perfect for:</p>
+            <ul style={bulletList}>
+              {whoCanUse.map((item) => (
+                <li key={item} style={bulletItem()}>
+                  <span style={{ position: 'absolute', left: 0, color: '#0066ff' }}>•</span>
+                  {item}
+                </li>
+              ))}
+            </ul>
+
+            <h3 style={sectionTitle}>Our Mission</h3>
+            <p style={bodyText}>
+              Our goal is to simplify how people find help and work. We aim to create a trusted platform where customers
+              and workers can connect safely, and efficiently.
+            </p>
+
+            <h3 style={sectionTitle}>Get Started Today</h3>
+            <p style={bodyText}>
+              Join Hire Right and experience a better way to get things done or earn money.
+            </p>
+            <ul style={bulletList}>
+              {getStarted.map((item) => (
+                <li key={item} style={bulletItem('#10b981')}>
+                  <span style={{ position: 'absolute', left: 0, color: '#10b981', fontWeight: 'bold' }}>✓</span>
+                  {item}
+                </li>
+              ))}
+            </ul>
+
+            <div style={{
+              display: 'flex',
+              justifyContent: 'center',
+              gap: '16px',
+              marginTop: '48px',
+              flexWrap: 'wrap',
+            }}>
+              <a
+                href="/signup"
+                style={{
+                  backgroundColor: '#0066ff',
+                  color: '#fff',
+                  borderRadius: '30px',
+                  padding: '14px 32px',
+                  fontSize: '16px',
+                  fontWeight: '600',
+                  textDecoration: 'none',
+                }}
+              >
+                Sign Up
+              </a>
+              <a
+                href="/services"
+                style={{
+                  backgroundColor: '#fff',
+                  color: '#0066ff',
+                  border: '2px solid #0066ff',
+                  borderRadius: '30px',
+                  padding: '12px 30px',
+                  fontSize: '16px',
+                  fontWeight: '600',
+                  textDecoration: 'none',
+                }}
+              >
+                Post a Task
+              </a>
+            </div>
+          </div>
+        </section>
+      )}
 
       {/* Footer */}
       <footer style={{

@@ -90,6 +90,35 @@ npm start
 
 Scan the QR code with Expo Go, or press `a` / `i` for Android/iOS simulators.
 
+### Google sign-in (optional)
+
+Set in `provider-mobile/.env`:
+
+```
+EXPO_PUBLIC_GOOGLE_CLIENT_ID=your-web-client-id.apps.googleusercontent.com
+```
+
+For **Android** (required when running on Expo Go or a device), create an **Android** OAuth client in [Google Cloud Console](https://console.cloud.google.com/apis/credentials):
+
+| Field | Expo Go value |
+|-------|----------------|
+| Package name | `host.exp.exponent` |
+| SHA-1 | `27:57:BC:89:88:9F:7E:0E:84:49:CE:98:47:46:EF:BC:26:C6:D6:52` |
+
+Add the Android client ID to `.env` (or it falls back to the web client ID):
+
+```
+EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID=your-android-client-id.apps.googleusercontent.com
+```
+
+For **iOS**, create an iOS OAuth client and optionally set:
+
+```
+EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID=your-ios-client-id.apps.googleusercontent.com
+```
+
+Restart Expo after changing `.env`: `npx expo start --clear`
+
 ## API endpoints used
 
 | Action | Method | Endpoint |

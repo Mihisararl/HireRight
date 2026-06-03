@@ -68,6 +68,7 @@ const ProviderDashboard = () => {
     portfolioPhoto: null,
     city: '',
     district: '',
+    nicNumber: '',
     idDocument: null,
     bankName: '',
     accountNumber: '',
@@ -373,6 +374,11 @@ const ProviderDashboard = () => {
     return errs;
   };
 
+  const isValidNicNumber = (value) => {
+    const nic = String(value || '').trim().toUpperCase();
+    return /^\d{9}[VX]$/.test(nic) || /^\d{12}$/.test(nic);
+  };
+
   const validateRegStep3 = () => {
     const errs = {};
     if (!regForm.city.trim()) errs.city = 'City is required';
@@ -381,8 +387,13 @@ const ProviderDashboard = () => {
     if (!regForm.accountNumber.trim()) errs.accountNumber = 'Account number is required';
     if (!regForm.branch.trim()) errs.branch = 'Branch is required';
     if (!regForm.accountHolderName.trim()) errs.accountHolderName = 'Account holder name is required';
+    if (!regForm.nicNumber.trim()) {
+      errs.nicNumber = 'NIC number is required';
+    } else if (!isValidNicNumber(regForm.nicNumber)) {
+      errs.nicNumber = 'Enter a valid NIC (9 digits + V/X or 12 digits)';
+    }
     if (!regForm.idDocument) {
-      errs.idDocument = 'ID document (NIC/Driving License) is required';
+      errs.idDocument = 'NIC photo upload is required';
     }
     if (!regForm.agreedToBackgroundCheck) {
       errs.agreedToBackgroundCheck = 'You must agree to the background check';
@@ -433,6 +444,7 @@ const ProviderDashboard = () => {
           branch: regForm.branch,
           accountHolderName: regForm.accountHolderName,
           agreedToBackgroundCheck: regForm.agreedToBackgroundCheck,
+          nicNumber: regForm.nicNumber.trim().toUpperCase(),
           portfolioPhoto: regForm.portfolioPhoto ? await fileToDataUrl(regForm.portfolioPhoto) : '',
           idDocument: regForm.idDocument ? await fileToDataUrl(regForm.idDocument) : ''
         };
@@ -454,6 +466,7 @@ const ProviderDashboard = () => {
           portfolioPhoto: null,
           city: '',
           district: '',
+          nicNumber: '',
           idDocument: null,
           bankName: '',
           accountNumber: '',
@@ -1910,7 +1923,7 @@ const ProviderDashboard = () => {
                       </div>
                     </div>
 
-                    {/* ID Document Upload Section */}
+                    {/* NIC Details */}
                     <div style={{ background: 'linear-gradient(135deg, #eff6ff, #dbeafe)', border: '2px solid #93c5fd', borderRadius: '12px', padding: '20px', marginTop: '8px' }}>
                       <div style={{ display: 'flex', gap: '12px' }}>
                         <div style={{ flexShrink: 0 }}>
@@ -1920,11 +1933,24 @@ const ProviderDashboard = () => {
                         </div>
                         <div style={{ flex: 1 }}>
                           <h4 style={{ fontSize: '15px', fontWeight: '700', color: '#1e3a8a', marginBottom: '8px' }}>
-                            ID Verification Document <span style={{ color: '#ef4444' }}>*</span>
+                            NIC Verification <span style={{ color: '#ef4444' }}>*</span>
                           </h4>
                           <p style={{ fontSize: '13px', color: '#1e40af', marginBottom: '12px' }}>
-                            Please upload a clear photo of your NIC (National Identity Card) or Driving License for identity verification.
+                            Enter your National Identity Card number and upload a clear photo of your NIC for verification.
                           </p>
+                          <div style={{ marginBottom: '12px' }}>
+                            <label style={{ display: 'block', fontSize: '13px', fontWeight: '600', color: '#334155', marginBottom: '6px' }}>
+                              NIC Number <span style={{ color: '#ef4444' }}>*</span>
+                            </label>
+                            <input
+                              name="nicNumber"
+                              value={regForm.nicNumber}
+                              onChange={handleRegChange}
+                              placeholder="123456789V or 200012345678"
+                              style={{ width: '100%', padding: '10px 12px', borderRadius: '8px', border: `2px solid ${regErrors.nicNumber ? '#fca5a5' : '#e2e8f0'}`, fontSize: '14px', outline: 'none', textTransform: 'uppercase' }}
+                            />
+                            {regErrors.nicNumber && <div style={{ color: '#ef4444', fontSize: '12px', marginTop: '4px' }}>{regErrors.nicNumber}</div>}
+                          </div>
 
                           <div style={{ border: `2px dashed ${regErrors.idDocument ? '#fca5a5' : '#93c5fd'}`, borderRadius: '8px', padding: '24px', textAlign: 'center', cursor: 'pointer', background: 'white', transition: 'all 0.3s' }}>
                             <input type="file" accept="image/png,image/jpeg,image/jpg,application/pdf" onChange={handleIdUpload} style={{ display: 'none' }} id="id-upload-modal" />
@@ -1936,8 +1962,8 @@ const ProviderDashboard = () => {
                                   <svg style={{ width: '40px', height: '40px', margin: '0 auto 8px', color: '#60a5fa' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
                                   </svg>
-                                  <p style={{ fontSize: '13px', color: '#475569', fontWeight: '500', marginBottom: '4px' }}>Click to upload ID document</p>
-                                  <p style={{ fontSize: '11px', color: '#94a3b8', margin: 0 }}>NIC or Driving License (PNG, JPG, or PDF - max 5MB)</p>
+                                  <p style={{ fontSize: '13px', color: '#475569', fontWeight: '500', marginBottom: '4px' }}>Click to upload NIC photo</p>
+                                  <p style={{ fontSize: '11px', color: '#94a3b8', margin: 0 }}>PNG, JPG, or PDF — max 5MB</p>
                                 </>
                               )}
                             </label>

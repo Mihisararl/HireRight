@@ -85,6 +85,12 @@ const workerRegistrationRequestSchema = new mongoose.Schema(
       required: true
     },
 
+    nicNumber: {
+      type: String,
+      trim: true,
+      uppercase: true
+    },
+
     bankName: {
       type: String,
       required: true,

@@ -46,26 +46,29 @@ export const formatLocationDisplay = (location) => {
 
 /** Backfill missing address on legacy service requests before Mongoose save(). */
 export const ensureStoredLocation = (serviceRequest) => {
-  if (!serviceRequest?.location || typeof serviceRequest.location !== 'object') {
-    serviceRequest.location = { address: 'Address not provided' };
+  if (!serviceRequest) return;
+
+  // Handle legacy records where location may be a raw string
+  // and avoid mutating potentially non-plain objects in-place.
+  const normalized = normalizeIncomingLocation(serviceRequest.location);
+  if (normalized?.address) {
+    serviceRequest.location = normalized;
     return;
   }
 
   const loc = serviceRequest.location;
-  const address = String(loc.address || '').trim();
-  if (address) {
-    loc.address = address;
-    return;
-  }
-
-  const lat = Number(loc.lat);
-  const lng = Number(loc.lng);
+  const lat = Number(loc?.lat);
+  const lng = Number(loc?.lng);
   if (Number.isFinite(lat) && Number.isFinite(lng)) {
-    loc.address = `${lat}, ${lng}`;
+    serviceRequest.location = {
+      address: `${lat}, ${lng}`,
+      lat,
+      lng,
+    };
     return;
   }
 
-  loc.address = 'Address not provided';
+  serviceRequest.location = { address: 'Address not provided' };
 };
 
 export const clearProviderLiveLocation = async (userId) => {

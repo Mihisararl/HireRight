@@ -1,14 +1,25 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Wrench, Home as HomeIcon, Camera, Paintbrush, Truck, Sparkles, FileText, Handshake, DollarSign } from 'lucide-react';
 
 export default function Home() {
+  const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState('');
 
-  const handleSearch = () => {
-    console.log('Searching for:', searchQuery);
+  const goToServicesSearch = (query) => {
+    const trimmed = String(query || '').trim();
+    if (trimmed) {
+      navigate(`/services?q=${encodeURIComponent(trimmed)}`);
+    } else {
+      navigate('/services');
+    }
   };
 
-  const handleKeyPress = (e) => {
+  const handleSearch = () => {
+    goToServicesSearch(searchQuery);
+  };
+
+  const handleKeyDown = (e) => {
     if (e.key === 'Enter') {
       handleSearch();
     }
@@ -197,7 +208,7 @@ export default function Home() {
             placeholder="What do you need help with?"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            onKeyPress={handleKeyPress}
+            onKeyDown={handleKeyDown}
             style={{
               flex: 1,
               border: 'none',
@@ -207,7 +218,7 @@ export default function Home() {
               backgroundColor: 'transparent'
             }}
           />
-          <button onClick={handleSearch} style={{
+          <button type="button" onClick={handleSearch} style={{
             backgroundColor: '#0066ff',
             color: '#fff',
             border: 'none',
@@ -246,6 +257,8 @@ export default function Home() {
           {['Cleaning', 'Repairs', 'Moving', 'Painting', 'Photography'].map((service) => (
             <button
               key={service}
+              type="button"
+              onClick={() => goToServicesSearch(service)}
               style={{
                 backgroundColor: '#fff',
                 border: '1px solid #ddd',
@@ -478,7 +491,10 @@ export default function Home() {
             Join thousands of happy customers who trust Hire Right for their daily tasks
           </p>
           <div style={{ display: 'flex', gap: '20px', justifyContent: 'center', flexWrap: 'wrap' }}>
-            <button style={{
+            <button
+              type="button"
+              onClick={() => navigate('/login')}
+              style={{
               backgroundColor: '#fff',
               color: '#0066ff',
               border: 'none',
@@ -491,7 +507,10 @@ export default function Home() {
             }}>
               Post a Task
             </button>
-            <button style={{
+            <button
+              type="button"
+              onClick={() => navigate('/become-a-worker')}
+              style={{
               backgroundColor: 'transparent',
               color: '#fff',
               border: '2px solid #fff',
