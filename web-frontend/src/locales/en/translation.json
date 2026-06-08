@@ -391,5 +391,131 @@
       "cookies": "Cookie Policy",
       "copyright": "© 2025 Hire Right. All rights reserved."
     }
+  },
+  "policies": {
+    "backToHome": "Back to Home",
+    "customer": {
+      "title": "Privacy Policy & Customer Terms",
+      "lastUpdated": "Last updated: June 2026",
+      "agreeLabel": "I have read and agree to the Privacy Policy and Customer Terms",
+      "agreePrefix": "I have read and agree to the",
+      "agreeRequired": "You must accept the Privacy Policy and Customer Terms to register",
+      "linkText": "Privacy Policy & Customer Terms",
+      "sections": [
+        {
+          "title": "1. Introduction",
+          "paragraphs": [
+            "Welcome to Hire Right. This Privacy Policy and Customer Terms explain how we collect, use, and protect your information when you use our platform to find and book service providers in Sri Lanka."
+          ]
+        },
+        {
+          "title": "2. Information We Collect",
+          "bullets": [
+            "Account details: name, email, phone number, address, and district",
+            "Service requests: job descriptions, preferred dates, location, and budget",
+            "Payment records processed through our secure payment partner (PayHere)",
+            "Communications, complaints, and reviews related to your bookings"
+          ]
+        },
+        {
+          "title": "3. How We Use Your Information",
+          "bullets": [
+            "To match you with suitable service providers",
+            "To process bookings, payments, and customer support",
+            "To improve platform safety, quality, and reliability",
+            "To send important updates about your account or bookings"
+          ]
+        },
+        {
+          "title": "4. Payments",
+          "paragraphs": [
+            "Payments are processed securely through the platform. You pay the agreed service amount shown at checkout. Hire Right facilitates the transaction between you and the service provider.",
+            "A platform commission of 5% is deducted from the service provider's payout on completed jobs. This is not charged separately to you as the customer at checkout, but it is part of how the platform operates."
+          ]
+        },
+        {
+          "title": "5. Complaints & 48-Hour Policy",
+          "paragraphs": [
+            "If you report an issue with a completed service, our team will review your complaint. When a complaint is marked as resolved, you have 48 hours to respond or reopen the complaint if the issue is not actually fixed.",
+            "If you do not respond or reopen the complaint within 48 hours after it is marked resolved, the payment will be released to the service provider. After that window, the complaint cannot be reopened and the payout is considered final."
+          ]
+        },
+        {
+          "title": "6. Your Responsibilities",
+          "bullets": [
+            "Provide accurate booking and contact information",
+            "Communicate respectfully with service providers",
+            "Report genuine issues promptly through the platform",
+            "Review resolved complaints within the 48-hour window if you disagree with the outcome"
+          ]
+        },
+        {
+          "title": "7. Contact",
+          "paragraphs": [
+            "For privacy or policy questions, contact Hire Right support through the platform Help section."
+          ]
+        }
+      ]
+    },
+    "worker": {
+      "title": "Worker Terms & Platform Policy",
+      "lastUpdated": "Last updated: June 2026",
+      "agreeLabel": "I agree to the Worker Terms & Platform Policy, including the 5% commission and 48-hour complaint policy",
+      "agreeRequired": "You must accept the Worker Terms & Platform Policy to register",
+      "linkText": "Worker Terms & Platform Policy",
+      "registrationAgreePrefix": "I consent to a background check and agree to the",
+      "registrationAgreeSuffix": ", including the 5% commission and 48-hour complaint policy",
+      "sections": [
+        {
+          "title": "1. Worker Agreement",
+          "paragraphs": [
+            "By registering as a worker on Hire Right, you agree to provide services professionally, honestly, and in line with customer bookings accepted through the platform."
+          ]
+        },
+        {
+          "title": "2. Background Check & Verification",
+          "paragraphs": [
+            "All workers must complete identity verification and consent to a background check. Approval is required before you can receive bookings on the platform."
+          ]
+        },
+        {
+          "title": "3. Platform Commission (5%)",
+          "paragraphs": [
+            "Hire Right charges a 5% commission on payments for completed jobs booked through the platform. This commission is deducted from your payout before funds are released to you.",
+            "Example: if a customer pays Rs. 10,000 for a completed job, the platform commission is Rs. 500 and your net payout is Rs. 9,500, subject to any complaint holds described below."
+          ]
+        },
+        {
+          "title": "4. 48-Hour Complaint & Payment Release Policy",
+          "paragraphs": [
+            "When a customer files a complaint about your work, payment may be held until the issue is reviewed. If the complaint is marked as resolved, the customer has 48 hours to respond or reopen the complaint.",
+            "If the customer does not respond or reopen the complaint within 48 hours after resolution, payment will be released to you (minus the 5% platform commission). If the customer reopens the complaint within that window, the review continues and payment remains on hold until the matter is closed."
+          ]
+        },
+        {
+          "title": "5. Payouts",
+          "bullets": [
+            "Payouts are released only after both parties mark the job complete, subject to complaint status",
+            "You must keep accurate bank details in your worker profile",
+            "Commission and complaint holds are applied automatically by the platform"
+          ]
+        },
+        {
+          "title": "6. Conduct",
+          "bullets": [
+            "Arrive on time and deliver the service described in your offer",
+            "Treat customers respectfully and safely",
+            "Do not request off-platform payments that bypass Hire Right",
+            "Do not misrepresent your skills, rates, or availability"
+          ]
+        },
+        {
+          "title": "7. Contact",
+          "paragraphs": [
+            "For questions about worker terms, commissions, or payouts, contact Hire Right support through the platform."
+          ]
+        }
+      ]
+    }
   }
 }

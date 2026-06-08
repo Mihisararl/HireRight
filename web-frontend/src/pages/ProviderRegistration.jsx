@@ -1,4 +1,6 @@
 import React, { useState } from 'react';
+import { Link } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { ChevronLeft } from 'lucide-react';
 import { registerProvider } from '../api/provider';
 
@@ -10,6 +12,7 @@ const fileToDataUrl = (file) => new Promise((resolve, reject) => {
 });
 
 const ProviderRegistration = () => {
+    const { t } = useTranslation();
     const [step, setStep] = useState(1);
     const [formData, setFormData] = useState({
         // Step 1: Personal Information
@@ -139,7 +142,7 @@ const ProviderRegistration = () => {
             newErrors.idDocument = 'NIC photo upload is required';
         }
         if (!formData.agreedToBackgroundCheck) {
-            newErrors.agreedToBackgroundCheck = 'You must agree to the background check';
+            newErrors.agreedToBackgroundCheck = t('policies.worker.agreeRequired');
         }
 
         setErrors(newErrors);
@@ -709,10 +712,11 @@ const ProviderRegistration = () => {
                                                     id="background-check"
                                                 />
                                                 <label htmlFor="background-check" className="text-sm text-slate-700 cursor-pointer">
-                                                    I consent to a background check and agree to the{' '}
-                                                    <a href="#" className="text-blue-600 hover:underline font-medium">Terms of Service</a>
-                                                    {' '}and{' '}
-                                                    <a href="#" className="text-blue-600 hover:underline font-medium">Privacy Policy</a>
+                                                    {t('policies.worker.registrationAgreePrefix')}{' '}
+                                                    <Link to="/worker-policy" target="_blank" className="text-blue-600 hover:underline font-medium">
+                                                        {t('policies.worker.linkText')}
+                                                    </Link>
+                                                    {t('policies.worker.registrationAgreeSuffix')}
                                                 </label>
                                             </div>
                                             {errors.agreedToBackgroundCheck && (

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useContext } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import {
   Search,
   Briefcase,
@@ -396,7 +396,7 @@ const ProviderDashboard = () => {
       errs.idDocument = 'NIC photo upload is required';
     }
     if (!regForm.agreedToBackgroundCheck) {
-      errs.agreedToBackgroundCheck = 'You must agree to the background check';
+      errs.agreedToBackgroundCheck = t('policies.worker.agreeRequired');
     }
     return errs;
   };
@@ -1990,7 +1990,11 @@ const ProviderDashboard = () => {
                           <div style={{ display: 'flex', gap: '12px', padding: '12px', background: 'white', borderRadius: '8px', border: `2px solid ${regErrors.agreedToBackgroundCheck ? '#fca5a5' : '#86efac'}` }}>
                             <input type="checkbox" name="agreedToBackgroundCheck" checked={regForm.agreedToBackgroundCheck} onChange={handleRegChange} style={{ width: '18px', height: '18px', cursor: 'pointer', marginTop: '2px' }} id="bg-check-modal" />
                             <label htmlFor="bg-check-modal" style={{ fontSize: '13px', color: '#1e293b', cursor: 'pointer', lineHeight: '1.5' }}>
-                              I consent to a background check and agree to the <a href="#" style={{ color: '#3b82f6', textDecoration: 'underline', fontWeight: '500' }}>Terms of Service</a> and <a href="#" style={{ color: '#3b82f6', textDecoration: 'underline', fontWeight: '500' }}>Privacy Policy</a>
+                              {t('policies.worker.registrationAgreePrefix')}{' '}
+                              <Link to="/worker-policy" target="_blank" style={{ color: '#3b82f6', textDecoration: 'underline', fontWeight: '500' }}>
+                                {t('policies.worker.linkText')}
+                              </Link>
+                              {t('policies.worker.registrationAgreeSuffix')}
                             </label>
                           </div>
                           {regErrors.agreedToBackgroundCheck && <div style={{ color: '#ef4444', fontSize: '12px', marginTop: '8px' }}>{regErrors.agreedToBackgroundCheck}</div>}

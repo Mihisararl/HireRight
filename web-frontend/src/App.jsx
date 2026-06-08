@@ -25,6 +25,7 @@ import ReportIssue from "./pages/ReportIssue";
 import CustomerSettings from "./pages/CustomerSettings";
 import ProviderSettings from "./pages/ProviderSettings";
 import CompleteProfile from "./pages/CompleteProfile";
+import PolicyPage from "./pages/PolicyPage";
 
 const googleClientId = process.env.REACT_APP_GOOGLE_CLIENT_ID || '';
 
@@ -42,6 +43,8 @@ function AppRoutes() {
           <Route path="/forgot-password" element={<ForgotPassword />} />
           <Route path="/reset-password/:token" element={<ResetPassword />} />
           <Route path="/signup" element={<Register />} />
+          <Route path="/privacy-policy" element={<PolicyPage />} />
+          <Route path="/worker-policy" element={<PolicyPage />} />
           <Route
             path="/complete-profile"
             element={

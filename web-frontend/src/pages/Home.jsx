@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { Wrench, Home as HomeIcon, Camera, Paintbrush, Sparkles, FileText, Handshake, DollarSign } from 'lucide-react';
 import LanguageSwitcher from '../components/LanguageSwitcher';
@@ -512,8 +512,8 @@ export default function Home() {
           <div>
             <h4 style={{ fontSize: '16px', fontWeight: '600', marginBottom: '15px' }}>{t('home.footer.legal')}</h4>
             <ul style={{ listStyle: 'none', padding: 0, margin: 0 }}>
-              <li style={{ marginBottom: '10px' }}><a href="#" style={{ color: '#a0aec0', textDecoration: 'none', fontSize: '14px' }}>{t('home.footer.privacy')}</a></li>
-              <li style={{ marginBottom: '10px' }}><a href="#" style={{ color: '#a0aec0', textDecoration: 'none', fontSize: '14px' }}>{t('home.footer.terms')}</a></li>
+              <li style={{ marginBottom: '10px' }}><Link to="/privacy-policy" style={{ color: '#a0aec0', textDecoration: 'none', fontSize: '14px' }}>{t('home.footer.privacy')}</Link></li>
+              <li style={{ marginBottom: '10px' }}><Link to="/worker-policy" style={{ color: '#a0aec0', textDecoration: 'none', fontSize: '14px' }}>{t('policies.worker.linkText')}</Link></li>
               <li style={{ marginBottom: '10px' }}><a href="#" style={{ color: '#a0aec0', textDecoration: 'none', fontSize: '14px' }}>{t('home.footer.cookies')}</a></li>
             </ul>
           </div>
