@@ -27,12 +27,15 @@ const serviceRequestSchema = new mongoose.Schema(
       type: String,
       required: true,
     },
-    estimatedDuration: {
-      type: String,
-    },
-    budget: {
+    /** Customer budget in LKR per day */
+    dailyBudget: {
       type: Number,
       required: true,
+      min: 1,
+    },
+    /** Legacy field kept for old records — do not use for new requests */
+    budget: {
+      type: Number,
     },
     location: {
       lat: { type: Number },
@@ -109,5 +112,13 @@ const serviceRequestSchema = new mongoose.Schema(
   },
   { timestamps: true }
 );
+
+serviceRequestSchema.pre('validate', function preValidateDailyBudget(next) {
+  // Legacy MongoDB documents may still have `budget` instead of `dailyBudget`
+  if ((this.dailyBudget == null || this.dailyBudget === undefined) && this.get('budget') != null) {
+    this.dailyBudget = Number(this.get('budget'));
+  }
+  next();
+});
 
 export default mongoose.model("ServiceRequest", serviceRequestSchema);

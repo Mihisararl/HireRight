@@ -8,6 +8,30 @@ import {
 } from "../utils/locationUtils.js";
 import { attachProviderProfilesToRequests } from "../utils/providerProfileUtils.js";
 
+const resolveDailyBudget = (payload) => {
+  const value = payload?.dailyBudget ?? payload?.budget;
+  const num = Number(value);
+  return Number.isFinite(num) && num > 0 ? num : null;
+};
+
+/** Map legacy budget field and strip removed fields for API responses */
+export const normalizeServiceRequest = (doc) => {
+  if (!doc) return doc;
+  const obj = typeof doc.toObject === 'function' ? doc.toObject() : { ...doc };
+  if (obj.dailyBudget == null && obj.budget != null) {
+    obj.dailyBudget = obj.budget;
+  }
+  delete obj.estimatedDuration;
+  return obj;
+};
+
+const mapRequests = (requests) => {
+  if (Array.isArray(requests)) {
+    return requests.map((item) => normalizeServiceRequest(item));
+  }
+  return normalizeServiceRequest(requests);
+};
+
 const saveServiceRequest = async (serviceRequest) => {
   ensureStoredLocation(serviceRequest);
   return serviceRequest.save();
@@ -18,7 +42,14 @@ export const createServiceRequest = async (req, res) => {
   try {
     // Coerce numeric fields if necessary
     const payload = { ...req.body, userId: req.user.id };
-    if (payload.budget) payload.budget = Number(payload.budget);
+    delete payload.estimatedDuration;
+
+    const dailyBudget = resolveDailyBudget(payload);
+    if (!dailyBudget) {
+      return res.status(400).json({ message: 'Daily budget (LKR per day) is required' });
+    }
+    payload.dailyBudget = dailyBudget;
+    delete payload.budget;
 
     const locationCheck = validateServiceLocation(payload.location);
     if (!locationCheck.valid) {
@@ -41,10 +72,16 @@ export const createServiceRequest = async (req, res) => {
 
     res.status(201).json({
       message: "Service request created successfully",
-      serviceRequest: newRequest,
+      serviceRequest: normalizeServiceRequest(newRequest),
     });
   } catch (error) {
     console.error('createServiceRequest error:', error);
+    if (error.name === 'ValidationError') {
+      return res.status(400).json({
+        message: error.message || 'Invalid service request data',
+        error: error.message,
+      });
+    }
     const resp = {
       message: "Failed to create service request",
       error: error.message,
@@ -58,7 +95,7 @@ export const createServiceRequest = async (req, res) => {
 export const getAllServiceRequests = async (req, res) => {
   try {
     const requests = await ServiceRequest.find().sort({ createdAt: -1 });
-    res.status(200).json(requests);
+    res.status(200).json(mapRequests(requests));
   } catch (error) {
     res.status(500).json({
       message: "Failed to fetch service requests",
@@ -75,7 +112,7 @@ export const getServiceRequestsByUser = async (req, res) => {
       .sort({ createdAt: -1 });
 
     const enrichedRequests = await attachProviderProfilesToRequests(requests);
-    res.status(200).json(enrichedRequests);
+    res.status(200).json(mapRequests(enrichedRequests));
   } catch (error) {
     res.status(500).json({
       message: "Failed to fetch service requests",
@@ -89,7 +126,16 @@ export const updateServiceRequest = async (req, res) => {
   try {
     const { id } = req.params;
     const payload = { ...req.body };
-    if (payload.budget) payload.budget = Number(payload.budget);
+    delete payload.estimatedDuration;
+
+    if (payload.dailyBudget !== undefined || payload.budget !== undefined) {
+      const dailyBudget = resolveDailyBudget(payload);
+      if (!dailyBudget) {
+        return res.status(400).json({ message: 'Daily budget (LKR per day) must be a positive number' });
+      }
+      payload.dailyBudget = dailyBudget;
+      delete payload.budget;
+    }
 
     if (payload.location !== undefined) {
       const locationCheck = validateServiceLocation(payload.location);
@@ -111,7 +157,7 @@ export const updateServiceRequest = async (req, res) => {
 
     res.status(200).json({
       message: "Service request updated successfully",
-      serviceRequest: updatedRequest,
+      serviceRequest: normalizeServiceRequest(updatedRequest),
     });
   } catch (error) {
     console.error('updateServiceRequest error:', error);
@@ -136,7 +182,7 @@ export const getAvailableServiceRequests = async (req, res) => {
       (request) => request.userId && request.userId.role === 'customer'
     );
 
-    res.status(200).json(filteredRequests);
+    res.status(200).json(mapRequests(filteredRequests));
   } catch (error) {
     res.status(500).json({
       message: "Failed to fetch available service requests",
@@ -183,7 +229,7 @@ export const acceptServiceRequest = async (req, res) => {
     const normalizedPrice = Number(proposedPrice);
     const offerPrice = Number.isFinite(normalizedPrice) && normalizedPrice > 0
       ? normalizedPrice
-      : serviceRequest.budget;
+      : (serviceRequest.dailyBudget ?? serviceRequest.budget);
 
     // Send offer to customer instead of directly accepting
     serviceRequest.status = "OfferSent";
@@ -200,7 +246,7 @@ export const acceptServiceRequest = async (req, res) => {
 
     res.status(200).json({
       message: "Offer sent to customer successfully",
-      serviceRequest,
+      serviceRequest: normalizeServiceRequest(serviceRequest),
     });
   } catch (error) {
     console.error('acceptServiceRequest error:', error);
@@ -217,7 +263,7 @@ export const getProviderServiceRequests = async (req, res) => {
     const requests = await ServiceRequest.find({ providerId: req.user.id })
       .populate('userId', 'name email')
       .sort({ createdAt: -1 });
-    res.status(200).json(requests);
+    res.status(200).json(mapRequests(requests));
   } catch (error) {
     res.status(500).json({
       message: "Failed to fetch provider service requests",
@@ -258,7 +304,7 @@ export const completeServiceRequest = async (req, res) => {
 
     res.status(200).json({
       message: "Provider completion recorded",
-      serviceRequest,
+      serviceRequest: normalizeServiceRequest(serviceRequest),
     });
   } catch (error) {
     console.error('completeServiceRequest error:', error);
@@ -304,7 +350,7 @@ export const completeServiceRequestByCustomer = async (req, res) => {
 
     res.status(200).json({
       message: "Customer completion recorded",
-      serviceRequest,
+      serviceRequest: normalizeServiceRequest(serviceRequest),
     });
   } catch (error) {
     console.error('completeServiceRequestByCustomer error:', error);
@@ -342,7 +388,7 @@ export const acceptProviderOffer = async (req, res) => {
 
     res.status(200).json({
       message: "Provider offer accepted successfully",
-      serviceRequest,
+      serviceRequest: normalizeServiceRequest(serviceRequest),
     });
   } catch (error) {
     console.error('acceptProviderOffer error:', error);
@@ -381,7 +427,7 @@ export const rejectProviderOffer = async (req, res) => {
 
     res.status(200).json({
       message: "Provider offer rejected successfully",
-      serviceRequest,
+      serviceRequest: normalizeServiceRequest(serviceRequest),
     });
   } catch (error) {
     console.error('rejectProviderOffer error:', error);
@@ -403,7 +449,7 @@ export const getDirectBookingRequests = async (req, res) => {
       .populate('userId', 'name email phone')
       .sort({ createdAt: -1 });
 
-    res.status(200).json(requests);
+    res.status(200).json(mapRequests(requests));
   } catch (error) {
     console.error('getDirectBookingRequests error:', error);
     res.status(500).json({
@@ -445,7 +491,7 @@ export const acceptDirectBooking = async (req, res) => {
 
     res.status(200).json({
       message: "Booking accepted successfully",
-      serviceRequest,
+      serviceRequest: normalizeServiceRequest(serviceRequest),
     });
   } catch (error) {
     console.error('acceptDirectBooking error:', error);
@@ -487,7 +533,7 @@ export const rejectDirectBooking = async (req, res) => {
 
     res.status(200).json({
       message: "Booking rejected successfully",
-      serviceRequest,
+      serviceRequest: normalizeServiceRequest(serviceRequest),
     });
   } catch (error) {
     console.error('rejectDirectBooking error:', error);

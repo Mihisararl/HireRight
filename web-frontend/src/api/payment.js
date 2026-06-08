@@ -5,6 +5,11 @@ export const getPayhereHash = async (payload) => {
   return response.data;
 };
 
+export const confirmPayment = async (payload) => {
+  const response = await api.post('/payment/confirm', payload);
+  return response.data;
+};
+
 export const getProviderPayments = async () => {
   const response = await api.get('/payment/provider');
   return response.data;

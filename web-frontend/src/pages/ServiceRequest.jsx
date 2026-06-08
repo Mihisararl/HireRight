@@ -13,8 +13,7 @@ const ServiceRequestPage = () => {
     description: "",
     preferredDate: "",
     preferredTime: "",
-    estimatedDuration: "",
-    budget: "",
+    dailyBudget: "",
     location: { address: '' },
     specificRequirements: "",
   });
@@ -33,7 +32,14 @@ const ServiceRequestPage = () => {
     }
 
     try {
-      await api.post("/services", formData);
+      const payload = {
+        ...formData,
+        dailyBudget: Number(formData.dailyBudget),
+      };
+      delete payload.budget;
+      delete payload.estimatedDuration;
+
+      await api.post("/services", payload);
       alert("Service request posted successfully ✅");
       navigate("/customer-dashboard", { state: { tab: 'posts' } });
       setFormData({
@@ -42,14 +48,14 @@ const ServiceRequestPage = () => {
         description: "",
         preferredDate: "",
         preferredTime: "",
-        estimatedDuration: "",
-        budget: "",
+        dailyBudget: "",
         location: { address: '' },
         specificRequirements: "",
       });
     } catch (error) {
       console.error("Error posting service request:", error);
-      alert("Failed to post service request. Please try again.");
+      const msg = error.response?.data?.message || error.response?.data?.error || "Failed to post service request. Please try again.";
+      alert(msg);
     }
   };
 
@@ -268,76 +274,42 @@ const ServiceRequestPage = () => {
               </div>
             </div>
 
-            {/* Duration & Budget */}
-            <div style={{
-              display: 'grid',
-              gridTemplateColumns: window.innerWidth >= 768 ? '1fr 1fr' : '1fr',
-              gap: '16px'
-            }}>
-              <div style={{ display: 'flex', flexDirection: 'column' }}>
-                <label style={{
-                  display: 'block',
+            {/* Daily budget */}
+            <div style={{ display: 'flex', flexDirection: 'column' }}>
+              <label style={{
+                display: 'block',
+                fontSize: '14px',
+                fontWeight: '500',
+                color: '#374151',
+                marginBottom: '8px'
+              }}>Budget per day (LKR) *</label>
+              <p style={{
+                margin: '0 0 8px',
+                fontSize: '13px',
+                color: '#6b7280',
+                lineHeight: 1.5
+              }}>
+                Enter how much you are willing to pay for one day of work.
+              </p>
+              <input
+                type="number"
+                name="dailyBudget"
+                min="1"
+                step="1"
+                value={formData.dailyBudget}
+                onChange={handleChange}
+                style={{
+                  width: '100%',
+                  padding: '10px 12px',
                   fontSize: '14px',
-                  fontWeight: '500',
-                  color: '#374151',
-                  marginBottom: '8px'
-                }}>Estimated Duration</label>
-                <select
-                  name="estimatedDuration"
-                  value={formData.estimatedDuration}
-                  onChange={handleChange}
-                  style={{
-                    width: '100%',
-                    padding: '10px 12px',
-                    fontSize: '14px',
-                    border: '1px solid #d1d5db',
-                    borderRadius: '8px',
-                    outline: 'none',
-                    backgroundColor: '#fff',
-                    cursor: 'pointer',
-                    boxSizing: 'border-box'
-                  }}
-                >
-                  <option value="">Select duration</option>
-                  <option value="1-2">1–2 hours</option>
-                  <option value="2-4">2–4 hours</option>
-                  <option value="4-8">4–8 hours</option>
-                  <option value="full-day">Full day</option>
-                </select>
-              </div>
-
-              <div style={{ position: 'relative' }}>
-                <label style={{
-                  display: 'block',
-                  fontSize: '14px',
-                  fontWeight: '500',
-                  color: '#374151',
-                  marginBottom: '8px'
-                }}>Budget (LKR) *</label>
-                <span style={{
-                  position: 'absolute',
-                  left: '12px',
-                  top: '38px',
-                  color: '#9ca3af',
-                  pointerEvents: 'none'
-                }} size={18} />
-                <input
-                  type="number"
-                  name="budget"
-                  value={formData.budget}
-                  onChange={handleChange}
-                  style={{
-                    width: '100%',
-                    padding: '10px 12px 10px 40px',
-                    fontSize: '14px',
-                    border: '1px solid #d1d5db',
-                    borderRadius: '8px',
-                    outline: 'none',
-                    boxSizing: 'border-box'
-                  }}
-                  required
-                />
-              </div>
+                  border: '1px solid #d1d5db',
+                  borderRadius: '8px',
+                  outline: 'none',
+                  boxSizing: 'border-box'
+                }}
+                placeholder="e.g. 5000"
+                required
+              />
             </div>
 
             <LocationPicker
@@ -451,7 +423,7 @@ const ServiceRequestPage = () => {
               margin: 0
             }}>
               <li>• Be detailed</li>
-              <li>• Set a fair budget</li>
+              <li>• Set a fair daily budget</li>
               <li>• Respond quickly</li>
             </ul>
           </div>

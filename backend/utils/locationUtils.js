@@ -48,11 +48,19 @@ export const formatLocationDisplay = (location) => {
 export const ensureStoredLocation = (serviceRequest) => {
   if (!serviceRequest) return;
 
-  // Handle legacy records where location may be a raw string
-  // and avoid mutating potentially non-plain objects in-place.
+  const assignLocation = (nextLocation) => {
+    if (typeof serviceRequest.set === 'function') {
+      serviceRequest.set('location', nextLocation);
+      serviceRequest.markModified('location');
+    } else {
+      serviceRequest.location = nextLocation;
+    }
+  };
+
+  // Legacy records may store location as a plain string
   const normalized = normalizeIncomingLocation(serviceRequest.location);
   if (normalized?.address) {
-    serviceRequest.location = normalized;
+    assignLocation(normalized);
     return;
   }
 
@@ -60,15 +68,15 @@ export const ensureStoredLocation = (serviceRequest) => {
   const lat = Number(loc?.lat);
   const lng = Number(loc?.lng);
   if (Number.isFinite(lat) && Number.isFinite(lng)) {
-    serviceRequest.location = {
+    assignLocation({
       address: `${lat}, ${lng}`,
       lat,
       lng,
-    };
+    });
     return;
   }
 
-  serviceRequest.location = { address: 'Address not provided' };
+  assignLocation({ address: 'Address not provided' });
 };
 
 export const clearProviderLiveLocation = async (userId) => {

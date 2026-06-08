@@ -117,6 +117,9 @@
       "noCompletedJobsText": "Finished services will appear here with payment details and the option to leave a review."
     },
     "budget": "Budget",
+    "dailyBudget": "Budget per day (LKR)",
+    "dailyBudgetHint": "Amount you are willing to pay for one day of work",
+    "perDay": "per day",
     "totalAmount": "Total Amount",
     "markTaskCompleted": "Mark Task Completed",
     "awaitingProvider": "Awaiting Provider Confirmation",
@@ -136,7 +139,6 @@
     "description": "Description",
     "preferredDate": "Preferred Date",
     "preferredTime": "Preferred Time",
-    "estimatedDuration": "Estimated Duration",
     "specificRequirements": "Specific Requirements",
     "rateProvider": "Rate Your Provider",
     "review": "Review",
@@ -217,7 +219,7 @@
     "date": "Date",
     "time": "Time",
     "location": "Location",
-    "budget": "Budget",
+    "budget": "Budget per day",
     "description": "Description",
     "specialRequirements": "Special Requirements",
     "acceptBooking": "Accept Booking",
@@ -321,6 +323,73 @@
       "saving": "Saving...",
       "profileUpdated": "Provider profile updated successfully!",
       "failedUpdateProfile": "Failed to update profile"
+    }
+  },
+  "home": {
+    "nav": {
+      "home": "Home",
+      "services": "Services",
+      "howItWorks": "How It Works",
+      "becomeWorker": "Become a Worker",
+      "login": "Login",
+      "signup": "Signup",
+      "administrator": "Administrator"
+    },
+    "hero": {
+      "title": "Find trusted help for your daily tasks",
+      "subtitle": "Hire skilled professionals for home and personal services — quick, safe, and affordable.",
+      "searchPlaceholder": "What do you need help with?",
+      "search": "Search",
+      "popular": "Popular:"
+    },
+    "tags": {
+      "cleaning": "Cleaning",
+      "repairs": "Repairs",
+      "moving": "Moving",
+      "painting": "Painting",
+      "photography": "Photography"
+    },
+    "popularServices": {
+      "title": "Popular Services",
+      "subtitle": "Whatever you need, we've got you covered",
+      "homeRepair": "Home Repair",
+      "plumbing": "Plumbing",
+      "outdoorHelp": "Out-Door Help",
+      "photography": "Photography",
+      "householdHelp": "Household Help",
+      "trending": "Trending"
+    },
+    "howItWorks": {
+      "title": "How It Works",
+      "subtitle": "Getting help is simple. Just follow these three easy steps.",
+      "step1Title": "Post a Task",
+      "step1Desc": "Describe what you need done and when you need it. It's quick and easy.",
+      "step2Title": "Get Matched",
+      "step2Desc": "Get profiles, ratings, and prices. Then choose the right person for the job.",
+      "step3Title": "Pay Securely",
+      "step3Desc": "Payment is cashless and secure. When the task is done, you can leave a review."
+    },
+    "cta": {
+      "title": "Ready to get started?",
+      "subtitle": "Join thousands of happy customers who trust Hire Right for their daily tasks",
+      "postTask": "Post a Task",
+      "becomeWorker": "Become a Worker"
+    },
+    "footer": {
+      "tagline": "Your trusted platform for finding skilled professionals for all your daily tasks.",
+      "company": "Company",
+      "aboutUs": "About Us",
+      "careers": "Careers",
+      "press": "Press",
+      "support": "Support",
+      "helpCenter": "Help Center",
+      "safety": "Safety",
+      "contact": "Contact",
+      "legal": "Legal",
+      "privacy": "Privacy Policy",
+      "terms": "Terms of Service",
+      "cookies": "Cookie Policy",
+      "copyright": "© 2025 Hire Right. All rights reserved."
     }
   }
 }

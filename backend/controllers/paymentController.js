@@ -3,8 +3,48 @@ import mongoose from 'mongoose';
 import Payment from '../models/Payment.js';
 import Provider from '../models/Provider.js';
 import Complaint from '../models/Complaint.js';
+import ServiceRequest from '../models/ServiceRequest.js';
+import { getRequestPayableAmount } from '../utils/serviceRequestAmount.js';
 
 const md5 = (value) => crypto.createHash('md5').update(value).digest('hex');
+
+const PAYMENT_HOLD_DAYS = 3;
+
+const upsertServicePayment = async ({
+  userId,
+  providerId,
+  serviceRequestId,
+  amount,
+  currency = 'LKR',
+}) => {
+  const normalizedAmount = Number(amount);
+  if (!Number.isFinite(normalizedAmount) || normalizedAmount <= 0) {
+    throw new Error('Invalid payment amount');
+  }
+
+  const holdUntil = new Date();
+  holdUntil.setDate(holdUntil.getDate() + PAYMENT_HOLD_DAYS);
+
+  const payment = await Payment.findOneAndUpdate(
+    { serviceRequestId },
+    {
+      $set: {
+        userId,
+        providerId,
+        serviceRequestId,
+        amount: normalizedAmount,
+        currency,
+        status: 'pending',
+        payoutStatus: 'hold',
+        holdUntil,
+      },
+      $setOnInsert: { createdAt: new Date() },
+    },
+    { upsert: true, new: true }
+  );
+
+  return payment;
+};
 
 const getNgrokUrl = async () => {
   try {
@@ -99,22 +139,88 @@ export const handlePayhereNotify = async (req, res) => {
 
     console.log(`Recording payment - User: ${customerUserId}, Provider: ${providerId}, ServiceRequest: ${serviceRequestId}, Amount: ${amount}`);
 
-    const payment = new Payment({
+    if (!customerUserId || !serviceRequestId) {
+      console.warn('PayHere notify missing customer or service request id');
+      return res.status(200).json({ message: 'Missing metadata' });
+    }
+
+    await upsertServicePayment({
       userId: customerUserId,
       providerId,
       serviceRequestId,
       amount,
       currency,
-      status: 'pending'
     });
-
-    await payment.save();
     console.log('Payment recorded successfully in database.');
 
     res.status(200).json({ message: 'Payment recorded' });
   } catch (error) {
     console.error('handlePayhereNotify error:', error);
     res.status(500).json({ message: 'Failed to process notification' });
+  }
+};
+
+/** Called from frontend after PayHere onCompleted (localhost notify often unreachable) */
+export const confirmPayment = async (req, res) => {
+  try {
+    const { serviceRequestId, amount, providerUserId } = req.body || {};
+
+    if (!serviceRequestId || amount == null) {
+      return res.status(400).json({ message: 'serviceRequestId and amount are required' });
+    }
+
+    if (!mongoose.Types.ObjectId.isValid(serviceRequestId)) {
+      return res.status(400).json({ message: 'Invalid serviceRequestId' });
+    }
+
+    const serviceRequest = await ServiceRequest.findOne({
+      _id: serviceRequestId,
+      userId: req.user.id,
+    });
+
+    if (!serviceRequest) {
+      return res.status(404).json({ message: 'Service request not found or not authorized' });
+    }
+
+    if (!['Accepted', 'Confirmed'].includes(serviceRequest.status)) {
+      return res.status(400).json({ message: 'This booking is not ready for payment' });
+    }
+
+    const expectedAmount = getRequestPayableAmount(serviceRequest);
+    const paidAmount = Number(amount);
+
+    if (!Number.isFinite(paidAmount) || paidAmount <= 0) {
+      return res.status(400).json({ message: 'Invalid payment amount' });
+    }
+
+    if (expectedAmount > 0 && Math.abs(paidAmount - expectedAmount) > 0.01) {
+      return res.status(400).json({
+        message: `Payment amount must be Rs. ${expectedAmount.toFixed(2)}`,
+      });
+    }
+
+    const providerUser = providerUserId || serviceRequest.providerId;
+    let providerProfileId = null;
+    if (providerUser) {
+      const providerProfile = await Provider.findOne({ userId: providerUser }).select('_id');
+      providerProfileId = providerProfile?._id || null;
+    }
+
+    const payment = await upsertServicePayment({
+      userId: req.user.id,
+      providerId: providerProfileId,
+      serviceRequestId,
+      amount: paidAmount,
+      currency: 'LKR',
+    });
+
+    res.json({
+      message: 'Payment recorded successfully',
+      payment,
+    });
+  } catch (error) {
+    console.error('confirmPayment error:', error);
+    res.status(500).json({ message: 'Failed to record payment' });
   }
 };
 

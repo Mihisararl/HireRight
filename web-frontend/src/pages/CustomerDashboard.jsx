@@ -11,7 +11,7 @@ import LocationPicker from '../components/location/LocationPicker';
 import CustomerProviderTracking from '../components/location/CustomerProviderTracking';
 import ProviderOfferProfile from '../components/offers/ProviderOfferProfile';
 import LanguageSwitcher from '../components/LanguageSwitcher';
-import { formatLocationDisplay, hasCoordinates } from '../utils/locationHelpers';
+import { formatLocationDisplay, hasCoordinates, getRequestDailyBudget, getRequestPayableAmount } from '../utils/locationHelpers';
 import '../styles/CustomerDashboard.css';
 
 const isPendingProviderOffer = (request) => (
@@ -68,14 +68,22 @@ const CustomerDashboard = () => {
     }
   }, [location.state]);
 
+  const refreshPayments = useCallback(async () => {
+    try {
+      const paymentList = await getUserPayments();
+      setPayments(paymentList || []);
+    } catch (error) {
+      console.error('Failed to fetch payments:', error);
+    }
+  }, []);
+
   useEffect(() => {
     const loadDashboardData = async () => {
       const requests = await refreshServiceRequests();
       if (!requests) return;
 
       try {
-        const paymentList = await getUserPayments();
-        setPayments(paymentList || []);
+        await refreshPayments();
         const complaintList = await getUserComplaints();
         setComplaints(complaintList || []);
         const reviewList = await getUserReviews();
@@ -86,11 +94,20 @@ const CustomerDashboard = () => {
     };
 
     loadDashboardData();
-  }, [refreshServiceRequests]);
+  }, [refreshServiceRequests, refreshPayments]);
+
+  useEffect(() => {
+    if (!location.state?.paymentSuccess) return;
+
+    refreshPayments();
+    setActiveTab(location.state?.tab || 'active');
+    navigate(location.pathname, { replace: true, state: { tab: location.state?.tab || 'active' } });
+  }, [location.state?.paymentSuccess, location.pathname, location.state?.tab, navigate, refreshPayments]);
 
   useEffect(() => {
     const pollOffers = async () => {
       await refreshServiceRequests();
+      await refreshPayments();
     };
 
     const intervalId = setInterval(pollOffers, 30000);
@@ -101,7 +118,7 @@ const CustomerDashboard = () => {
       clearInterval(intervalId);
       window.removeEventListener('focus', handleFocus);
     };
-  }, [refreshServiceRequests]);
+  }, [refreshServiceRequests, refreshPayments]);
 
   useEffect(() => {
     const refreshComplaints = async () => {
@@ -142,9 +159,15 @@ const CustomerDashboard = () => {
       return;
     }
     try {
-      await updateServiceRequest(editingRequest._id, formData);
+      const payload = { ...formData };
+      delete payload.estimatedDuration;
+      if (payload.dailyBudget !== undefined && payload.dailyBudget !== '') {
+        payload.dailyBudget = Number(payload.dailyBudget);
+      }
+      delete payload.budget;
+      await updateServiceRequest(editingRequest._id, payload);
       setServiceRequests(serviceRequests.map(req =>
-        req._id === editingRequest._id ? { ...req, ...formData } : req
+        req._id === editingRequest._id ? { ...req, ...payload } : req
       ));
       setIsEditing(false);
       setEditingRequest(null);
@@ -201,7 +224,7 @@ const CustomerDashboard = () => {
 
   const completedBookings = serviceRequests.filter((request) => request.status === 'Completed');
 
-  const totalSpent = completedBookings.reduce((sum, request) => sum + (Number(request.budget) || 0), 0);
+  const totalSpent = completedBookings.reduce((sum, request) => sum + getRequestDailyBudget(request), 0);
 
   const stats = [
     { key: 'active', label: t('customer.stats.active'), value: String(activeBookings.length) },
@@ -232,6 +255,7 @@ const CustomerDashboard = () => {
     const statusLabel = getStatusDisplay(request.status);
     const isConfirmed = request.status === 'Accepted' || request.status === 'Confirmed';
     const payment = payments.find((item) => String(item.serviceRequestId) === String(request._id));
+    const payableAmount = getRequestPayableAmount(request);
     const isPaid = Boolean(payment);
     const paymentReleased = payment?.payoutStatus === 'paid';
     const complaint = complaints.find((item) => String(item.serviceRequestId) === String(request._id));
@@ -246,11 +270,10 @@ const CustomerDashboard = () => {
       statusColor: isConfirmed ? "#1d4ed8" : "#ca8a04",
       statusBg: isConfirmed ? "#dbeafe" : "#fef3c7",
       date: `${request.preferredDate} at ${request.preferredTime}`,
-      duration: request.estimatedDuration || t('common.notAvailable'),
       location: formatLocationDisplay(request.location),
       customerLocation: request.location,
-      amount: `Rs.${request.budget || 0}`,
-      amountValue: Number(request.budget) || 0,
+      amount: `Rs.${payableAmount.toLocaleString()}`,
+      amountValue: payableAmount,
       canPayNow: (request.status === 'Accepted' || request.status === 'Confirmed') && !isPaid,
       isPaid,
       canComplete: (request.status === 'Accepted' || request.status === 'Confirmed') && !request.customerCompleted,
@@ -1438,12 +1461,6 @@ const CustomerDashboard = () => {
                     <Calendar size={16} color="#3b82f6" />
                     <span>{request.preferredDate} at {request.preferredTime}</span>
                   </div>
-                  {request.estimatedDuration && (
-                    <div className="item-detail-row">
-                      <Clock size={16} color="#3b82f6" />
-                      <span>{request.estimatedDuration}</span>
-                    </div>
-                  )}
                   <div className="item-detail-row">
                     <MapPin size={16} color="#3b82f6" />
                     <span>{formatLocationDisplay(request.location)}</span>
@@ -1453,8 +1470,8 @@ const CustomerDashboard = () => {
                 {/* FOOTER */}
                 <div className="item-card-footer-flex">
                   <div className="item-budget-box">
-                    <span className="item-budget-lbl">{t('customer.budget')}</span>
-                    <span className="item-budget-val">Rs.{request.budget}</span>
+                    <span className="item-budget-lbl">{t('customer.dailyBudget')}</span>
+                    <span className="item-budget-val">Rs.{getRequestDailyBudget(request).toLocaleString()} {t('customer.perDay')}</span>
                   </div>
                   <div className="item-status-badge" style={isPendingProviderOffer(request) ? {
                     background: '#ffedd5',
@@ -1616,10 +1633,6 @@ const CustomerDashboard = () => {
                     <span>{b.date}</span>
                   </div>
                   <div className="item-detail-row">
-                    <Clock size={16} color="#3b82f6" />
-                    <span>{b.duration}</span>
-                  </div>
-                  <div className="item-detail-row">
                     <MapPin size={16} color="#3b82f6" />
                     <span>{b.location}</span>
                   </div>
@@ -1743,20 +1756,13 @@ const CustomerDashboard = () => {
                 </div>
               </div>
               <div style={styles.formGroup}>
-                <label style={styles.label}>{t('customer.estimatedDuration')}</label>
-                <input
-                  type="text"
-                  value={formData.estimatedDuration || ''}
-                  onChange={(e) => setFormData({ ...formData, estimatedDuration: e.target.value })}
-                  style={styles.input}
-                />
-              </div>
-              <div style={styles.formGroup}>
-                <label style={styles.label}>{t('customer.budget')}</label>
+                <label style={styles.label}>{t('customer.dailyBudget')}</label>
+                <p style={{ margin: '0 0 8px', fontSize: '13px', color: '#64748b' }}>{t('customer.dailyBudgetHint')}</p>
                 <input
                   type="number"
-                  value={formData.budget || ''}
-                  onChange={(e) => setFormData({ ...formData, budget: e.target.value })}
+                  min="1"
+                  value={formData.dailyBudget ?? formData.budget ?? ''}
+                  onChange={(e) => setFormData({ ...formData, dailyBudget: e.target.value, budget: undefined })}
                   style={styles.input}
                 />
               </div>

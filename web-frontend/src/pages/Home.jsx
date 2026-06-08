@@ -1,9 +1,12 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Wrench, Home as HomeIcon, Camera, Paintbrush, Truck, Sparkles, FileText, Handshake, DollarSign } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
+import { Wrench, Home as HomeIcon, Camera, Paintbrush, Sparkles, FileText, Handshake, DollarSign } from 'lucide-react';
+import LanguageSwitcher from '../components/LanguageSwitcher';
 
 export default function Home() {
   const navigate = useNavigate();
+  const { t } = useTranslation();
   const [searchQuery, setSearchQuery] = useState('');
 
   const goToServicesSearch = (query) => {
@@ -25,41 +28,49 @@ export default function Home() {
     }
   };
 
-  const popularServices = [
-    { name: 'Home Repair', icon: Wrench, color: '#10b981', bgColor: '#d1fae5' },
-    { name: 'Plumbing', icon: Wrench, color: '#3b82f6', bgColor: '#dbeafe' },
-    { name: 'Out-Door Help', icon: HomeIcon, color: '#6366f1', bgColor: '#e0e7ff' },
-    { name: 'Photography', icon: Camera, color: '#10b981', bgColor: '#d1fae5' },
-    { name: 'Household Help', icon: Sparkles, color: '#3b82f6', bgColor: '#dbeafe' },
-    { name: 'Trending', icon: Sparkles, color: '#6366f1', bgColor: '#e0e7ff' }
-  ];
+  const popularTags = useMemo(() => [
+    { key: 'cleaning', query: t('home.tags.cleaning') },
+    { key: 'repairs', query: t('home.tags.repairs') },
+    { key: 'moving', query: t('home.tags.moving') },
+    { key: 'painting', query: t('home.tags.painting') },
+    { key: 'photography', query: t('home.tags.photography') },
+  ], [t]);
 
-  const howItWorks = [
+  const popularServices = useMemo(() => [
+    { name: t('home.popularServices.homeRepair'), icon: Wrench, color: '#10b981', bgColor: '#d1fae5' },
+    { name: t('home.popularServices.plumbing'), icon: Wrench, color: '#3b82f6', bgColor: '#dbeafe' },
+    { name: t('home.popularServices.outdoorHelp'), icon: HomeIcon, color: '#6366f1', bgColor: '#e0e7ff' },
+    { name: t('home.popularServices.photography'), icon: Camera, color: '#10b981', bgColor: '#d1fae5' },
+    { name: t('home.popularServices.householdHelp'), icon: Sparkles, color: '#3b82f6', bgColor: '#dbeafe' },
+    { name: t('home.popularServices.trending'), icon: Sparkles, color: '#6366f1', bgColor: '#e0e7ff' },
+  ], [t]);
+
+  const howItWorks = useMemo(() => [
     {
       step: '1',
-      title: 'Post a Task',
-      description: 'Describe what you need done and when you need it. It\'s quick and easy.',
+      title: t('home.howItWorks.step1Title'),
+      description: t('home.howItWorks.step1Desc'),
       icon: FileText,
-      color: '#10b981'
+      color: '#10b981',
     },
     {
       step: '2',
-      title: 'Get Matched',
-      description: 'Get profiles, ratings, and prices. Then choose the right person for the job.',
+      title: t('home.howItWorks.step2Title'),
+      description: t('home.howItWorks.step2Desc'),
       icon: Handshake,
-      color: '#3b82f6'
+      color: '#3b82f6',
     },
     {
       step: '3',
-      title: 'Pay Securely',
-      description: 'Payment is cashless and secure. When the task is done, you can leave a review.',
+      title: t('home.howItWorks.step3Title'),
+      description: t('home.howItWorks.step3Desc'),
       icon: DollarSign,
-      color: '#6366f1'
-    }
-  ];
+      color: '#6366f1',
+    },
+  ], [t]);
 
   return (
-    <div style={{ minHeight: '100vh', backgroundColor: '#f8f9fa', fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif' }}>
+    <div style={{ minHeight: '100vh', backgroundColor: '#f8f9fa', fontFamily: "'Noto Sans Sinhala', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" }}>
       {/* Header */}
       <header style={{
         display: 'flex',
@@ -70,22 +81,25 @@ export default function Home() {
         borderBottom: '1px solid #e0e0e0',
         position: 'sticky',
         top: 0,
-        zIndex: 1000
+        zIndex: 1000,
+        flexWrap: 'wrap',
+        gap: '16px',
       }}>
         <div style={{
           fontSize: '28px',
           fontWeight: 'bold',
           color: '#0066cc',
-          letterSpacing: '-0.5px'
+          letterSpacing: '-0.5px',
         }}>
-          Hire Right
+          {t('common.appName')}
         </div>
 
-        <nav style={{ display: 'flex', gap: '35px', alignItems: 'center' }}>
-          <a href="/" style={{ textDecoration: 'none', color: '#333', fontSize: '16px', fontWeight: '500' }}>Home</a>
-          <a href="/services" style={{ textDecoration: 'none', color: '#333', fontSize: '16px', fontWeight: '500' }}>Services</a>
-          <a href="/how-it-works" style={{ textDecoration: 'none', color: '#333', fontSize: '16px', fontWeight: '500' }}>How It Works</a>
-          <a href="/become-a-worker" style={{ textDecoration: 'none', color: '#333', fontSize: '16px', fontWeight: '500' }}>Become a Worker</a>
+        <nav style={{ display: 'flex', gap: '20px', alignItems: 'center', flexWrap: 'wrap' }}>
+          <LanguageSwitcher />
+          <a href="/" style={{ textDecoration: 'none', color: '#333', fontSize: '16px', fontWeight: '500' }}>{t('home.nav.home')}</a>
+          <a href="/services" style={{ textDecoration: 'none', color: '#333', fontSize: '16px', fontWeight: '500' }}>{t('home.nav.services')}</a>
+          <a href="/how-it-works" style={{ textDecoration: 'none', color: '#333', fontSize: '16px', fontWeight: '500' }}>{t('home.nav.howItWorks')}</a>
+          <a href="/become-a-worker" style={{ textDecoration: 'none', color: '#333', fontSize: '16px', fontWeight: '500' }}>{t('home.nav.becomeWorker')}</a>
           <a href="/login" style={{
             textDecoration: 'none',
             backgroundColor: '#0066ff',
@@ -94,10 +108,9 @@ export default function Home() {
             borderRadius: '25px',
             fontSize: '16px',
             fontWeight: '600',
-            marginLeft: '20px',
-            transition: 'all 0.3s'
+            transition: 'all 0.3s',
           }}>
-            Login
+            {t('home.nav.login')}
           </a>
           <a href="/signup" style={{
             textDecoration: 'none',
@@ -107,9 +120,9 @@ export default function Home() {
             borderRadius: '25px',
             fontSize: '16px',
             fontWeight: '600',
-            transition: 'all 0.3s'
+            transition: 'all 0.3s',
           }}>
-            Signup
+            {t('home.nav.signup')}
           </a>
           <a href="/admin-login" style={{
             textDecoration: 'none',
@@ -119,9 +132,9 @@ export default function Home() {
             borderRadius: '25px',
             fontSize: '16px',
             fontWeight: '600',
-            transition: 'all 0.3s'
+            transition: 'all 0.3s',
           }}>
-            Administrator
+            {t('home.nav.administrator')}
           </a>
         </nav>
       </header>
@@ -135,9 +148,8 @@ export default function Home() {
         padding: '100px 20px 80px',
         background: 'linear-gradient(135deg, #e3f2fd 0%, #bbdefb 50%, #e1f5fe 100%)',
         position: 'relative',
-        overflow: 'hidden'
+        overflow: 'hidden',
       }}>
-        {/* Decorative circles */}
         <div style={{
           position: 'absolute',
           width: '500px',
@@ -146,8 +158,8 @@ export default function Home() {
           background: 'radial-gradient(circle, rgba(66,153,225,0.15) 0%, transparent 70%)',
           top: '-200px',
           right: '-100px',
-          pointerEvents: 'none'
-        }}></div>
+          pointerEvents: 'none',
+        }} />
         <div style={{
           position: 'absolute',
           width: '400px',
@@ -156,8 +168,8 @@ export default function Home() {
           background: 'radial-gradient(circle, rgba(66,153,225,0.1) 0%, transparent 70%)',
           bottom: '-150px',
           left: '-100px',
-          pointerEvents: 'none'
-        }}></div>
+          pointerEvents: 'none',
+        }} />
         <h1 style={{
           fontSize: '56px',
           fontWeight: 'bold',
@@ -167,9 +179,9 @@ export default function Home() {
           textAlign: 'center',
           lineHeight: '1.1',
           position: 'relative',
-          zIndex: 1
+          zIndex: 1,
         }}>
-          Find trusted help for your daily tasks
+          {t('home.hero.title')}
         </h1>
 
         <p style={{
@@ -180,12 +192,11 @@ export default function Home() {
           maxWidth: '700px',
           lineHeight: '1.6',
           position: 'relative',
-          zIndex: 1
+          zIndex: 1,
         }}>
-          Hire skilled professionals for home and personal services — quick, safe, and affordable.
+          {t('home.hero.subtitle')}
         </p>
 
-        {/* Search Bar */}
         <div style={{
           display: 'flex',
           alignItems: 'center',
@@ -198,14 +209,14 @@ export default function Home() {
           marginBottom: '35px',
           position: 'relative',
           zIndex: 1,
-          border: '2px solid rgba(255,255,255,0.8)'
+          border: '2px solid rgba(255,255,255,0.8)',
         }}>
           <svg width="22" height="22" viewBox="0 0 20 20" fill="none" style={{ marginRight: '14px' }}>
             <path d="M9 17A8 8 0 1 0 9 1a8 8 0 0 0 0 16zM19 19l-4.35-4.35" stroke="#999" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
           </svg>
           <input
             type="text"
-            placeholder="What do you need help with?"
+            placeholder={t('home.hero.searchPlaceholder')}
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             onKeyDown={handleKeyDown}
@@ -215,7 +226,7 @@ export default function Home() {
               outline: 'none',
               fontSize: '17px',
               color: '#333',
-              backgroundColor: 'transparent'
+              backgroundColor: 'transparent',
             }}
           />
           <button type="button" onClick={handleSearch} style={{
@@ -229,21 +240,12 @@ export default function Home() {
             cursor: 'pointer',
             marginLeft: '10px',
             transition: 'all 0.3s',
-            boxShadow: '0 4px 15px rgba(0,102,255,0.3)'
-          }}
-            onMouseOver={(e) => {
-              e.target.style.transform = 'scale(1.05)';
-              e.target.style.boxShadow = '0 6px 20px rgba(0,102,255,0.4)';
-            }}
-            onMouseOut={(e) => {
-              e.target.style.transform = 'scale(1)';
-              e.target.style.boxShadow = '0 4px 15px rgba(0,102,255,0.3)';
-            }}>
-            Search
+            boxShadow: '0 4px 15px rgba(0,102,255,0.3)',
+          }}>
+            {t('home.hero.search')}
           </button>
         </div>
 
-        {/* Popular Tags */}
         <div style={{
           display: 'flex',
           alignItems: 'center',
@@ -251,14 +253,14 @@ export default function Home() {
           flexWrap: 'wrap',
           justifyContent: 'center',
           position: 'relative',
-          zIndex: 1
+          zIndex: 1,
         }}>
-          <span style={{ color: '#5a6c7d', fontSize: '16px', fontWeight: '500' }}>Popular:</span>
-          {['Cleaning', 'Repairs', 'Moving', 'Painting', 'Photography'].map((service) => (
+          <span style={{ color: '#5a6c7d', fontSize: '16px', fontWeight: '500' }}>{t('home.hero.popular')}</span>
+          {popularTags.map((tag) => (
             <button
-              key={service}
+              key={tag.key}
               type="button"
-              onClick={() => goToServicesSearch(service)}
+              onClick={() => goToServicesSearch(tag.query)}
               style={{
                 backgroundColor: '#fff',
                 border: '1px solid #ddd',
@@ -269,49 +271,34 @@ export default function Home() {
                 cursor: 'pointer',
                 transition: 'all 0.3s',
                 fontWeight: '500',
-                boxShadow: '0 2px 8px rgba(0,0,0,0.05)'
-              }}
-              onMouseOver={(e) => {
-                e.target.style.borderColor = '#0066ff';
-                e.target.style.color = '#0066ff';
-                e.target.style.transform = 'translateY(-2px)';
-                e.target.style.boxShadow = '0 4px 12px rgba(0,102,255,0.2)';
-              }}
-              onMouseOut={(e) => {
-                e.target.style.borderColor = '#ddd';
-                e.target.style.color = '#333';
-                e.target.style.transform = 'translateY(0)';
-                e.target.style.boxShadow = '0 2px 8px rgba(0,0,0,0.05)';
+                boxShadow: '0 2px 8px rgba(0,0,0,0.05)',
               }}
             >
-              {service}
+              {tag.query}
             </button>
           ))}
         </div>
       </section>
 
       {/* Popular Services Section */}
-      <section style={{
-        padding: '80px 50px',
-        backgroundColor: '#fff'
-      }}>
+      <section style={{ padding: '80px 50px', backgroundColor: '#fff' }}>
         <div style={{ maxWidth: '1200px', margin: '0 auto' }}>
           <h2 style={{
             fontSize: '42px',
             fontWeight: 'bold',
             color: '#1a202c',
             textAlign: 'center',
-            marginBottom: '12px'
+            marginBottom: '12px',
           }}>
-            Popular Services
+            {t('home.popularServices.title')}
           </h2>
           <p style={{
             fontSize: '18px',
             color: '#718096',
             textAlign: 'center',
-            marginBottom: '60px'
+            marginBottom: '60px',
           }}>
-            Whatever you need, we've got you covered
+            {t('home.popularServices.subtitle')}
           </p>
 
           <div style={{
@@ -319,7 +306,7 @@ export default function Home() {
             gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))',
             gap: '30px',
             maxWidth: '1000px',
-            margin: '0 auto'
+            margin: '0 auto',
           }}>
             {popularServices.map((service, idx) => {
               const Icon = service.icon;
@@ -334,15 +321,7 @@ export default function Home() {
                     cursor: 'pointer',
                     transition: 'all 0.3s',
                     border: '1px solid #e5e7eb',
-                    boxShadow: '0 2px 8px rgba(0,0,0,0.04)'
-                  }}
-                  onMouseOver={(e) => {
-                    e.currentTarget.style.transform = 'translateY(-8px)';
-                    e.currentTarget.style.boxShadow = '0 12px 24px rgba(0,0,0,0.1)';
-                  }}
-                  onMouseOut={(e) => {
-                    e.currentTarget.style.transform = 'translateY(0)';
-                    e.currentTarget.style.boxShadow = '0 2px 8px rgba(0,0,0,0.04)';
+                    boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
                   }}
                 >
                   <div style={{
@@ -353,16 +332,11 @@ export default function Home() {
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
-                    margin: '0 auto 20px'
+                    margin: '0 auto 20px',
                   }}>
                     <Icon size={36} color={service.color} strokeWidth={2} />
                   </div>
-                  <h3 style={{
-                    fontSize: '18px',
-                    fontWeight: '600',
-                    color: '#2d3748',
-                    margin: 0
-                  }}>
+                  <h3 style={{ fontSize: '18px', fontWeight: '600', color: '#2d3748', margin: 0 }}>
                     {service.name}
                   </h3>
                 </div>
@@ -375,8 +349,7 @@ export default function Home() {
       {/* How It Works Section */}
       <section style={{
         padding: '80px 50px',
-        backgroundColor: 'linear-gradient(135deg, #e8f0f8 0%, #f0f4f8 100%)',
-        background: 'linear-gradient(135deg, #e8f0f8 0%, #f0f4f8 100%)'
+        background: 'linear-gradient(135deg, #e8f0f8 0%, #f0f4f8 100%)',
       }}>
         <div style={{ maxWidth: '1200px', margin: '0 auto' }}>
           <h2 style={{
@@ -384,17 +357,17 @@ export default function Home() {
             fontWeight: 'bold',
             color: '#1a202c',
             textAlign: 'center',
-            marginBottom: '12px'
+            marginBottom: '12px',
           }}>
-            How It Works
+            {t('home.howItWorks.title')}
           </h2>
           <p style={{
             fontSize: '18px',
             color: '#718096',
             textAlign: 'center',
-            marginBottom: '70px'
+            marginBottom: '70px',
           }}>
-            Getting help is simple. Just follow these three easy steps.
+            {t('home.howItWorks.subtitle')}
           </p>
 
           <div style={{
@@ -402,18 +375,12 @@ export default function Home() {
             gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))',
             gap: '50px',
             maxWidth: '1100px',
-            margin: '0 auto'
+            margin: '0 auto',
           }}>
             {howItWorks.map((item, idx) => {
               const Icon = item.icon;
               return (
-                <div
-                  key={idx}
-                  style={{
-                    textAlign: 'center',
-                    position: 'relative'
-                  }}
-                >
+                <div key={idx} style={{ textAlign: 'center', position: 'relative' }}>
                   <div style={{
                     width: '120px',
                     height: '120px',
@@ -423,7 +390,7 @@ export default function Home() {
                     alignItems: 'center',
                     justifyContent: 'center',
                     margin: '0 auto 30px',
-                    position: 'relative'
+                    position: 'relative',
                   }}>
                     <div style={{
                       position: 'absolute',
@@ -438,27 +405,16 @@ export default function Home() {
                       justifyContent: 'center',
                       color: '#fff',
                       fontSize: '20px',
-                      fontWeight: 'bold'
+                      fontWeight: 'bold',
                     }}>
                       {item.step}
                     </div>
                     <Icon size={50} color={item.color} strokeWidth={2} />
                   </div>
-                  <h3 style={{
-                    fontSize: '24px',
-                    fontWeight: '600',
-                    color: '#2d3748',
-                    marginBottom: '15px'
-                  }}>
+                  <h3 style={{ fontSize: '24px', fontWeight: '600', color: '#2d3748', marginBottom: '15px' }}>
                     {item.title}
                   </h3>
-                  <p style={{
-                    fontSize: '16px',
-                    color: '#4a5568',
-                    lineHeight: '1.6',
-                    maxWidth: '280px',
-                    margin: '0 auto'
-                  }}>
+                  <p style={{ fontSize: '16px', color: '#4a5568', lineHeight: '1.6', maxWidth: '280px', margin: '0 auto' }}>
                     {item.description}
                   </p>
                 </div>
@@ -473,104 +429,92 @@ export default function Home() {
         padding: '80px 50px',
         backgroundColor: '#0066ff',
         color: '#fff',
-        textAlign: 'center'
+        textAlign: 'center',
       }}>
         <div style={{ maxWidth: '800px', margin: '0 auto' }}>
-          <h2 style={{
-            fontSize: '42px',
-            fontWeight: 'bold',
-            marginBottom: '20px'
-          }}>
-            Ready to get started?
+          <h2 style={{ fontSize: '42px', fontWeight: 'bold', marginBottom: '20px' }}>
+            {t('home.cta.title')}
           </h2>
-          <p style={{
-            fontSize: '20px',
-            marginBottom: '40px',
-            opacity: 0.95
-          }}>
-            Join thousands of happy customers who trust Hire Right for their daily tasks
+          <p style={{ fontSize: '20px', marginBottom: '40px', opacity: 0.95 }}>
+            {t('home.cta.subtitle')}
           </p>
           <div style={{ display: 'flex', gap: '20px', justifyContent: 'center', flexWrap: 'wrap' }}>
             <button
               type="button"
               onClick={() => navigate('/login')}
               style={{
-              backgroundColor: '#fff',
-              color: '#0066ff',
-              border: 'none',
-              borderRadius: '30px',
-              padding: '16px 40px',
-              fontSize: '18px',
-              fontWeight: '600',
-              cursor: 'pointer',
-              transition: 'all 0.3s'
-            }}>
-              Post a Task
+                backgroundColor: '#fff',
+                color: '#0066ff',
+                border: 'none',
+                borderRadius: '30px',
+                padding: '16px 40px',
+                fontSize: '18px',
+                fontWeight: '600',
+                cursor: 'pointer',
+              }}
+            >
+              {t('home.cta.postTask')}
             </button>
             <button
               type="button"
               onClick={() => navigate('/become-a-worker')}
               style={{
-              backgroundColor: 'transparent',
-              color: '#fff',
-              border: '2px solid #fff',
-              borderRadius: '30px',
-              padding: '16px 40px',
-              fontSize: '18px',
-              fontWeight: '600',
-              cursor: 'pointer',
-              transition: 'all 0.3s'
-            }}>
-              Become a Worker
+                backgroundColor: 'transparent',
+                color: '#fff',
+                border: '2px solid #fff',
+                borderRadius: '30px',
+                padding: '16px 40px',
+                fontSize: '18px',
+                fontWeight: '600',
+                cursor: 'pointer',
+              }}
+            >
+              {t('home.cta.becomeWorker')}
             </button>
           </div>
         </div>
       </section>
 
       {/* Footer */}
-      <footer style={{
-        backgroundColor: '#1a202c',
-        color: '#fff',
-        padding: '60px 50px 30px'
-      }}>
+      <footer style={{ backgroundColor: '#1a202c', color: '#fff', padding: '60px 50px 30px' }}>
         <div style={{
           maxWidth: '1200px',
           margin: '0 auto',
           display: 'grid',
           gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
           gap: '40px',
-          marginBottom: '40px'
+          marginBottom: '40px',
         }}>
           <div>
             <h3 style={{ fontSize: '24px', fontWeight: 'bold', marginBottom: '20px', color: '#0066ff' }}>
-              Hire Right
+              {t('common.appName')}
             </h3>
             <p style={{ fontSize: '14px', color: '#a0aec0', lineHeight: '1.6' }}>
-              Your trusted platform for finding skilled professionals for all your daily tasks.
+              {t('home.footer.tagline')}
             </p>
           </div>
           <div>
-            <h4 style={{ fontSize: '16px', fontWeight: '600', marginBottom: '15px' }}>Company</h4>
+            <h4 style={{ fontSize: '16px', fontWeight: '600', marginBottom: '15px' }}>{t('home.footer.company')}</h4>
             <ul style={{ listStyle: 'none', padding: 0, margin: 0 }}>
-              <li style={{ marginBottom: '10px' }}><a href="#" style={{ color: '#a0aec0', textDecoration: 'none', fontSize: '14px' }}>About Us</a></li>
-              <li style={{ marginBottom: '10px' }}><a href="#" style={{ color: '#a0aec0', textDecoration: 'none', fontSize: '14px' }}>Careers</a></li>
-              <li style={{ marginBottom: '10px' }}><a href="#" style={{ color: '#a0aec0', textDecoration: 'none', fontSize: '14px' }}>Press</a></li>
+              <li style={{ marginBottom: '10px' }}><a href="#" style={{ color: '#a0aec0', textDecoration: 'none', fontSize: '14px' }}>{t('home.footer.aboutUs')}</a></li>
+              <li style={{ marginBottom: '10px' }}><a href="#" style={{ color: '#a0aec0', textDecoration: 'none', fontSize: '14px' }}>{t('home.footer.careers')}</a></li>
+              <li style={{ marginBottom: '10px' }}><a href="#" style={{ color: '#a0aec0', textDecoration: 'none', fontSize: '14px' }}>{t('home.footer.press')}</a></li>
             </ul>
           </div>
           <div>
-            <h4 style={{ fontSize: '16px', fontWeight: '600', marginBottom: '15px' }}>Support</h4>
+            <h4 style={{ fontSize: '16px', fontWeight: '600', marginBottom: '15px' }}>{t('home.footer.support')}</h4>
             <ul style={{ listStyle: 'none', padding: 0, margin: 0 }}>
-              <li style={{ marginBottom: '10px' }}><a href="#" style={{ color: '#a0aec0', textDecoration: 'none', fontSize: '14px' }}>Help Center</a></li>
-              <li style={{ marginBottom: '10px' }}><a href="#" style={{ color: '#a0aec0', textDecoration: 'none', fontSize: '14px' }}>Safety</a></li>
-              <li style={{ marginBottom: '10px' }}><a href="#" style={{ color: '#a0aec0', textDecoration: 'none', fontSize: '14px' }}>Contact</a></li>
+              <li style={{ marginBottom: '10px' }}><a href="#" style={{ color: '#a0aec0', textDecoration: 'none', fontSize: '14px' }}>{t('home.footer.helpCenter')}</a></li>
+              <li style={{ marginBottom: '10px' }}><a href="#" style={{ color: '#a0aec0', textDecoration: 'none', fontSize: '14px' }}>{t('home.footer.safety')}</a></li>
+              <li style={{ marginBottom: '10px' }}><a href="#" style={{ color: '#a0aec0', textDecoration: 'none', fontSize: '14px' }}>{t('home.footer.contact')}</a></li>
             </ul>
           </div>
           <div>
-            <h4 style={{ fontSize: '16px', fontWeight: '600', marginBottom: '15px' }}>Legal</h4>
+            <h4 style={{ fontSize: '16px', fontWeight: '600', marginBottom: '15px' }}>{t('home.footer.legal')}</h4>
             <ul style={{ listStyle: 'none', padding: 0, margin: 0 }}>
-              <li style={{ marginBottom: '10px' }}><a href="#" style={{ color: '#a0aec0', textDecoration: 'none', fontSize: '14px' }}>Privacy Policy</a></li>
-              <li style={{ marginBottom: '10px' }}><a href="#" style={{ color: '#a0aec0', textDecoration: 'none', fontSize: '14px' }}>Terms of Service</a></li>
-              <li style={{ marginBottom: '10px' }}><a href="#" style={{ color: '#a0aec0', textDecoration: 'none', fontSize: '14px' }}>Cookie Policy</a></li>
+              <li style={{ marginBottom: '10px' }}><a href="#" style={{ color: '#a0aec0', textDecoration: 'none', fontSize: '14px' }}>{t('home.footer.privacy')}</a></li>
+              <li style={{ marginBottom: '10px' }}><a href="#" style={{ color: '#a0aec0', textDecoration: 'none', fontSize: '14px' }}>{t('home.footer.terms')}</a></li>
+              <li style={{ marginBottom: '10px' }}><a href="#" style={{ color: '#a0aec0', textDecoration: 'none', fontSize: '14px' }}>{t('home.footer.cookies')}</a></li>
             </ul>
           </div>
         </div>
@@ -579,9 +523,9 @@ export default function Home() {
           paddingTop: '30px',
           textAlign: 'center',
           color: '#718096',
-          fontSize: '14px'
+          fontSize: '14px',
         }}>
-          © 2025 Hire Right. All rights reserved.
+          {t('home.footer.copyright')}
         </div>
       </footer>
     </div>

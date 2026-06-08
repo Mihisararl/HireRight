@@ -29,7 +29,7 @@ import { getProviderReviews } from '../api/review';
 import { AuthContext } from '../context/AuthContext';
 import ProviderJobTracking from '../components/location/ProviderJobTracking';
 import LanguageSwitcher from '../components/LanguageSwitcher';
-import { formatLocationDisplay } from '../utils/locationHelpers';
+import { formatLocationDisplay, getRequestDailyBudget } from '../utils/locationHelpers';
 
 const fileToDataUrl = (file) => new Promise((resolve, reject) => {
   const reader = new FileReader();
@@ -967,7 +967,7 @@ const ProviderDashboard = () => {
                               fontWeight: '700',
                               marginLeft: '16px'
                             }}>
-                              Rs. {request.budget?.toLocaleString()}
+                              Rs. {getRequestDailyBudget(request).toLocaleString()} {t('customer.perDay')}
                             </div>
                           </div>
 
@@ -1008,7 +1008,7 @@ const ProviderDashboard = () => {
 
                             <button
                               className="btn-primary"
-                              onClick={() => handleAcceptJob(request._id, request.budget, request.preferredDate)}
+                              onClick={() => handleAcceptJob(request._id, getRequestDailyBudget(request), request.preferredDate)}
                               disabled={!isApproved}
                               style={!isApproved ? { opacity: 0.6, cursor: 'not-allowed' } : undefined}
                             >
@@ -1108,7 +1108,7 @@ const ProviderDashboard = () => {
                             </div>
                             <div>
                               <span style={{ color: '#64748b' }}>💰 {t('provider.budget')}:</span>
-                              <div style={{ fontWeight: '600', color: '#1e293b' }}>Rs.{booking.budget}</div>
+                              <div style={{ fontWeight: '600', color: '#1e293b' }}>Rs.{getRequestDailyBudget(booking).toLocaleString()} {t('customer.perDay')}</div>
                             </div>
                           </div>
 
@@ -1226,7 +1226,7 @@ const ProviderDashboard = () => {
                               fontWeight: '700',
                               marginLeft: '16px'
                             }}>
-                              Rs. {request.budget?.toLocaleString()}
+                              Rs. {getRequestDailyBudget(request).toLocaleString()} {t('customer.perDay')}
                             </div>
                           </div>
 
@@ -1334,7 +1334,7 @@ const ProviderDashboard = () => {
                                 fontWeight: '700',
                                 marginLeft: '16px'
                               }}>
-                                Rs. {request.budget?.toLocaleString()}
+                                Rs. {getRequestDailyBudget(request).toLocaleString()} {t('customer.perDay')}
                               </div>
                             </div>
 
@@ -1452,7 +1452,7 @@ const ProviderDashboard = () => {
                               fontWeight: '700',
                               marginLeft: '16px'
                             }}>
-                              Rs. {request.budget?.toLocaleString()}
+                              Rs. {getRequestDailyBudget(request).toLocaleString()} {t('customer.perDay')}
                             </div>
                           </div>
 
