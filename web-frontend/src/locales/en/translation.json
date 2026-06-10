@@ -14,6 +14,7 @@
     "saving": "Saving...",
     "cancel": "Cancel",
     "loading": "Loading...",
+    "sending": "Sending...",
     "notAvailable": "N/A"
   },
   "auth": {
@@ -33,7 +34,33 @@
     "serviceProvider": "Service Provider",
     "passwordsNoMatch": "Passwords do not match",
     "registrationSuccess": "Registration successful. You can now log in.",
-    "registrationFailed": "Registration failed"
+    "registrationFailed": "Registration failed",
+    "forgotPasswordTitle": "Forgot your password?",
+    "forgotPasswordSubtitle": "Enter your account email and we will send you a link to reset your password.",
+    "sendResetLink": "Send reset link",
+    "resetEmailSent": "If an account exists for that email, you will receive a password reset link shortly.",
+    "resetRequestFailed": "Could not send reset email. Please try again.",
+    "backToLogin": "Back to login",
+    "resetPasswordTitle": "Set a new password",
+    "resetPasswordSubtitle": "Create a new password for {{email}}",
+    "resetPasswordSubtitleGeneric": "Create a new password for your account",
+    "newPassword": "New password",
+    "updatePassword": "Update password",
+    "passwordResetSuccess": "Password updated successfully. You can now log in.",
+    "passwordResetFailed": "Failed to reset password",
+    "invalidResetLink": "This reset link is invalid or has expired.",
+    "validatingResetLink": "Validating reset link...",
+    "resetLinkExpiredTitle": "Link expired",
+    "requestNewResetLink": "Request a new reset link",
+    "orDivider": "or",
+    "continueWithGoogle": "Continue with Google",
+    "googleSignInFailed": "Google sign-in failed. Please try again.",
+    "googleCustomersOnly": "Google sign-in is for service receivers only.",
+    "googleSignInAs": "Sign in with Google as",
+    "completeProfileTitle": "Complete your profile",
+    "completeProfileSubtitle": "Add your phone number so providers can reach you.",
+    "completeProfileContinue": "Continue",
+    "completeProfileFailed": "Could not save your details. Please try again."
   },
   "customer": {
     "dashboardTitle": "HireRight — Customer Dashboard",
@@ -90,6 +117,9 @@
       "noCompletedJobsText": "Finished services will appear here with payment details and the option to leave a review."
     },
     "budget": "Budget",
+    "dailyBudget": "Budget per day (LKR)",
+    "dailyBudgetHint": "Amount you are willing to pay for one day of work",
+    "perDay": "per day",
     "totalAmount": "Total Amount",
     "markTaskCompleted": "Mark Task Completed",
     "awaitingProvider": "Awaiting Provider Confirmation",
@@ -109,7 +139,6 @@
     "description": "Description",
     "preferredDate": "Preferred Date",
     "preferredTime": "Preferred Time",
-    "estimatedDuration": "Estimated Duration",
     "specificRequirements": "Specific Requirements",
     "rateProvider": "Rate Your Provider",
     "review": "Review",
@@ -134,8 +163,11 @@
       "backToDashboard": "Back to Dashboard",
       "profilePhoto": "Profile Photo",
       "basicData": "Basic Data",
+      "basicDataHint": "Update your personal contact information",
       "address": "Address",
+      "addressPlaceholder": "Street, city, district",
       "paymentBankDetails": "Payment / Bank Details",
+      "bankHint": "Used for refunds and payment-related transactions",
       "bankName": "Bank Name",
       "accountNumber": "Account Number",
       "accountHolderName": "Account Holder Name",
@@ -187,7 +219,7 @@
     "date": "Date",
     "time": "Time",
     "location": "Location",
-    "budget": "Budget",
+    "budget": "Budget per day",
     "description": "Description",
     "specialRequirements": "Special Requirements",
     "acceptBooking": "Accept Booking",
@@ -258,22 +290,31 @@
       "backToDashboard": "Back to Dashboard",
       "profilePhoto": "Profile Photo",
       "basicData": "Basic Data",
+      "basicDataHint": "Update your personal contact and location details",
       "fullName": "Full Name",
       "emailAddress": "Email Address",
       "phoneNumber": "Phone Number",
       "streetAddress": "Street Address",
+      "addressPlaceholder": "Street, city, district",
+      "cityPlaceholder": "e.g. Colombo",
+      "selectDistrict": "Select District",
       "city": "City",
       "district": "District",
       "postalCode": "Postal Code",
       "professionalInfo": "Professional Information",
+      "professionalHint": "Tell customers about your skills, experience, and rates",
+      "selectCategory": "Select Category",
+      "bioPlaceholder": "Describe your experience, specialties, and what makes you stand out...",
       "serviceCategory": "Service Category",
       "yearsOfExperience": "Years of Experience",
       "hourlyRate": "Hourly Rate (Rs.)",
       "professionalBio": "Professional Bio",
       "availability": "Availability",
+      "availabilityHint": "Control whether customers can book you for today",
       "availableToday": "Available today",
       "unavailableToday": "Unavailable today",
       "bankDetails": "Bank Details",
+      "bankHint": "Used to receive payouts after completed jobs",
       "bankName": "Bank Name",
       "accountNumber": "Account Number",
       "accountHolderName": "Account Holder Name",
@@ -282,6 +323,199 @@
       "saving": "Saving...",
       "profileUpdated": "Provider profile updated successfully!",
       "failedUpdateProfile": "Failed to update profile"
+    }
+  },
+  "home": {
+    "nav": {
+      "home": "Home",
+      "services": "Services",
+      "howItWorks": "How It Works",
+      "becomeWorker": "Become a Worker",
+      "login": "Login",
+      "signup": "Signup",
+      "administrator": "Administrator"
+    },
+    "hero": {
+      "title": "Find trusted help for your daily tasks",
+      "subtitle": "Hire skilled professionals for home and personal services — quick, safe, and affordable.",
+      "searchPlaceholder": "What do you need help with?",
+      "search": "Search",
+      "popular": "Popular:"
+    },
+    "tags": {
+      "cleaning": "Cleaning",
+      "repairs": "Repairs",
+      "moving": "Moving",
+      "painting": "Painting",
+      "photography": "Photography"
+    },
+    "popularServices": {
+      "title": "Popular Services",
+      "subtitle": "Whatever you need, we've got you covered",
+      "homeRepair": "Home Repair",
+      "plumbing": "Plumbing",
+      "outdoorHelp": "Out-Door Help",
+      "photography": "Photography",
+      "householdHelp": "Household Help",
+      "trending": "Trending"
+    },
+    "howItWorks": {
+      "title": "How It Works",
+      "subtitle": "Getting help is simple. Just follow these three easy steps.",
+      "step1Title": "Post a Task",
+      "step1Desc": "Describe what you need done and when you need it. It's quick and easy.",
+      "step2Title": "Get Matched",
+      "step2Desc": "Get profiles, ratings, and prices. Then choose the right person for the job.",
+      "step3Title": "Pay Securely",
+      "step3Desc": "Payment is cashless and secure. When the task is done, you can leave a review."
+    },
+    "cta": {
+      "title": "Ready to get started?",
+      "subtitle": "Join thousands of happy customers who trust Hire Right for their daily tasks",
+      "postTask": "Post a Task",
+      "becomeWorker": "Become a Worker"
+    },
+    "footer": {
+      "tagline": "Your trusted platform for finding skilled professionals for all your daily tasks.",
+      "company": "Company",
+      "aboutUs": "About Us",
+      "careers": "Careers",
+      "press": "Press",
+      "support": "Support",
+      "helpCenter": "Help Center",
+      "safety": "Safety",
+      "contact": "Contact",
+      "legal": "Legal",
+      "privacy": "Privacy Policy",
+      "terms": "Terms of Service",
+      "cookies": "Cookie Policy",
+      "copyright": "© 2025 Hire Right. All rights reserved."
+    }
+  },
+  "policies": {
+    "backToHome": "Back to Home",
+    "customer": {
+      "title": "Privacy Policy & Customer Terms",
+      "lastUpdated": "Last updated: June 2026",
+      "agreeLabel": "I have read and agree to the Privacy Policy and Customer Terms",
+      "agreePrefix": "I have read and agree to the",
+      "agreeRequired": "You must accept the Privacy Policy and Customer Terms to register",
+      "linkText": "Privacy Policy & Customer Terms",
+      "sections": [
+        {
+          "title": "1. Introduction",
+          "paragraphs": [
+            "Welcome to Hire Right. This Privacy Policy and Customer Terms explain how we collect, use, and protect your information when you use our platform to find and book service providers in Sri Lanka."
+          ]
+        },
+        {
+          "title": "2. Information We Collect",
+          "bullets": [
+            "Account details: name, email, phone number, address, and district",
+            "Service requests: job descriptions, preferred dates, location, and budget",
+            "Payment records processed through our secure payment partner (PayHere)",
+            "Communications, complaints, and reviews related to your bookings"
+          ]
+        },
+        {
+          "title": "3. How We Use Your Information",
+          "bullets": [
+            "To match you with suitable service providers",
+            "To process bookings, payments, and customer support",
+            "To improve platform safety, quality, and reliability",
+            "To send important updates about your account or bookings"
+          ]
+        },
+        {
+          "title": "4. Payments",
+          "paragraphs": [
+            "Payments are processed securely through the platform. You pay the agreed service amount shown at checkout. Hire Right facilitates the transaction between you and the service provider.",
+            "A platform commission of 5% is deducted from the service provider's payout on completed jobs. This is not charged separately to you as the customer at checkout, but it is part of how the platform operates."
+          ]
+        },
+        {
+          "title": "5. Complaints & 48-Hour Policy",
+          "paragraphs": [
+            "If you report an issue with a completed service, our team will review your complaint. When a complaint is marked as resolved, you have 48 hours to respond or reopen the complaint if the issue is not actually fixed.",
+            "If you do not respond or reopen the complaint within 48 hours after it is marked resolved, the payment will be released to the service provider. After that window, the complaint cannot be reopened and the payout is considered final."
+          ]
+        },
+        {
+          "title": "6. Your Responsibilities",
+          "bullets": [
+            "Provide accurate booking and contact information",
+            "Communicate respectfully with service providers",
+            "Report genuine issues promptly through the platform",
+            "Review resolved complaints within the 48-hour window if you disagree with the outcome"
+          ]
+        },
+        {
+          "title": "7. Contact",
+          "paragraphs": [
+            "For privacy or policy questions, contact Hire Right support through the platform Help section."
+          ]
+        }
+      ]
+    },
+    "worker": {
+      "title": "Worker Terms & Platform Policy",
+      "lastUpdated": "Last updated: June 2026",
+      "agreeLabel": "I agree to the Worker Terms & Platform Policy, including the 5% commission and 48-hour complaint policy",
+      "agreeRequired": "You must accept the Worker Terms & Platform Policy to register",
+      "linkText": "Worker Terms & Platform Policy",
+      "registrationAgreePrefix": "I consent to a background check and agree to the",
+      "registrationAgreeSuffix": ", including the 5% commission and 48-hour complaint policy",
+      "sections": [
+        {
+          "title": "1. Worker Agreement",
+          "paragraphs": [
+            "By registering as a worker on Hire Right, you agree to provide services professionally, honestly, and in line with customer bookings accepted through the platform."
+          ]
+        },
+        {
+          "title": "2. Background Check & Verification",
+          "paragraphs": [
+            "All workers must complete identity verification and consent to a background check. Approval is required before you can receive bookings on the platform."
+          ]
+        },
+        {
+          "title": "3. Platform Commission (5%)",
+          "paragraphs": [
+            "Hire Right charges a 5% commission on payments for completed jobs booked through the platform. This commission is deducted from your payout before funds are released to you.",
+            "Example: if a customer pays Rs. 10,000 for a completed job, the platform commission is Rs. 500 and your net payout is Rs. 9,500, subject to any complaint holds described below."
+          ]
+        },
+        {
+          "title": "4. 48-Hour Complaint & Payment Release Policy",
+          "paragraphs": [
+            "When a customer files a complaint about your work, payment may be held until the issue is reviewed. If the complaint is marked as resolved, the customer has 48 hours to respond or reopen the complaint.",
+            "If the customer does not respond or reopen the complaint within 48 hours after resolution, payment will be released to you (minus the 5% platform commission). If the customer reopens the complaint within that window, the review continues and payment remains on hold until the matter is closed."
+          ]
+        },
+        {
+          "title": "5. Payouts",
+          "bullets": [
+            "Payouts are released only after both parties mark the job complete, subject to complaint status",
+            "You must keep accurate bank details in your worker profile",
+            "Commission and complaint holds are applied automatically by the platform"
+          ]
+        },
+        {
+          "title": "6. Conduct",
+          "bullets": [
+            "Arrive on time and deliver the service described in your offer",
+            "Treat customers respectfully and safely",
+            "Do not request off-platform payments that bypass Hire Right",
+            "Do not misrepresent your skills, rates, or availability"
+          ]
+        },
+        {
+          "title": "7. Contact",
+          "paragraphs": [
+            "For questions about worker terms, commissions, or payouts, contact Hire Right support through the platform."
+          ]
+        }
+      ]
     }
   }
 }

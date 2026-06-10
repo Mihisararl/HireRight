@@ -1,4 +1,6 @@
 import React, { useState } from 'react';
+import { Link } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { ChevronLeft } from 'lucide-react';
 import { registerProvider } from '../api/provider';
 
@@ -10,6 +12,7 @@ const fileToDataUrl = (file) => new Promise((resolve, reject) => {
 });
 
 const ProviderRegistration = () => {
+    const { t } = useTranslation();
     const [step, setStep] = useState(1);
     const [formData, setFormData] = useState({
         // Step 1: Personal Information
@@ -29,6 +32,7 @@ const ProviderRegistration = () => {
         // Step 3: Location & Verification
         city: '',
         district: '',
+        nicNumber: '',
         idDocument: null,
         agreedToBackgroundCheck: false,
     });
@@ -124,13 +128,21 @@ const ProviderRegistration = () => {
 
     const validateStep3 = () => {
         const newErrors = {};
+        const nic = String(formData.nicNumber || '').trim().toUpperCase();
+        const isValidNic = /^\d{9}[VX]$/.test(nic) || /^\d{12}$/.test(nic);
+
         if (!formData.city.trim()) newErrors.city = 'City is required';
         if (!formData.district.trim()) newErrors.district = 'District is required';
+        if (!nic) {
+            newErrors.nicNumber = 'NIC number is required';
+        } else if (!isValidNic) {
+            newErrors.nicNumber = 'Enter a valid NIC (9 digits + V/X or 12 digits)';
+        }
         if (!formData.idDocument) {
-            newErrors.idDocument = 'ID document (NIC/Driving License) is required';
+            newErrors.idDocument = 'NIC photo upload is required';
         }
         if (!formData.agreedToBackgroundCheck) {
-            newErrors.agreedToBackgroundCheck = 'You must agree to the background check';
+            newErrors.agreedToBackgroundCheck = t('policies.worker.agreeRequired');
         }
 
         setErrors(newErrors);
@@ -172,6 +184,7 @@ const ProviderRegistration = () => {
                     professionalBio: formData.professionalBio,
                     city: formData.city,
                     district: formData.district,
+                    nicNumber: formData.nicNumber.trim().toUpperCase(),
                     agreedToBackgroundCheck: formData.agreedToBackgroundCheck,
                     portfolioPhoto: formData.portfolioPhoto ? await fileToDataUrl(formData.portfolioPhoto) : '',
                     idDocument: formData.idDocument ? await fileToDataUrl(formData.idDocument) : ''
@@ -611,7 +624,7 @@ const ProviderRegistration = () => {
                                     {errors.district && <p className="text-red-500 text-xs mt-1">{errors.district}</p>}
                                 </div>
 
-                                {/* ID Document Upload Section */}
+                                {/* NIC Verification */}
                                 <div className="bg-blue-50 border-2 border-blue-200 rounded-lg p-6 mt-6">
                                     <div className="flex items-start gap-3">
                                         <div className="flex-shrink-0 mt-1">
@@ -620,10 +633,26 @@ const ProviderRegistration = () => {
                                             </svg>
                                         </div>
                                         <div className="flex-1">
-                                            <h3 className="font-bold text-blue-900 mb-2">ID Verification Document <span className="text-red-500">*</span></h3>
+                                            <h3 className="font-bold text-blue-900 mb-2">NIC Verification <span className="text-red-500">*</span></h3>
                                             <p className="text-sm text-blue-800 mb-4">
-                                                Please upload a clear photo of your NIC (National Identity Card) or Driving License for identity verification.
+                                                Enter your National Identity Card number and upload a clear photo of your NIC for verification.
                                             </p>
+
+                                            <div className="mb-4">
+                                                <label className="block text-sm font-semibold text-slate-700 mb-2">
+                                                    NIC Number <span className="text-red-500">*</span>
+                                                </label>
+                                                <input
+                                                    type="text"
+                                                    name="nicNumber"
+                                                    value={formData.nicNumber}
+                                                    onChange={handleInputChange}
+                                                    placeholder="123456789V or 200012345678"
+                                                    className={`form-input w-full px-4 py-3 rounded-lg border-2 focus:outline-none focus:border-blue-500 uppercase
+                        ${errors.nicNumber ? 'border-red-300 bg-red-50' : 'border-slate-200'}`}
+                                                />
+                                                {errors.nicNumber && <p className="text-red-500 text-xs mt-1">{errors.nicNumber}</p>}
+                                            </div>
 
                                             <div className={`upload-area border-2 border-dashed rounded-lg p-6 text-center cursor-pointer bg-white
                                                 ${errors.idDocument ? 'border-red-300' : 'border-blue-300'}`}>
@@ -643,8 +672,8 @@ const ProviderRegistration = () => {
                                                             <p className="text-sm text-slate-700 font-medium">{formData.idDocument.name}</p>
                                                         ) : (
                                                             <>
-                                                                <p className="text-sm text-slate-600 font-medium mb-1">Click to upload ID document</p>
-                                                                <p className="text-xs text-slate-400">NIC or Driving License (PNG, JPG, or PDF - max 5MB)</p>
+                                                                <p className="text-sm text-slate-600 font-medium mb-1">Click to upload NIC photo</p>
+                                                                <p className="text-xs text-slate-400">PNG, JPG, or PDF — max 5MB</p>
                                                             </>
                                                         )}
                                                     </div>
@@ -683,10 +712,11 @@ const ProviderRegistration = () => {
                                                     id="background-check"
                                                 />
                                                 <label htmlFor="background-check" className="text-sm text-slate-700 cursor-pointer">
-                                                    I consent to a background check and agree to the{' '}
-                                                    <a href="#" className="text-blue-600 hover:underline font-medium">Terms of Service</a>
-                                                    {' '}and{' '}
-                                                    <a href="#" className="text-blue-600 hover:underline font-medium">Privacy Policy</a>
+                                                    {t('policies.worker.registrationAgreePrefix')}{' '}
+                                                    <Link to="/worker-policy" target="_blank" className="text-blue-600 hover:underline font-medium">
+                                                        {t('policies.worker.linkText')}
+                                                    </Link>
+                                                    {t('policies.worker.registrationAgreeSuffix')}
                                                 </label>
                                             </div>
                                             {errors.agreedToBackgroundCheck && (

@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useState, useContext } from 'react';
 import { ArrowLeft, CreditCard, Lock } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { AuthContext } from '../context/AuthContext';
-import { getPayhereHash } from '../api/payment';
+import { getPayhereHash, confirmPayment } from '../api/payment';
 
 const PaymentPage = () => {
     const navigate = useNavigate();
@@ -36,9 +36,22 @@ const PaymentPage = () => {
         const setupPayhereHandlers = () => {
             if (!window.payhere) return;
 
-            window.payhere.onCompleted = function onCompleted(orderId) {
-                alert(`Payment completed. Order: ${orderId}`);
-                navigate('/customer-dashboard', { state: { paymentSuccess: true } });
+            window.payhere.onCompleted = async function onCompleted(orderId) {
+                try {
+                    await confirmPayment({
+                        serviceRequestId: orderId,
+                        amount: amountValue,
+                        providerUserId: booking.providerUserId || null,
+                    });
+                    navigate('/customer-dashboard', {
+                        state: { paymentSuccess: true, tab: 'active' },
+                        replace: true,
+                    });
+                } catch (error) {
+                    console.error('Payment confirm error:', error);
+                    alert(error.response?.data?.message || 'Payment completed but failed to save. Please contact support.');
+                    navigate('/customer-dashboard', { state: { tab: 'active' }, replace: true });
+                }
             };
 
             window.payhere.onDismissed = function onDismissed() {
@@ -84,7 +97,7 @@ const PaymentPage = () => {
         };
 
         loadNext();
-    }, [navigate]);
+    }, [navigate, amountValue, booking.providerUserId]);
 
     const handlePayNow = async () => {
         try {

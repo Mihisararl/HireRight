@@ -1,0 +1,163 @@
+/* Provider settings — extends CustomerSettings.css */
+
+.provider-settings-page .provider-settings-hero {
+  background: linear-gradient(135deg, #059669 0%, #0d9488 100%);
+  box-shadow: 0 12px 32px rgba(5, 150, 105, 0.25);
+}
+
+.provider-settings-badge {
+  display: inline-block;
+  margin-top: 8px;
+  padding: 4px 12px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.2);
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.customer-settings-card-icon--professional {
+  background: #fef3c7;
+  color: #d97706;
+}
+
+.customer-settings-card-icon--availability {
+  background: #ede9fe;
+  color: #7c3aed;
+}
+
+.customer-settings-field select,
+.customer-settings-field textarea {
+  width: 100%;
+  padding: 12px 14px;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  font-size: 15px;
+  color: #0f172a;
+  background: #f8fafc;
+  transition: border-color 0.15s, box-shadow 0.15s, background 0.15s;
+  box-sizing: border-box;
+  font-family: inherit;
+}
+
+.customer-settings-field select:focus,
+.customer-settings-field textarea:focus {
+  outline: none;
+  border-color: #059669;
+  background: #fff;
+  box-shadow: 0 0 0 3px rgba(5, 150, 105, 0.12);
+}
+
+.customer-settings-textarea {
+  resize: vertical;
+  min-height: 110px;
+  line-height: 1.5;
+}
+
+.provider-settings-page .customer-settings-field input:focus {
+  border-color: #059669;
+  box-shadow: 0 0 0 3px rgba(5, 150, 105, 0.12);
+}
+
+.provider-settings-page .customer-settings-save {
+  background: linear-gradient(135deg, #059669 0%, #0d9488 100%);
+  box-shadow: 0 4px 14px rgba(5, 150, 105, 0.35);
+}
+
+.provider-settings-page .customer-settings-save:hover:not(:disabled) {
+  box-shadow: 0 6px 18px rgba(5, 150, 105, 0.4);
+}
+
+.provider-settings-page .customer-settings-back:hover {
+  color: #059669;
+}
+
+.provider-settings-availability {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.provider-settings-availability-status {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.provider-settings-status-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.provider-settings-status-dot--on {
+  background: #10b981;
+  box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.25);
+}
+
+.provider-settings-status-dot--off {
+  background: #94a3b8;
+  box-shadow: 0 0 0 3px rgba(148, 163, 184, 0.25);
+}
+
+.provider-settings-status-label {
+  font-size: 15px;
+  font-weight: 600;
+  color: #0f172a;
+}
+
+.provider-settings-availability-btn {
+  align-self: flex-start;
+  padding: 12px 24px;
+  border-radius: 10px;
+  border: none;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: opacity 0.15s, transform 0.15s;
+}
+
+.provider-settings-availability-btn--on {
+  background: #fef2f2;
+  color: #b91c1c;
+  border: 1px solid #fecaca;
+}
+
+.provider-settings-availability-btn--off {
+  background: #ecfdf5;
+  color: #047857;
+  border: 1px solid #a7f3d0;
+}
+
+.provider-settings-availability-btn:hover:not(:disabled) {
+  transform: translateY(-1px);
+}
+
+.provider-settings-availability-btn:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+}
+
+.provider-settings-booked-dates {
+  padding: 14px 16px;
+  border-radius: 10px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  color: #64748b;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.provider-settings-booked-dates--active {
+  background: #fff7ed;
+  border-color: #fed7aa;
+  color: #9a3412;
+}
+
+@media (max-width: 640px) {
+  .provider-settings-availability-btn {
+    width: 100%;
+    text-align: center;
+  }
+}

@@ -1,12 +1,17 @@
-import { useState } from 'react';
+import { useState, useContext } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import API from '../utils/api';
+import { loginWithGoogle } from '../api/auth';
+import { AuthContext } from '../context/AuthContext';
 import LanguageSwitcher from '../components/LanguageSwitcher';
+import GoogleSignInButton from '../components/GoogleSignInButton';
+import { navigateAfterAuth } from '../utils/authNavigation';
 
 export default function Register() {
   const { t } = useTranslation();
   const navigate = useNavigate();
+  const { login } = useContext(AuthContext);
 
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
@@ -18,6 +23,25 @@ export default function Register() {
   const [role, setRole] = useState('customer');
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
+  const [googleLoading, setGoogleLoading] = useState(false);
+  const [agreedToTerms, setAgreedToTerms] = useState(false);
+
+  const showGoogle = Boolean(process.env.REACT_APP_GOOGLE_CLIENT_ID);
+
+  const handleGoogleSuccess = async (credential) => {
+    setError('');
+    setSuccess('');
+    setGoogleLoading(true);
+    try {
+      const data = await loginWithGoogle(credential, role);
+      login(data.user, data.token);
+      navigateAfterAuth(navigate, data.user, null);
+    } catch (err) {
+      setError(err.response?.data?.message || t('auth.googleSignInFailed'));
+    } finally {
+      setGoogleLoading(false);
+    }
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -26,6 +50,11 @@ export default function Register() {
 
     if (password !== confirmPassword) {
       setError(t("auth.passwordsNoMatch"));
+      return;
+    }
+
+    if (!agreedToTerms) {
+      setError(t("policies.customer.agreeRequired"));
       return;
     }
 
@@ -112,7 +141,52 @@ export default function Register() {
           <input type="password" placeholder={t("auth.confirmPassword")} value={confirmPassword}
             onChange={(e) => setConfirmPassword(e.target.value)} required style={inputStyle} />
 
+          <label style={{
+            display: 'flex',
+            alignItems: 'flex-start',
+            gap: '10px',
+            fontSize: '14px',
+            color: '#475569',
+            lineHeight: 1.5,
+            cursor: 'pointer',
+          }}>
+            <input
+              type="checkbox"
+              checked={agreedToTerms}
+              onChange={(e) => setAgreedToTerms(e.target.checked)}
+              style={{ marginTop: '3px', width: '16px', height: '16px', cursor: 'pointer' }}
+            />
+            <span>
+              {t('policies.customer.agreePrefix')}{' '}
+              <Link to="/privacy-policy" target="_blank" style={{ color: '#0066cc', fontWeight: '600' }}>
+                {t('policies.customer.linkText')}
+              </Link>
+            </span>
+          </label>
+
           <button type="submit" style={buttonStyle}>{t("register")}</button>
+
+          {showGoogle && (
+            <>
+              <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '12px',
+                margin: '8px 0 0',
+              }}>
+                <div style={{ flex: 1, height: 1, backgroundColor: '#ddd' }} />
+                <span style={{ fontSize: '13px', color: '#888' }}>{t('auth.orDivider')}</span>
+                <div style={{ flex: 1, height: 1, backgroundColor: '#ddd' }} />
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'center' }}>
+                <GoogleSignInButton
+                  onSuccess={handleGoogleSuccess}
+                  onError={(msg) => setError(msg || t('auth.googleSignInFailed'))}
+                  disabled={googleLoading}
+                />
+              </div>
+            </>
+          )}
 
           {error && (
             <p style={{ color: "#dc3545", textAlign: "center", margin: "0", fontSize: "14px" }}>

@@ -96,6 +96,7 @@ export const approveProvider = async (req, res) => {
             professionalBio: registrationRequest.professionalBio,
             portfolioPhoto: registrationRequest.portfolioPhoto,
             idDocument: registrationRequest.idDocument,
+            nicNumber: registrationRequest.nicNumber,
             bankName: registrationRequest.bankName,
             accountNumber: registrationRequest.accountNumber,
             branch: registrationRequest.branch,

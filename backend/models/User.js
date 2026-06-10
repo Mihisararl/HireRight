@@ -9,6 +9,13 @@ const userSchema = new mongoose.Schema({
   district: { type: String, trim: true },
   postalCode: { type: String, trim: true },
   password: { type: String, required: true },
+  googleId: { type: String, unique: true, sparse: true },
+  authProvider: {
+    type: String,
+    enum: ['local', 'google', 'both'],
+    default: 'local'
+  },
+  needsPhone: { type: Boolean, default: false },
   role: { type: String, enum: ['customer', 'provider', 'admin'], default: 'customer' },
   profilePhoto: { type: String },
 
@@ -19,9 +26,12 @@ const userSchema = new mongoose.Schema({
   professionalBio: { type: String },
   portfolioPhoto: { type: String }, // URL or path
   idDocument: { type: String }, // URL or path to ID document
+  nicNumber: { type: String, trim: true, uppercase: true },
   city: { type: String },
   verificationToken: String,
   verificationExpires: Date,
+  passwordResetToken: String,
+  passwordResetExpires: Date,
   isVerified: {
     type: Boolean,
     default: false,

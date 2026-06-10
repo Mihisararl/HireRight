@@ -18,6 +18,23 @@ export default function AdminDashboard() {
   const [bankDetails, setBankDetails] = useState(null);
   const [bankUser, setBankUser] = useState(null);
   const [bankLoading, setBankLoading] = useState(false);
+  const [nicModalOpen, setNicModalOpen] = useState(false);
+  const [nicProvider, setNicProvider] = useState(null);
+
+  const getProviderDisplayName = (provider) => {
+    const fullName = [provider?.firstName, provider?.lastName].filter(Boolean).join(' ').trim();
+    return fullName || provider?.name || '-';
+  };
+
+  const isPdfDocument = (doc) => {
+    if (!doc || typeof doc !== 'string') return false;
+    return doc.startsWith('data:application/pdf') || doc.toLowerCase().includes('.pdf');
+  };
+
+  const openNicModal = (provider) => {
+    setNicProvider(provider);
+    setNicModalOpen(true);
+  };
 
   useEffect(() => {
     if (!user || user.role !== 'admin') {
@@ -119,7 +136,7 @@ export default function AdminDashboard() {
 
   const Badge = ({ children, variant = 'default' }) => {
     const badgeColors = {
-      pending: { bg: '#fef3c7', text: '#92400e' },
+      pending: { bg: '#fee2e2', text: '#991b1b' },
       approved: { bg: '#d1fae5', text: '#065f46' },
       rejected: { bg: '#fee2e2', text: '#991b1b' },
       open: { bg: '#dbeafe', text: '#1e40af' },
@@ -415,7 +432,8 @@ export default function AdminDashboard() {
                     <th style={styles.th}>Location</th>
                     <th style={styles.th}>Experience</th>
                     <th style={styles.th}>Rate</th>
-                    <th style={styles.th}>ID Doc</th>
+                    <th style={styles.th}>NIC</th>
+                    <th style={styles.th}>Verification</th>
                     <th style={styles.th}>Status</th>
                     <th style={styles.th}>Actions</th>
                   </tr>
@@ -423,24 +441,48 @@ export default function AdminDashboard() {
                 <tbody>
                   {providers.length === 0 ? (
                     <tr>
-                      <td colSpan="10" style={styles.emptyCell}>No provider requests</td>
+                      <td colSpan="11" style={styles.emptyCell}>No provider requests</td>
                     </tr>
                   ) : (
                     providers.map((p) => (
-                      <tr key={p._id} style={styles.tableRow}>
+                      <tr
+                        key={p._id}
+                        style={{
+                          ...styles.tableRow,
+                          ...(p.status === 'pending' ? styles.tableRowPending : {})
+                        }}
+                      >
                         <td style={styles.td}>
                           <div style={styles.userCell}>
-                            <div style={styles.miniAvatar}>{p.name?.charAt(0).toUpperCase()}</div>
-                            {p.name}
+                            <div style={{
+                              ...styles.miniAvatar,
+                              ...(p.status === 'pending' ? styles.miniAvatarPending : {})
+                            }}>
+                              {getProviderDisplayName(p).charAt(0).toUpperCase()}
+                            </div>
+                            <span style={p.status === 'pending' ? styles.pendingText : undefined}>
+                              {getProviderDisplayName(p)}
+                            </span>
                           </div>
                         </td>
-                        <td style={styles.td}>{p.email}</td>
-                        <td style={styles.td}>{p.phone || '-'}</td>
-                        <td style={styles.td}>{p.serviceCategory || '-'}</td>
-                        <td style={styles.td}>{[p.city, p.district].filter(Boolean).join(', ') || '-'}</td>
-                        <td style={styles.td}>{p.yearsOfExperience ?? '-'} years</td>
-                        <td style={styles.td}>Rs. {p.hourlyRate ?? '-'}</td>
-                        <td style={styles.td}>{p.idDocument ? 'Uploaded' : '-'}</td>
+                        <td style={{ ...styles.td, ...(p.status === 'pending' ? styles.pendingCell : {}) }}>{p.email}</td>
+                        <td style={{ ...styles.td, ...(p.status === 'pending' ? styles.pendingCell : {}) }}>{p.phone || '-'}</td>
+                        <td style={{ ...styles.td, ...(p.status === 'pending' ? styles.pendingCell : {}) }}>{p.serviceCategory || '-'}</td>
+                        <td style={{ ...styles.td, ...(p.status === 'pending' ? styles.pendingCell : {}) }}>{[p.city, p.district].filter(Boolean).join(', ') || '-'}</td>
+                        <td style={{ ...styles.td, ...(p.status === 'pending' ? styles.pendingCell : {}) }}>{p.yearsOfExperience ?? '-'} years</td>
+                        <td style={{ ...styles.td, ...(p.status === 'pending' ? styles.pendingCell : {}) }}>Rs. {p.hourlyRate ?? '-'}</td>
+                        <td style={{ ...styles.td, ...(p.status === 'pending' ? styles.pendingCell : {}) }}>
+                          {p.nicNumber || '-'}
+                        </td>
+                        <td style={{ ...styles.td, ...(p.status === 'pending' ? styles.pendingCell : {}) }}>
+                          {p.idDocument ? (
+                            <button type="button" style={styles.btnCheckNic} onClick={() => openNicModal(p)}>
+                              Check NIC
+                            </button>
+                          ) : (
+                            '-'
+                          )}
+                        </td>
                         <td style={styles.td}>
                           <Badge variant={p.status}>{p.status === 'pending' ? 'Pending' : p.status}</Badge>
                         </td>
@@ -625,6 +667,68 @@ export default function AdminDashboard() {
                   )}
                 </tbody>
               </table>
+            </div>
+          </div>
+        )}
+
+        {nicModalOpen && (
+          <div style={styles.modalOverlay}>
+            <div style={{ ...styles.modalCard, maxWidth: '720px' }}>
+              <div style={styles.modalHeader}>
+                <div>
+                  <h3 style={styles.modalTitle}>NIC Verification</h3>
+                  <p style={styles.modalSubtitle}>{getProviderDisplayName(nicProvider)}</p>
+                </div>
+                <button
+                  style={styles.modalClose}
+                  onClick={() => setNicModalOpen(false)}
+                >
+                  ×
+                </button>
+              </div>
+
+              <div style={styles.modalBody}>
+                <div style={styles.detailRow}>
+                  <span style={styles.detailLabel}>NIC Number</span>
+                  <span style={styles.detailValue}>{nicProvider?.nicNumber || 'Not provided'}</span>
+                </div>
+                <div style={styles.detailRow}>
+                  <span style={styles.detailLabel}>Email</span>
+                  <span style={styles.detailValue}>{nicProvider?.email || '-'}</span>
+                </div>
+                <div style={styles.detailDivider}></div>
+
+                {nicProvider?.idDocument ? (
+                  isPdfDocument(nicProvider.idDocument) ? (
+                    <div>
+                      <p style={{ fontSize: '14px', color: '#64748b', marginBottom: '12px' }}>
+                        NIC document uploaded as PDF
+                      </p>
+                      <iframe
+                        title="NIC document"
+                        src={nicProvider.idDocument}
+                        style={styles.nicPreviewFrame}
+                      />
+                      <a
+                        href={nicProvider.idDocument}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        style={styles.nicOpenLink}
+                      >
+                        Open in new tab
+                      </a>
+                    </div>
+                  ) : (
+                    <img
+                      src={nicProvider.idDocument}
+                      alt="NIC document"
+                      style={styles.nicPreviewImage}
+                    />
+                  )
+                ) : (
+                  <p style={{ color: '#94a3b8' }}>No NIC document uploaded.</p>
+                )}
+              </div>
             </div>
           </div>
         )}
@@ -1051,6 +1155,55 @@ const styles = {
   },
   tableRow: {
     transition: 'background-color 0.2s'
+  },
+  tableRowPending: {
+    backgroundColor: '#fef2f2',
+    borderLeft: '4px solid #ef4444'
+  },
+  pendingText: {
+    color: '#b91c1c',
+    fontWeight: '600'
+  },
+  pendingCell: {
+    color: '#991b1b'
+  },
+  miniAvatarPending: {
+    backgroundColor: '#fee2e2',
+    color: '#dc2626'
+  },
+  btnCheckNic: {
+    padding: '8px 14px',
+    borderRadius: '8px',
+    border: '1px solid #93c5fd',
+    backgroundColor: '#eff6ff',
+    color: '#1d4ed8',
+    fontSize: '13px',
+    fontWeight: '600',
+    cursor: 'pointer',
+    transition: 'background-color 0.15s, border-color 0.15s'
+  },
+  nicPreviewImage: {
+    width: '100%',
+    maxHeight: '420px',
+    objectFit: 'contain',
+    borderRadius: '12px',
+    border: '1px solid #e2e8f0',
+    backgroundColor: '#f8fafc'
+  },
+  nicPreviewFrame: {
+    width: '100%',
+    height: '420px',
+    border: '1px solid #e2e8f0',
+    borderRadius: '12px',
+    backgroundColor: '#f8fafc'
+  },
+  nicOpenLink: {
+    display: 'inline-block',
+    marginTop: '12px',
+    color: '#2563eb',
+    fontSize: '14px',
+    fontWeight: '600',
+    textDecoration: 'none'
   },
   emptyCell: {
     padding: '60px 28px',

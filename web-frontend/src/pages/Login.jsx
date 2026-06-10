@@ -1,9 +1,11 @@
 import { useState, useContext, useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import { AuthContext } from "../context/AuthContext";
-import { loginUser } from "../api/auth";
-import { useNavigate, useLocation } from "react-router-dom";
+import { loginUser, loginWithGoogle } from "../api/auth";
+import { Link, useNavigate, useLocation } from "react-router-dom";
 import LanguageSwitcher from "../components/LanguageSwitcher";
+import GoogleSignInButton from "../components/GoogleSignInButton";
+import { navigateAfterAuth } from "../utils/authNavigation";
 
 export default function Login() {
   const { t } = useTranslation();
@@ -15,6 +17,8 @@ export default function Login() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [verifiedMsg, setVerifiedMsg] = useState("");
+  const [googleLoading, setGoogleLoading] = useState(false);
+  const [googleRole, setGoogleRole] = useState("customer");
 
   useEffect(() => {
     const searchParams = new URLSearchParams(location.search);
@@ -28,21 +32,7 @@ export default function Login() {
     try {
       const data = await loginUser(email, password);
       login(data.user, data.token);
-
-      if (location.state?.bookingIntent) {
-        if (data.user.role === "customer") {
-          navigate("/services", { state: { bookingIntent: location.state.bookingIntent } });
-        } else {
-          alert(t("auth.onlyCustomersBook"));
-          navigate("/provider-dashboard");
-        }
-      } else if (data.user.role === "provider") {
-        navigate("/provider-dashboard");
-      } else if (data.user.role === "customer") {
-        navigate("/customer-dashboard");
-      } else {
-        navigate("/");
-      }
+      navigateAfterAuth(navigate, data.user, location);
     } catch (err) {
       if (err.response?.status === 400) {
         setError(t("auth.invalidCredentials"));
@@ -51,6 +41,22 @@ export default function Login() {
       }
     }
   };
+
+  const handleGoogleSuccess = async (credential) => {
+    setError("");
+    setGoogleLoading(true);
+    try {
+      const data = await loginWithGoogle(credential, googleRole);
+      login(data.user, data.token);
+      navigateAfterAuth(navigate, data.user, location);
+    } catch (err) {
+      setError(err.response?.data?.message || t("auth.googleSignInFailed"));
+    } finally {
+      setGoogleLoading(false);
+    }
+  };
+
+  const showGoogle = Boolean(process.env.REACT_APP_GOOGLE_CLIENT_ID);
 
   return (
     <div style={{
@@ -146,10 +152,10 @@ export default function Login() {
             />
           </div>
 
-          <a href="/forgot-password"
-            style={{ textAlign: 'left', fontSize: '14px', color: '#666' }}>
+          <Link to="/forgot-password"
+            style={{ textAlign: 'left', fontSize: '14px', color: '#666', textDecoration: 'none' }}>
             {t("auth.forgotPassword")}
-          </a>
+          </Link>
 
           <button onClick={handleSubmit} style={{
             width: '100%',
@@ -164,6 +170,65 @@ export default function Login() {
           }}>
             {t("auth.logIn")}
           </button>
+
+          {showGoogle && (
+            <>
+              <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '12px',
+                margin: '4px 0',
+              }}>
+                <div style={{ flex: 1, height: 1, backgroundColor: '#ddd' }} />
+                <span style={{ fontSize: '13px', color: '#888' }}>{t("auth.orDivider")}</span>
+                <div style={{ flex: 1, height: 1, backgroundColor: '#ddd' }} />
+              </div>
+              <p style={{ fontSize: '13px', color: '#666', margin: 0, textAlign: 'center' }}>
+                {t("auth.googleSignInAs")}
+              </p>
+              <div style={{ display: 'flex', gap: '8px' }}>
+                <button
+                  type="button"
+                  onClick={() => setGoogleRole('customer')}
+                  style={{
+                    flex: 1,
+                    padding: '10px',
+                    borderRadius: '8px',
+                    border: googleRole === 'customer' ? '2px solid #4169ff' : '1px solid #ddd',
+                    backgroundColor: googleRole === 'customer' ? '#eef3ff' : '#f5f5f5',
+                    cursor: 'pointer',
+                    fontSize: '13px',
+                    fontWeight: 600,
+                  }}
+                >
+                  {t("auth.serviceReceiver")}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setGoogleRole('provider')}
+                  style={{
+                    flex: 1,
+                    padding: '10px',
+                    borderRadius: '8px',
+                    border: googleRole === 'provider' ? '2px solid #4169ff' : '1px solid #ddd',
+                    backgroundColor: googleRole === 'provider' ? '#eef3ff' : '#f5f5f5',
+                    cursor: 'pointer',
+                    fontSize: '13px',
+                    fontWeight: 600,
+                  }}
+                >
+                  {t("auth.serviceProvider")}
+                </button>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'center' }}>
+                <GoogleSignInButton
+                  onSuccess={handleGoogleSuccess}
+                  onError={(msg) => setError(msg || t("auth.googleSignInFailed"))}
+                  disabled={googleLoading}
+                />
+              </div>
+            </>
+          )}
 
           {error && (
             <p style={{ color: '#dc3545', textAlign: 'center', margin: '0' }}>

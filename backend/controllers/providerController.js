@@ -6,6 +6,13 @@ import ServiceRequest from '../models/ServiceRequest.js';
 
 const toNumber = (value) => (value === '' || value === null || value === undefined ? undefined : Number(value));
 
+const normalizeNicNumber = (value) => String(value || '').trim().toUpperCase();
+
+const isValidNicNumber = (value) => {
+  const nic = normalizeNicNumber(value);
+  return /^\d{9}[VX]$/.test(nic) || /^\d{12}$/.test(nic);
+};
+
 const getLocalDateString = () => {
   const d = new Date();
   const y = d.getFullYear();
@@ -140,6 +147,7 @@ export const registerProvider = async (req, res) => {
       district,
       postalCode,
       idDocument,
+      nicNumber,
       bankName,
       accountNumber,
       branch,
@@ -171,6 +179,16 @@ export const registerProvider = async (req, res) => {
     if (!serviceCategory || yearsOfExperience === undefined || hourlyRate === undefined || !city || !district || !idDocument) {
       return res.status(400).json({
         message: 'Complete all required worker registration fields before submitting.'
+      });
+    }
+
+    const normalizedNic = normalizeNicNumber(nicNumber);
+    if (!normalizedNic) {
+      return res.status(400).json({ message: 'NIC number is required.' });
+    }
+    if (!isValidNicNumber(normalizedNic)) {
+      return res.status(400).json({
+        message: 'Enter a valid NIC number (9 digits + V/X or 12 digits).'
       });
     }
 
@@ -208,6 +226,7 @@ export const registerProvider = async (req, res) => {
     existingUser.professionalBio = professionalBio || existingUser.professionalBio;
     existingUser.portfolioPhoto = portfolioPhoto || existingUser.portfolioPhoto;
     existingUser.idDocument = idDocument || existingUser.idDocument;
+    existingUser.nicNumber = normalizedNic || existingUser.nicNumber;
     existingUser.city = city || existingUser.city;
     existingUser.phone = providerPhone || existingUser.phone;
     await existingUser.save();
@@ -231,6 +250,7 @@ export const registerProvider = async (req, res) => {
       district,
       postalCode,
       idDocument,
+      nicNumber: normalizedNic,
       bankName,
       accountNumber,
       branch,

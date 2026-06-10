@@ -113,3 +113,20 @@ export const tryGetBrowserLocation = async () => {
   }
   throw lastError;
 };
+
+/** LKR per day — supports legacy `budget` field on older service requests */
+export const getRequestDailyBudget = (request) => (
+  Number(request?.dailyBudget ?? request?.budget ?? 0)
+);
+
+/** Total amount customer pays (accepted offer price, or daily budget fallback) */
+export const getRequestPayableAmount = (request) => {
+  if (!request) return 0;
+
+  const offerPrice = request.providerOffer?.proposedPrice;
+  if (offerPrice != null && Number(offerPrice) > 0) {
+    return Number(offerPrice);
+  }
+
+  return getRequestDailyBudget(request);
+};

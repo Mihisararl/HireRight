@@ -1,10 +1,11 @@
 // components/ProtectedRoute.jsx
-import { Navigate } from 'react-router-dom';
+import { Navigate, useLocation } from 'react-router-dom';
 import { useContext } from 'react';
 import { AuthContext } from '../context/AuthContext';
 
 export default function ProtectedRoute({ children, requiredRole }) {
   const { user, loading } = useContext(AuthContext);
+  const location = useLocation();
 
   if (loading) return <p>Loading...</p>; // shows spinner or text while auth initializes
 
@@ -15,6 +16,15 @@ export default function ProtectedRoute({ children, requiredRole }) {
   // Check role (case-insensitive)
   if (requiredRole && user.role?.toLowerCase() !== requiredRole.toLowerCase()) {
     return <Navigate to="/login" replace />; // optional: send to login instead of home
+  }
+
+  const onCompleteProfile = location.pathname === '/complete-profile';
+  if (
+    (user.role === 'customer' || user.role === 'provider')
+    && user.needsProfileCompletion
+    && !onCompleteProfile
+  ) {
+    return <Navigate to="/complete-profile" replace />;
   }
 
   return children;

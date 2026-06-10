@@ -1,6 +1,7 @@
 // App.jsx
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import { GoogleOAuthProvider } from '@react-oauth/google';
 import { I18nextProvider } from 'react-i18next';
 import i18n from './i18n';
 import { AuthProvider } from './context/AuthContext';
@@ -10,6 +11,8 @@ import Services from './pages/Services';
 import HowItWorks from './pages/HowItWorks';
 import BecomeWorker from './pages/BecomeWorker';
 import Login from './pages/Login';
+import ForgotPassword from './pages/ForgotPassword';
+import ResetPassword from './pages/ResetPassword';
 import CustomerDashboard from "./pages/CustomerDashboard";
 import AdminLogin from './pages/AdminLogin';
 import AdminDashboard from './pages/AdminDashboard';
@@ -21,12 +24,13 @@ import PaymentPage from './pages/PaymentPage';
 import ReportIssue from "./pages/ReportIssue";
 import CustomerSettings from "./pages/CustomerSettings";
 import ProviderSettings from "./pages/ProviderSettings";
+import CompleteProfile from "./pages/CompleteProfile";
+import PolicyPage from "./pages/PolicyPage";
 
+const googleClientId = process.env.REACT_APP_GOOGLE_CLIENT_ID || '';
 
-function App() {
+function AppRoutes() {
   return (
-    <I18nextProvider i18n={i18n}>
-    <AuthProvider>
       <Router>
         <Routes>
           <Route path="/" element={<Home />} />
@@ -36,7 +40,19 @@ function App() {
           <Route path="/become-a-worker" element={<BecomeWorker />} />
           <Route path="/provider-registration" element={<ProviderRegistration />} />
           <Route path="/login" element={<Login />} />
+          <Route path="/forgot-password" element={<ForgotPassword />} />
+          <Route path="/reset-password/:token" element={<ResetPassword />} />
           <Route path="/signup" element={<Register />} />
+          <Route path="/privacy-policy" element={<PolicyPage />} />
+          <Route path="/worker-policy" element={<PolicyPage />} />
+          <Route
+            path="/complete-profile"
+            element={
+              <ProtectedRoute>
+                <CompleteProfile />
+              </ProtectedRoute>
+            }
+          />
           <Route path="/customer-dashboard" element={<ProtectedRoute><CustomerDashboard /></ProtectedRoute>} />
           <Route path="/admin-login" element={<AdminLogin />} />
           <Route path="/payment" element={<PaymentPage />} />
@@ -79,7 +95,23 @@ function App() {
 
           <Route path="/provider-dashboard" element={<ProtectedRoute><ProviderDashboard /></ProtectedRoute>} /></Routes>
       </Router>
+  );
+}
+
+function App() {
+  const content = (
+    <AuthProvider>
+      <AppRoutes />
     </AuthProvider>
+  );
+
+  return (
+    <I18nextProvider i18n={i18n}>
+      {googleClientId ? (
+        <GoogleOAuthProvider clientId={googleClientId}>
+          {content}
+        </GoogleOAuthProvider>
+      ) : content}
     </I18nextProvider>
   );
 }

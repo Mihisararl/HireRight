@@ -4,8 +4,10 @@ import Provider from '../models/Provider.js';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import crypto from 'crypto';
+import { OAuth2Client } from 'google-auth-library';
 import { Resend } from 'resend';
 import dotenv from 'dotenv';
+import { buildAuthUserResponse, signAuthToken } from '../utils/authHelpers.js';
 
 dotenv.config();
 
@@ -110,6 +112,127 @@ export const verifyEmail = async (req, res) => {
   }
 };
 
+const PASSWORD_RESET_EXPIRY_MS = 60 * 60 * 1000; // 1 hour
+
+const normalizeEmail = (email) => String(email || '').trim().toLowerCase();
+
+const isStrongEnoughPassword = (password) => typeof password === 'string' && password.length >= 6;
+
+// ================= FORGOT PASSWORD =================
+export const forgotPassword = async (req, res) => {
+  try {
+    const email = normalizeEmail(req.body?.email);
+    const genericMessage =
+      'If an account exists for that email, you will receive a password reset link shortly.';
+
+    if (!email) {
+      return res.status(400).json({ message: 'Email is required' });
+    }
+
+    const user = await User.findOne({ email });
+
+    if (user && user.authProvider === 'google') {
+      return res.json({ message: genericMessage });
+    }
+
+    if (user) {
+      const resetToken = crypto.randomBytes(32).toString('hex');
+      user.passwordResetToken = resetToken;
+      user.passwordResetExpires = new Date(Date.now() + PASSWORD_RESET_EXPIRY_MS);
+      await user.save();
+
+      const resetUrl = `${process.env.FRONTEND_URL}/reset-password/${resetToken}`;
+
+      try {
+        await resend.emails.send({
+          from: process.env.RESEND_FROM_EMAIL,
+          to: email,
+          subject: 'Reset your HireRight password',
+          html: `
+            <h2>Password reset request</h2>
+            <p>Hi ${user.name},</p>
+            <p>We received a request to reset your password. Click the button below to choose a new password:</p>
+            <a href="${resetUrl}"
+               style="display:inline-block;padding:10px 20px;background:#0066ff;color:#fff;text-decoration:none;border-radius:5px;">
+               Reset Password
+            </a>
+            <p>If the button does not work, copy and paste this link into your browser:</p>
+            <p>${resetUrl}</p>
+            <p>This link expires in 1 hour. If you did not request a reset, you can ignore this email.</p>
+          `
+        });
+      } catch (emailErr) {
+        console.error('forgotPassword email error:', emailErr);
+        return res.status(500).json({ message: 'Failed to send reset email. Please try again later.' });
+      }
+    }
+
+    res.json({ message: genericMessage });
+  } catch (err) {
+    console.error('forgotPassword error:', err);
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
+// ================= VALIDATE RESET TOKEN =================
+export const validateResetToken = async (req, res) => {
+  try {
+    const { token } = req.params;
+
+    const user = await User.findOne({
+      passwordResetToken: token,
+      passwordResetExpires: { $gt: Date.now() }
+    }).select('email');
+
+    if (!user) {
+      return res.status(400).json({ valid: false, message: 'Invalid or expired reset link' });
+    }
+
+    res.json({ valid: true, email: user.email });
+  } catch (err) {
+    console.error('validateResetToken error:', err);
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
+// ================= RESET PASSWORD =================
+export const resetPassword = async (req, res) => {
+  try {
+    const { token, password, confirmPassword } = req.body || {};
+
+    if (!token) {
+      return res.status(400).json({ message: 'Reset token is required' });
+    }
+
+    if (!isStrongEnoughPassword(password)) {
+      return res.status(400).json({ message: 'Password must be at least 6 characters' });
+    }
+
+    if (password !== confirmPassword) {
+      return res.status(400).json({ message: 'Passwords do not match' });
+    }
+
+    const user = await User.findOne({
+      passwordResetToken: token,
+      passwordResetExpires: { $gt: Date.now() }
+    });
+
+    if (!user) {
+      return res.status(400).json({ message: 'Invalid or expired reset link' });
+    }
+
+    user.password = password;
+    user.passwordResetToken = undefined;
+    user.passwordResetExpires = undefined;
+    await user.save();
+
+    res.json({ message: 'Password updated successfully. You can now log in.' });
+  } catch (err) {
+    console.error('resetPassword error:', err);
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
 // ================= LOGIN =================
 export const login = async (req, res) => {
   try {
@@ -119,9 +242,15 @@ export const login = async (req, res) => {
       return res.status(400).json({ message: "Email and password required" });
     }
 
-    const user = await User.findOne({ email });
+    const user = await User.findOne({ email: normalizeEmail(email) });
     if (!user) {
       return res.status(400).json({ message: "Invalid credentials" });
+    }
+
+    if (user.authProvider === 'google') {
+      return res.status(400).json({
+        message: 'This account uses Google sign-in. Please continue with Google.'
+      });
     }
 
     // BLOCK IF NOT VERIFIED (admins can bypass)
@@ -136,30 +265,132 @@ export const login = async (req, res) => {
       return res.status(400).json({ message: "Invalid credentials" });
     }
 
-    const token = jwt.sign(
-      { id: user._id, role: user.role },
-      JWT_SECRET,
-      { expiresIn: '1d' }
-    );
+    const token = signAuthToken(user);
 
     res.json({
       token,
-      user: {
-        id: user._id,
-        name: user.name,
-        email: user.email,
-        phone: user.phone,
-        address: user.address,
-        postalCode: user.postalCode,
-        profilePhoto: user.profilePhoto,
-        role: user.role,
-        providerStatus: user.providerStatus
-      }
+      user: buildAuthUserResponse(user)
     });
 
   } catch (err) {
     console.error("Login error:", err);
     res.status(500).json({ message: "Server error" });
+  }
+};
+
+const ALLOWED_GOOGLE_ROLES = ['customer', 'provider'];
+
+const roleMismatchMessage = (existingRole, requestedRole) => {
+  if (existingRole === 'customer') {
+    return 'This email is registered as a service receiver. Sign in with Google as a customer, or use email and password.';
+  }
+  if (existingRole === 'provider') {
+    return 'This email is registered as a service provider. Sign in with Google as a provider, or use email and password.';
+  }
+  return 'This account cannot use Google sign-in for the selected role.';
+};
+
+// ================= GOOGLE (CUSTOMERS & PROVIDERS) =================
+export const googleAuth = async (req, res) => {
+  try {
+    const { credential, role: requestedRole } = req.body || {};
+    if (!credential) {
+      return res.status(400).json({ message: 'Google credential is required' });
+    }
+
+    const role = ALLOWED_GOOGLE_ROLES.includes(requestedRole) ? requestedRole : 'customer';
+
+    const googleClientId = process.env.GOOGLE_CLIENT_ID;
+    if (!googleClientId) {
+      return res.status(500).json({ message: 'Google sign-in is not configured on the server' });
+    }
+
+    const client = new OAuth2Client(googleClientId);
+    const ticket = await client.verifyIdToken({
+      idToken: credential,
+      audience: googleClientId
+    });
+
+    const payload = ticket.getPayload();
+    if (!payload?.email) {
+      return res.status(400).json({ message: 'Google account email is not available' });
+    }
+
+    if (payload.email_verified === false) {
+      return res.status(400).json({ message: 'Google email is not verified' });
+    }
+
+    const email = normalizeEmail(payload.email);
+    const googleId = payload.sub;
+    const name = payload.name || email.split('@')[0];
+    const picture = payload.picture;
+
+    let user = await User.findOne({ $or: [{ googleId }, { email }] });
+
+    if (user) {
+      if (user.role === 'admin') {
+        return res.status(403).json({ message: 'Admin accounts cannot use Google sign-in' });
+      }
+
+      if (user.role !== role) {
+        return res.status(403).json({ message: roleMismatchMessage(user.role, role) });
+      }
+
+      if (user.googleId && user.googleId !== googleId) {
+        return res.status(400).json({ message: 'Google account does not match this email' });
+      }
+
+      if (!user.googleId) {
+        user.googleId = googleId;
+        if (!user.authProvider || user.authProvider === 'local') {
+          user.authProvider = 'both';
+        }
+        if (picture && !user.profilePhoto) user.profilePhoto = picture;
+        user.isVerified = true;
+        await user.save();
+      }
+    } else {
+      const newUser = {
+        name,
+        email,
+        phone: '0000000000',
+        password: crypto.randomBytes(32).toString('hex'),
+        role,
+        googleId,
+        authProvider: 'google',
+        profilePhoto: picture,
+        isVerified: true,
+        needsPhone: true
+      };
+
+      if (role === 'provider') {
+        newUser.providerStatus = 'pending';
+      }
+
+      user = new User(newUser);
+      await user.save();
+    }
+
+    const token = signAuthToken(user);
+
+    res.json({
+      token,
+      user: buildAuthUserResponse(user)
+    });
+  } catch (err) {
+    console.error('googleAuth error:', err);
+    if (err.name === 'ValidationError') {
+      const messages = Object.values(err.errors).map((e) => e.message).join(', ');
+      return res.status(400).json({ message: messages });
+    }
+    if (err.code === 11000) {
+      return res.status(400).json({ message: 'An account with this email or Google ID already exists' });
+    }
+    const isDev = process.env.NODE_ENV !== 'production';
+    res.status(401).json({
+      message: 'Google sign-in failed. Please try again.',
+      ...(isDev && err.message ? { detail: err.message } : {})
+    });
   }
 };
 
@@ -187,7 +418,8 @@ export const getMe = async (req, res) => {
       professionalBio: user.professionalBio,
       portfolioPhoto: user.portfolioPhoto,
       city: user.city,
-      district: user.district
+      district: user.district,
+      needsProfileCompletion: Boolean(user.needsPhone)
     };
 
     if (user.role === 'provider') {
@@ -258,10 +490,20 @@ export const updateProfile = async (req, res) => {
     }
 
     if (name !== undefined) user.name = name;
-    if (phone !== undefined) user.phone = phone;
+    if (phone !== undefined) {
+      const trimmedPhone = String(phone).trim();
+      if (user.needsPhone && !trimmedPhone) {
+        return res.status(400).json({ message: 'Phone number is required' });
+      }
+      user.phone = trimmedPhone;
+      if (trimmedPhone && user.needsPhone) {
+        user.needsPhone = false;
+      }
+    }
     if (address !== undefined) user.address = address;
     if (postalCode !== undefined) user.postalCode = postalCode;
     if (profilePhoto !== undefined) user.profilePhoto = profilePhoto;
+    if (district !== undefined) user.district = district;
 
     if (user.role === 'provider') {
       if (serviceCategory !== undefined) user.serviceCategory = serviceCategory;
@@ -270,7 +512,6 @@ export const updateProfile = async (req, res) => {
       if (professionalBio !== undefined) user.professionalBio = professionalBio;
       if (portfolioPhoto !== undefined) user.portfolioPhoto = portfolioPhoto;
       if (city !== undefined) user.city = city;
-      if (district !== undefined) user.district = district;
     }
 
     await user.save();
@@ -379,7 +620,8 @@ export const updateProfile = async (req, res) => {
         professionalBio: user.professionalBio,
         portfolioPhoto: user.portfolioPhoto,
         city: user.city,
-        district: user.district
+        district: user.district,
+        needsProfileCompletion: Boolean(user.needsPhone)
       }
     });
   } catch (err) {

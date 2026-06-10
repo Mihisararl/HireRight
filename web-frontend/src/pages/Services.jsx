@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useContext } from 'react';
 import { Search, Wrench, Home, Paintbrush, Truck, Sparkles, MapPin, Phone, Star, X } from 'lucide-react';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { useNavigate, useLocation, useSearchParams } from 'react-router-dom';
 import { AuthContext } from '../context/AuthContext';
 import { getApprovedProviders, getProvidersByCategory } from '../api/provider';
 import { createServiceRequest } from '../api/service';
@@ -10,8 +10,9 @@ import { hasCoordinates } from '../utils/locationHelpers';
 export default function Services() {
   const navigate = useNavigate();
   const location = useLocation();
+  const [searchParams] = useSearchParams();
   const { user } = useContext(AuthContext);
-  const [searchQuery, setSearchQuery] = useState('');
+  const [searchQuery, setSearchQuery] = useState(() => searchParams.get('q') || '');
   const [selectedCategory, setSelectedCategory] = useState('All Services');
   const [sortBy, setSortBy] = useState('rating');
   const [providers, setProviders] = useState([]);
@@ -41,6 +42,13 @@ export default function Services() {
     { name: 'Moving', icon: Truck, count: null },
     { name: 'Other', icon: Sparkles, count: null }
   ];
+
+  useEffect(() => {
+    const q = searchParams.get('q');
+    if (q !== null) {
+      setSearchQuery(q);
+    }
+  }, [searchParams]);
 
   // Fetch providers on component mount
   useEffect(() => {
@@ -105,7 +113,8 @@ export default function Services() {
     (selectedCategory === 'All Services' || service.category === selectedCategory) &&
     (searchQuery === '' ||
       service.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      service.provider.toLowerCase().includes(searchQuery.toLowerCase()))
+      service.provider.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (service.category && service.category.toLowerCase().includes(searchQuery.toLowerCase())))
   );
 
   const sortedServices = [...filteredServices].sort((a, b) => {

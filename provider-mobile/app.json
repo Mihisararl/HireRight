@@ -2,6 +2,7 @@
   "expo": {
     "name": "HireRight Provider",
     "slug": "provider-mobile",
+    "scheme": "hireright-provider",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -30,6 +31,9 @@
     },
     "web": {
       "favicon": "./assets/favicon.png"
-    }
+    },
+    "plugins": [
+      "expo-web-browser"
+    ]
   }
 }
