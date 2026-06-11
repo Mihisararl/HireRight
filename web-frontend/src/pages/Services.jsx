@@ -23,8 +23,6 @@ export default function Services() {
     description: '',
     preferredDate: '',
     preferredTime: '',
-    estimatedDuration: '',
-    budget: '',
     location: { address: '' },
     specificRequirements: ''
   });
@@ -124,24 +122,6 @@ export default function Services() {
     return 0;
   });
 
-  const getParsedHours = (val) => {
-    if (!val) return 0;
-    const match = val.match(/(\d+(\.\d+)?)/);
-    return match ? parseFloat(match[0]) : 0;
-  };
-
-  const handleDurationChange = (duration) => {
-    const hours = getParsedHours(duration);
-    const hourlyRate = bookingModal ? parseFloat(bookingModal.price) : 0;
-    const calculatedBudget = hours > 0 ? (hours * hourlyRate).toString() : hourlyRate.toString();
-
-    setBookingForm(prev => ({
-      ...prev,
-      estimatedDuration: duration,
-      budget: calculatedBudget
-    }));
-  };
-
   const handleBook = (service) => {
     if (!user) {
       // Not logged in, redirect to login
@@ -157,8 +137,6 @@ export default function Services() {
         description: `Booking ${service.provider} for ${service.category}`,
         preferredDate: '',
         preferredTime: '',
-        estimatedDuration: '',
-        budget: service.price.toString(),
         location: { address: '' },
         specificRequirements: ''
       });
@@ -179,6 +157,7 @@ export default function Services() {
     }
 
     try {
+      const providerRate = Number(bookingModal.price);
       const payload = {
         userId: user.id,
         serviceCategory: bookingModal.category,
@@ -186,8 +165,7 @@ export default function Services() {
         description: bookingForm.description,
         preferredDate: bookingForm.preferredDate,
         preferredTime: bookingForm.preferredTime,
-        estimatedDuration: bookingForm.estimatedDuration,
-        budget: parseFloat(bookingForm.budget) || bookingModal.price,
+        dailyBudget: Number.isFinite(providerRate) && providerRate > 0 ? providerRate : 1,
         location: bookingForm.location,
         specificRequirements: bookingForm.specificRequirements,
         providerId: bookingModal.providerId,
@@ -203,8 +181,6 @@ export default function Services() {
         description: '',
         preferredDate: '',
         preferredTime: '',
-        estimatedDuration: '',
-        budget: '',
         location: { address: '' },
         specificRequirements: ''
       });
@@ -221,8 +197,6 @@ export default function Services() {
       description: '',
       preferredDate: '',
       preferredTime: '',
-      estimatedDuration: '',
-      budget: '',
       location: { address: '' },
       specificRequirements: ''
     });
@@ -889,53 +863,6 @@ export default function Services() {
                       boxSizing: 'border-box'
                     }}
                   />
-                </div>
-              </div>
-
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-                <div>
-                  <label style={{ fontSize: '14px', fontWeight: '600', color: '#1f2937', display: 'block', marginBottom: '8px' }}>
-                    Estimated Duration
-                  </label>
-                  <input
-                    type="text"
-                    placeholder="e.g., 2 hours"
-                    value={bookingForm.estimatedDuration}
-                    onChange={(e) => handleDurationChange(e.target.value)}
-                    style={{
-                      width: '100%',
-                      padding: '12px',
-                      border: '1px solid #d1d5db',
-                      borderRadius: '8px',
-                      fontSize: '14px',
-                      fontFamily: 'inherit',
-                      boxSizing: 'border-box'
-                    }}
-                  />
-                </div>
-                <div>
-                  <label style={{ fontSize: '14px', fontWeight: '600', color: '#1f2937', display: 'block', marginBottom: '8px' }}>
-                    Budget (Rs.)
-                  </label>
-                  <input
-                    type="number"
-                    value={bookingForm.budget}
-                    onChange={(e) => setBookingForm({ ...bookingForm, budget: e.target.value })}
-                    style={{
-                      width: '100%',
-                      padding: '12px',
-                      border: '1px solid #d1d5db',
-                      borderRadius: '8px',
-                      fontSize: '14px',
-                      fontFamily: 'inherit',
-                      boxSizing: 'border-box'
-                    }}
-                  />
-                  {getParsedHours(bookingForm.estimatedDuration) > 0 && (
-                    <div style={{ fontSize: '12px', color: '#0066ff', marginTop: '6px', fontWeight: '600' }}>
-                      Total Cost: {getParsedHours(bookingForm.estimatedDuration)} hours × Rs. {bookingModal?.price} = Rs. {bookingForm.budget}
-                    </div>
-                  )}
                 </div>
               </div>
 
