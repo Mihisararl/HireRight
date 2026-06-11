@@ -5,6 +5,7 @@ import Provider from '../models/Provider.js';
 import ServiceRequest from '../models/ServiceRequest.js';
 import { getRequestPayableAmount } from '../utils/serviceRequestAmount.js';
 import { PLATFORM_COMMISSION_PERCENT } from '../constants/commission.js';
+import { resolvePaymentPartyIds } from '../utils/paymentParties.js';
 
 const md5 = (value) => crypto.createHash('md5').update(value).digest('hex');
 
@@ -22,6 +23,12 @@ const upsertServicePayment = async ({
     throw new Error('Invalid payment amount');
   }
 
+  const { userId: resolvedUserId, providerId: resolvedProviderId } = await resolvePaymentPartyIds({
+    userId,
+    providerId,
+    serviceRequestId,
+  });
+
   const holdUntil = new Date();
   holdUntil.setDate(holdUntil.getDate() + PAYMENT_HOLD_DAYS);
 
@@ -29,8 +36,8 @@ const upsertServicePayment = async ({
     { serviceRequestId },
     {
       $set: {
-        userId,
-        providerId,
+        userId: resolvedUserId,
+        providerId: resolvedProviderId,
         serviceRequestId,
         amount: normalizedAmount,
         serviceAmount: normalizedAmount,
@@ -41,8 +48,11 @@ const upsertServicePayment = async ({
         holdUntil,
       },
       $unset: {
+        settlementType: '',
+        settlementAmount: '',
         commissionAmount: '',
         providerAmount: '',
+        refundAmount: '',
         releasedAt: '',
         approvedAt: '',
       },
@@ -147,13 +157,24 @@ export const handlePayhereNotify = async (req, res) => {
 
     console.log(`Recording payment - User: ${customerUserId}, Provider: ${providerId}, ServiceRequest: ${serviceRequestId}, Amount: ${amount}`);
 
-    if (!customerUserId || !serviceRequestId) {
-      console.warn('PayHere notify missing customer or service request id');
+    if (!serviceRequestId) {
+      console.warn('PayHere notify missing service request id');
       return res.status(200).json({ message: 'Missing metadata' });
     }
 
-    await upsertServicePayment({
+    const { userId: resolvedUserId } = await resolvePaymentPartyIds({
       userId: customerUserId,
+      providerId,
+      serviceRequestId,
+    });
+
+    if (!resolvedUserId) {
+      console.warn('PayHere notify could not resolve customer for service request');
+      return res.status(200).json({ message: 'Missing customer metadata' });
+    }
+
+    await upsertServicePayment({
+      userId: resolvedUserId,
       providerId,
       serviceRequestId,
       amount,

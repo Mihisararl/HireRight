@@ -1,9 +1,7 @@
 import Complaint from '../models/Complaint.js';
 import ServiceRequest from '../models/ServiceRequest.js';
-import {
-  PLATFORM_COMMISSION_PERCENT,
-  calculateCommissionBreakdown,
-} from '../constants/commission.js';
+import { SETTLEMENT_TYPES } from '../constants/settlement.js';
+import { calculateSettlement } from './settlement.js';
 
 /** Customer can reopen a resolved complaint within this window before payment release. */
 export const COMPLAINT_REOPEN_WINDOW_MS = 48 * 60 * 60 * 1000;
@@ -12,23 +10,22 @@ export const getPaymentServiceAmount = (payment) => (
   Number(payment.serviceAmount ?? payment.amount ?? 0)
 );
 
-export const getProjectedCommission = (payment) => {
-  const serviceAmount = getPaymentServiceAmount(payment);
-  const commissionRate = payment.commissionRate ?? PLATFORM_COMMISSION_PERCENT;
-  return calculateCommissionBreakdown(serviceAmount, commissionRate);
-};
+export const isPaymentSettled = (payment) => (
+  payment?.status === 'approved'
+  && (payment?.payoutStatus === 'paid' || payment?.payoutStatus === 'refunded')
+);
 
 /**
- * Validates whether a payment can be released to the provider.
- * @returns {{ ok: true } | { ok: false, message: string, statusCode?: number }}
+ * Validates whether a payment can be released/settled.
+ * @returns {{ ok: true, serviceRequest, latestComplaint } | { ok: false, message: string, statusCode?: number }}
  */
 export const validatePaymentRelease = async (payment) => {
   if (!payment) {
     return { ok: false, message: 'Payment not found', statusCode: 404 };
   }
 
-  if (payment.payoutStatus === 'paid' || payment.status === 'approved') {
-    return { ok: false, message: 'Payment has already been released', statusCode: 400 };
+  if (isPaymentSettled(payment)) {
+    return { ok: false, message: 'Payment has already been settled', statusCode: 400 };
   }
 
   if (!payment.serviceRequestId) {
@@ -77,31 +74,63 @@ export const validatePaymentRelease = async (payment) => {
 };
 
 /**
- * Applies commission, marks payment as released, and saves.
+ * Resolves settlement type/amount for a payment release.
+ */
+export const resolveSettlementOptions = (payment, latestComplaint) => {
+  if (latestComplaint?.status === 'resolved' && latestComplaint.settlementType) {
+    return {
+      settlementType: latestComplaint.settlementType,
+      settlementAmountInput: latestComplaint.settlementAmount,
+      hasDispute: true,
+    };
+  }
+
+  return {
+    settlementType: SETTLEMENT_TYPES.FULL_RELEASE,
+    settlementAmountInput: null,
+    hasDispute: Boolean(latestComplaint),
+  };
+};
+
+/**
+ * Applies settlement, commission, and marks payment as settled.
  * Caller must run validatePaymentRelease first.
  */
-export const applyPaymentRelease = (payment) => {
+export const applyPaymentSettlement = (payment, options = {}) => {
   const serviceAmount = getPaymentServiceAmount(payment);
   if (!Number.isFinite(serviceAmount) || serviceAmount <= 0) {
     throw new Error('Invalid payment service amount');
   }
 
-  const commissionRate = payment.commissionRate ?? PLATFORM_COMMISSION_PERCENT;
-  const { commissionAmount, providerAmount } = calculateCommissionBreakdown(
-    serviceAmount,
-    commissionRate
-  );
+  const settlementType = options.settlementType || SETTLEMENT_TYPES.FULL_RELEASE;
+  const settlementAmountInput = options.settlementAmountInput ?? null;
+  const commissionRate = payment.commissionRate ?? options.commissionRatePercent;
+
+  const breakdown = calculateSettlement({
+    totalAmount: serviceAmount,
+    settlementType,
+    settlementAmountInput,
+    commissionRatePercent: commissionRate,
+  });
 
   const now = new Date();
 
-  payment.serviceAmount = serviceAmount;
-  payment.commissionRate = commissionRate;
-  payment.commissionAmount = commissionAmount;
-  payment.providerAmount = providerAmount;
+  payment.serviceAmount = breakdown.serviceAmount;
+  payment.settlementType = breakdown.settlementType;
+  payment.settlementAmount = breakdown.settlementAmount;
+  payment.commissionRate = breakdown.commissionRate;
+  payment.commissionAmount = breakdown.commissionAmount;
+  payment.providerAmount = breakdown.providerAmount;
+  payment.refundAmount = breakdown.refundAmount;
   payment.status = 'approved';
-  payment.payoutStatus = 'paid';
+  payment.payoutStatus = settlementType === SETTLEMENT_TYPES.FULL_REFUND ? 'refunded' : 'paid';
   payment.approvedAt = payment.approvedAt || now;
   payment.releasedAt = now;
 
   return payment;
 };
+
+/** @deprecated Use applyPaymentSettlement with FULL_RELEASE */
+export const applyPaymentRelease = (payment) => applyPaymentSettlement(payment, {
+  settlementType: SETTLEMENT_TYPES.FULL_RELEASE,
+});
