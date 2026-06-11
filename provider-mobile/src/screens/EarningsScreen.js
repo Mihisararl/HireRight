@@ -34,7 +34,7 @@ export default function EarningsScreen() {
     }, [load])
   );
 
-  const paid = payments.filter((p) => p.payoutStatus === 'paid');
+  const paid = payments.filter((p) => p.payoutStatus === 'paid' && p.status === 'approved');
   const total = paid.reduce((sum, p) => sum + getPaymentBreakdown(p).providerAmount, 0);
 
   if (loading) return <LoadingView message="Loading earnings..." />;
@@ -64,6 +64,9 @@ export default function EarningsScreen() {
           <View style={styles.card}>
             <Text style={styles.amount}>Rs. {breakdown.providerAmount.toLocaleString()}</Text>
             <Text style={styles.meta}>Service: Rs. {breakdown.serviceAmount.toLocaleString()}</Text>
+            {breakdown.settlementType === 'PARTIAL_RELEASE' && (
+              <Text style={styles.meta}>Settlement: Rs. {breakdown.settlementAmount.toLocaleString()}</Text>
+            )}
             <Text style={styles.meta}>
               Commission ({breakdown.commissionRate}%): -Rs. {breakdown.commissionAmount.toLocaleString()}
             </Text>

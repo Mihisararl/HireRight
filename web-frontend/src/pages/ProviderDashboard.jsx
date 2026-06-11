@@ -25,7 +25,11 @@ import {
 } from '../api/service';
 import { registerProvider, getMyAvailability, updateAvailability } from '../api/provider';
 import { getProviderPayments } from '../api/payment';
-import { formatLkr, getPaymentBreakdown } from '../utils/paymentHelpers';
+import {
+  formatLkr,
+  getPaymentBreakdown,
+  getSettlementTypeLabel,
+} from '../utils/paymentHelpers';
 import { getProviderReviews } from '../api/review';
 import { AuthContext } from '../context/AuthContext';
 import ProviderJobTracking from '../components/location/ProviderJobTracking';
@@ -303,7 +307,7 @@ const ProviderDashboard = () => {
 
   const upcomingRequests = myRequests.filter(req => ['Accepted', 'Confirmed'].includes(req.status));
   const historyRequests = myRequests.filter(req => req.status === 'Completed');
-  const paidPayments = payments.filter((payment) => payment.payoutStatus === 'paid');
+  const paidPayments = payments.filter((payment) => payment.payoutStatus === 'paid' && payment.status === 'approved');
   const totalEarnings = paidPayments.reduce((sum, payment) => {
     const { providerAmount } = getPaymentBreakdown(payment);
     return sum + providerAmount;
@@ -1584,6 +1588,15 @@ const ProviderDashboard = () => {
                                 <span style={{ fontWeight: '600', color: '#475569' }}>{t('provider.serviceAmount')}:</span>{' '}
                                 {formatLkr(breakdown.serviceAmount)}
                               </div>
+                              {breakdown.settlementType && breakdown.settlementType !== 'FULL_RELEASE' && (
+                                <div>
+                                  <span style={{ fontWeight: '600', color: '#475569' }}>{t('provider.settlementType')}:</span>{' '}
+                                  {getSettlementTypeLabel(breakdown.settlementType)}
+                                  {breakdown.settlementType === 'PARTIAL_RELEASE' && (
+                                    <> ({formatLkr(breakdown.settlementAmount)})</>
+                                  )}
+                                </div>
+                              )}
                               <div>
                                 <span style={{ fontWeight: '600', color: '#475569' }}>
                                   {t('provider.platformCommission', { rate: breakdown.commissionRate })}:
