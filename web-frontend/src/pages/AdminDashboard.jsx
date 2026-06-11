@@ -2,6 +2,7 @@ import React, { useEffect, useState, useContext } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from '../utils/api';
 import { AuthContext } from '../context/AuthContext';
+import { formatLkr, getPaymentBreakdown, getPaymentStatusLabel } from '../utils/paymentHelpers';
 
 export default function AdminDashboard() {
   const { user, logout } = useContext(AuthContext);
@@ -10,6 +11,12 @@ export default function AdminDashboard() {
   const [users, setUsers] = useState([]);
   const [providers, setProviders] = useState([]);
   const [payments, setPayments] = useState([]);
+  const [paymentStats, setPaymentStats] = useState({
+    totalTransactions: 0,
+    totalCommissionEarned: 0,
+    totalReleasedPayments: 0,
+    totalPendingPayments: 0,
+  });
   const [complaints, setComplaints] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -48,16 +55,23 @@ export default function AdminDashboard() {
   const loadAll = async () => {
     setLoading(true);
     try {
-      const [uRes, pRes, payRes, cRes] = await Promise.all([
+      const [uRes, pRes, payRes, statsRes, cRes] = await Promise.all([
         api.get('/admin/users'),
         api.get('/admin/provider-requests'),
         api.get('/admin/payments'),
+        api.get('/admin/payments/stats'),
         api.get('/admin/complaints')
       ]);
 
       setUsers(uRes.data || []);
       setProviders(pRes.data || []);
       setPayments(payRes.data || []);
+      setPaymentStats(statsRes.data || {
+        totalTransactions: 0,
+        totalCommissionEarned: 0,
+        totalReleasedPayments: 0,
+        totalPendingPayments: 0,
+      });
       setComplaints(cRes.data || []);
     } catch (err) {
       setError('Failed to load dashboard data');
@@ -91,10 +105,15 @@ export default function AdminDashboard() {
 
   const approvePayment = async (id) => {
     try {
-      await api.post(`/admin/payments/${id}/approve`);
-      setPayments((prev) => prev.map((p) => (p._id === id ? { ...p, status: 'approved' } : p)));
+      const response = await api.post(`/admin/payments/${id}/approve`);
+      const releasedPayment = response.data?.payment;
+      setPayments((prev) => prev.map((p) => (
+        p._id === id ? { ...p, ...releasedPayment } : p
+      )));
+      const statsRes = await api.get('/admin/payments/stats');
+      setPaymentStats(statsRes.data || paymentStats);
     } catch (err) {
-      setError(err.response?.data?.message || 'Failed to approve payment');
+      setError(err.response?.data?.message || 'Failed to release payment');
     }
   };
 
@@ -170,7 +189,8 @@ export default function AdminDashboard() {
   }
 
   const pendingProviders = providers.filter(p => p.status === 'pending').length;
-  const pendingPayments = payments.filter(p => p.status === 'pending').length;
+  const pendingPayments = paymentStats.totalPendingPayments
+    || payments.filter((p) => p.payoutStatus === 'hold' && p.status === 'pending').length;
   const openComplaints = complaints.filter(c => c.status === 'open').length;
 
   return (
@@ -319,6 +339,45 @@ export default function AdminDashboard() {
                 value={openComplaints}
                 color="#ef4444"
                 bgColor="#fee2e2"
+              />
+            </div>
+
+            <div style={styles.statsGrid}>
+              <StatCard
+                icon={<svg style={styles.statIcon} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                </svg>}
+                title="Total Transactions"
+                value={paymentStats.totalTransactions}
+                color="#6366f1"
+                bgColor="#e0e7ff"
+              />
+              <StatCard
+                icon={<svg style={styles.statIcon} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>}
+                title="Total Commission Earned"
+                value={formatLkr(paymentStats.totalCommissionEarned)}
+                color="#0d9488"
+                bgColor="#ccfbf1"
+              />
+              <StatCard
+                icon={<svg style={styles.statIcon} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                </svg>}
+                title="Total Released Payments"
+                value={paymentStats.totalReleasedPayments}
+                color="#16a34a"
+                bgColor="#dcfce7"
+              />
+              <StatCard
+                icon={<svg style={styles.statIcon} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>}
+                title="Total Pending Payments"
+                value={paymentStats.totalPendingPayments}
+                color="#f59e0b"
+                bgColor="#fef3c7"
               />
             </div>
 
@@ -530,22 +589,28 @@ export default function AdminDashboard() {
                   <tr>
                     <th style={styles.th}>From</th>
                     <th style={styles.th}>To</th>
-                    <th style={styles.th}>Amount (LKR)</th>
+                    <th style={styles.th}>Service Amount</th>
+                    <th style={styles.th}>Commission (5%)</th>
+                    <th style={styles.th}>Provider Payout</th>
                     <th style={styles.th}>Task Completion</th>
                     <th style={styles.th}>Status</th>
+                    <th style={styles.th}>Release Date</th>
                     <th style={styles.th}>Actions</th>
                   </tr>
                 </thead>
                 <tbody>
                   {payments.length === 0 ? (
                     <tr>
-                      <td colSpan="6" style={styles.emptyCell}>No payment records</td>
+                      <td colSpan="9" style={styles.emptyCell}>No payment records</td>
                     </tr>
                   ) : (
                     payments.map((p) => {
+                      const breakdown = getPaymentBreakdown(p);
                       const isReadyForApproval = p.serviceRequestId
                         ? (p.serviceRequestId.customerCompleted && p.serviceRequestId.providerCompleted)
                         : true;
+                      const statusLabel = getPaymentStatusLabel(p);
+                      const isReleased = statusLabel === 'Released';
 
                       return (
                         <tr key={p._id} style={styles.tableRow}>
@@ -554,7 +619,17 @@ export default function AdminDashboard() {
                             {p.providerId ? `${p.providerId.firstName || ''} ${p.providerId.lastName || ''}`.trim() || '-' : '-'}
                           </td>
                           <td style={styles.td}>
-                            <span style={styles.amountText}>LKR {p.amount?.toLocaleString()}</span>
+                            <span style={styles.amountText}>{formatLkr(breakdown.serviceAmount)}</span>
+                          </td>
+                          <td style={styles.td}>
+                            <span style={{ color: '#0d9488', fontWeight: '600' }}>
+                              {formatLkr(breakdown.commissionAmount)}
+                            </span>
+                          </td>
+                          <td style={styles.td}>
+                            <span style={{ color: '#16a34a', fontWeight: '600' }}>
+                              {formatLkr(breakdown.providerAmount)}
+                            </span>
                           </td>
                           <td style={styles.td}>
                             {p.serviceRequestId ? (
@@ -577,10 +652,15 @@ export default function AdminDashboard() {
                             )}
                           </td>
                           <td style={styles.td}>
-                            <Badge variant={p.status}>{p.status}</Badge>
+                            <Badge variant={isReleased ? 'approved' : p.status}>{statusLabel}</Badge>
                           </td>
                           <td style={styles.td}>
-                            {p.status === 'pending' && (
+                            {p.releasedAt
+                              ? new Date(p.releasedAt).toLocaleString()
+                              : <span style={{ color: '#94a3b8' }}>—</span>}
+                          </td>
+                          <td style={styles.td}>
+                            {!isReleased && (
                               <button
                                 style={{
                                   ...styles.btnApprove,
@@ -598,7 +678,7 @@ export default function AdminDashboard() {
                                 <svg style={styles.btnIcon} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                                 </svg>
-                                Approve
+                                Release Payment
                               </button>
                             )}
                           </td>

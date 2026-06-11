@@ -25,6 +25,7 @@ import {
 } from '../api/service';
 import { registerProvider, getMyAvailability, updateAvailability } from '../api/provider';
 import { getProviderPayments } from '../api/payment';
+import { formatLkr, getPaymentBreakdown } from '../utils/paymentHelpers';
 import { getProviderReviews } from '../api/review';
 import { AuthContext } from '../context/AuthContext';
 import ProviderJobTracking from '../components/location/ProviderJobTracking';
@@ -303,7 +304,10 @@ const ProviderDashboard = () => {
   const upcomingRequests = myRequests.filter(req => ['Accepted', 'Confirmed'].includes(req.status));
   const historyRequests = myRequests.filter(req => req.status === 'Completed');
   const paidPayments = payments.filter((payment) => payment.payoutStatus === 'paid');
-  const totalEarnings = paidPayments.reduce((sum, payment) => sum + (payment.amount || 0), 0);
+  const totalEarnings = paidPayments.reduce((sum, payment) => {
+    const { providerAmount } = getPaymentBreakdown(payment);
+    return sum + providerAmount;
+  }, 0);
   const averageRating = reviews.length
     ? (reviews.reduce((sum, review) => sum + (review.rating || 0), 0) / reviews.length).toFixed(2)
     : '0.00';
@@ -1556,7 +1560,9 @@ const ProviderDashboard = () => {
                     </div>
                   ) : (
                     <div style={{ display: 'grid', gap: '12px' }}>
-                      {paidPayments.map((payment) => (
+                      {paidPayments.map((payment) => {
+                        const breakdown = getPaymentBreakdown(payment);
+                        return (
                         <div key={payment._id} style={{
                           background: 'white',
                           borderRadius: '10px',
@@ -1565,37 +1571,52 @@ const ProviderDashboard = () => {
                           border: '1px solid #e2e8f0',
                           display: 'flex',
                           justifyContent: 'space-between',
-                          alignItems: 'center'
+                          alignItems: 'center',
+                          gap: '16px',
+                          flexWrap: 'wrap',
                         }}>
-                          <div style={{ flex: 1 }}>
-                            <h4 style={{ fontSize: '16px', fontWeight: '600', color: '#1e293b', marginBottom: '6px' }}>
+                          <div style={{ flex: 1, minWidth: '220px' }}>
+                            <h4 style={{ fontSize: '16px', fontWeight: '600', color: '#1e293b', marginBottom: '8px' }}>
                               {t('provider.paymentReleased')}
                             </h4>
-                            <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap' }}>
-                              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                <MapPin size={14} color="#64748b" />
-                                <span style={{ fontSize: '13px', color: '#64748b' }}>
-                                  {payment.currency || 'LKR'}
-                                </span>
+                            <div style={{ display: 'grid', gap: '6px', fontSize: '13px', color: '#64748b' }}>
+                              <div>
+                                <span style={{ fontWeight: '600', color: '#475569' }}>{t('provider.serviceAmount')}:</span>{' '}
+                                {formatLkr(breakdown.serviceAmount)}
+                              </div>
+                              <div>
+                                <span style={{ fontWeight: '600', color: '#475569' }}>
+                                  {t('provider.platformCommission', { rate: breakdown.commissionRate })}:
+                                </span>{' '}
+                                -{formatLkr(breakdown.commissionAmount)}
                               </div>
                               <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                                 <Calendar size={14} color="#64748b" />
-                                <span style={{ fontSize: '13px', color: '#64748b' }}>
-                                  {payment.approvedAt ? new Date(payment.approvedAt).toLocaleDateString() : t('provider.notAvailable')}
+                                <span>
+                                  {payment.releasedAt
+                                    ? new Date(payment.releasedAt).toLocaleDateString()
+                                    : payment.approvedAt
+                                      ? new Date(payment.approvedAt).toLocaleDateString()
+                                      : t('provider.notAvailable')}
                                 </span>
                               </div>
                             </div>
                           </div>
-                          <div style={{
-                            fontSize: '20px',
-                            fontWeight: '700',
-                            color: '#10b981',
-                            marginLeft: '16px'
-                          }}>
-                            Rs. {payment.amount?.toLocaleString()}
+                          <div style={{ textAlign: 'right' }}>
+                            <div style={{ fontSize: '12px', color: '#64748b', marginBottom: '4px' }}>
+                              {t('provider.netReceived')}
+                            </div>
+                            <div style={{
+                              fontSize: '20px',
+                              fontWeight: '700',
+                              color: '#10b981',
+                            }}>
+                              {formatLkr(breakdown.providerAmount)}
+                            </div>
                           </div>
                         </div>
-                      ))}
+                        );
+                      })}
                     </div>
                   )}
                 </div>

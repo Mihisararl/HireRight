@@ -2,9 +2,9 @@ import crypto from 'crypto';
 import mongoose from 'mongoose';
 import Payment from '../models/Payment.js';
 import Provider from '../models/Provider.js';
-import Complaint from '../models/Complaint.js';
 import ServiceRequest from '../models/ServiceRequest.js';
 import { getRequestPayableAmount } from '../utils/serviceRequestAmount.js';
+import { PLATFORM_COMMISSION_PERCENT } from '../constants/commission.js';
 
 const md5 = (value) => crypto.createHash('md5').update(value).digest('hex');
 
@@ -33,10 +33,18 @@ const upsertServicePayment = async ({
         providerId,
         serviceRequestId,
         amount: normalizedAmount,
+        serviceAmount: normalizedAmount,
+        commissionRate: PLATFORM_COMMISSION_PERCENT,
         currency,
         status: 'pending',
         payoutStatus: 'hold',
         holdUntil,
+      },
+      $unset: {
+        commissionAmount: '',
+        providerAmount: '',
+        releasedAt: '',
+        approvedAt: '',
       },
       $setOnInsert: { createdAt: new Date() },
     },
@@ -231,28 +239,6 @@ export const getProviderPayments = async (req, res) => {
       return res.status(404).json({ message: 'Provider profile not found' });
     }
 
-    const now = new Date();
-    const heldPayments = await Payment.find({
-      providerId: providerProfile._id,
-      payoutStatus: 'hold',
-      holdUntil: { $lte: now }
-    });
-
-    for (const payment of heldPayments) {
-      const openComplaint = await Complaint.findOne({
-        serviceRequestId: payment.serviceRequestId,
-        status: 'open'
-      });
-
-      if (!openComplaint) {
-        payment.payoutStatus = 'paid';
-        payment.status = 'approved';
-        payment.approvedAt = payment.approvedAt || now;
-        payment.releasedAt = now;
-        await payment.save();
-      }
-    }
-
     const payments = await Payment.find({ providerId: providerProfile._id })
       .sort({ createdAt: -1 });
 
@@ -265,28 +251,6 @@ export const getProviderPayments = async (req, res) => {
 
 export const getUserPayments = async (req, res) => {
   try {
-    const now = new Date();
-    const heldPayments = await Payment.find({
-      userId: req.user.id,
-      payoutStatus: 'hold',
-      holdUntil: { $lte: now }
-    });
-
-    for (const payment of heldPayments) {
-      const openComplaint = await Complaint.findOne({
-        serviceRequestId: payment.serviceRequestId,
-        status: 'open'
-      });
-
-      if (!openComplaint) {
-        payment.payoutStatus = 'paid';
-        payment.status = 'approved';
-        payment.approvedAt = payment.approvedAt || now;
-        payment.releasedAt = now;
-        await payment.save();
-      }
-    }
-
     const payments = await Payment.find({ userId: req.user.id })
       .sort({ createdAt: -1 });
 

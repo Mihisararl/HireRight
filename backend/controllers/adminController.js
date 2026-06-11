@@ -5,9 +5,11 @@ import Payment from '../models/Payment.js';
 import ServiceRequest from '../models/ServiceRequest.js';
 import Complaint from '../models/Complaint.js';
 import UserPaymentDetails from '../models/UserPaymentDetails.js';
-
-/** Customer can reopen a resolved complaint within this window before payment release. */
-const COMPLAINT_REOPEN_WINDOW_MS = 48 * 60 * 60 * 1000;
+import {
+  applyPaymentRelease,
+  COMPLAINT_REOPEN_WINDOW_MS,
+  validatePaymentRelease,
+} from '../utils/paymentRelease.js';
 
 const loadUserForRegistrationRequest = (email) => User.findOne({ email });
 
@@ -182,54 +184,100 @@ export const getPayments = async (req, res) => {
     res.json(payments);
 };
 
-// Approve payment
+// Release payment to provider (with 5% platform commission)
 export const approvePayment = async (req, res) => {
-    const { id } = req.params;
-    const payment = await Payment.findById(id);
+    try {
+        const { id } = req.params;
+        const payment = await Payment.findById(id);
 
-    if (!payment) {
-        return res.status(404).json({ message: 'Payment not found' });
-    }
+        const validation = await validatePaymentRelease(payment);
+        if (!validation.ok) {
+            return res.status(validation.statusCode || 400).json({ message: validation.message });
+        }
 
-    if (!payment.serviceRequestId) {
-        return res.status(400).json({ message: 'Payment is not linked to a service request' });
-    }
+        applyPaymentRelease(payment);
+        await payment.save();
 
-    const serviceRequest = await ServiceRequest.findById(payment.serviceRequestId);
-    if (!serviceRequest) {
-        return res.status(404).json({ message: 'Service request not found' });
-    }
-
-    const bothCompleted = serviceRequest.customerCompleted && serviceRequest.providerCompleted;
-    if (!bothCompleted) {
-        return res.status(400).json({
-            message: 'Cannot release payment until both customer and provider complete the task'
+        res.json({
+            message: 'Payment released to provider',
+            payment,
         });
+    } catch (error) {
+        console.error('approvePayment error:', error);
+        res.status(500).json({ message: 'Failed to release payment' });
     }
+};
 
-    const latestComplaint = await Complaint.findOne({
-        serviceRequestId: serviceRequest._id
-    }).sort({ createdAt: -1 });
+export const getPaymentStats = async (req, res) => {
+    try {
+        const [totalTransactions, releasedAgg, pendingPayments] = await Promise.all([
+            Payment.countDocuments({
+                payoutStatus: { $in: ['hold', 'paid'] },
+                status: { $in: ['pending', 'approved'] },
+            }),
+            Payment.aggregate([
+                { $match: { payoutStatus: 'paid', status: 'approved' } },
+                {
+                    $group: {
+                        _id: null,
+                        totalReleasedPayments: { $sum: 1 },
+                        totalCommissionEarned: {
+                            $sum: {
+                                $ifNull: [
+                                    '$commissionAmount',
+                                    {
+                                        $multiply: [
+                                            { $ifNull: ['$serviceAmount', '$amount'] },
+                                            { $divide: [{ $ifNull: ['$commissionRate', 5] }, 100] },
+                                        ],
+                                    },
+                                ],
+                            },
+                        },
+                        totalProviderPayout: {
+                            $sum: {
+                                $ifNull: [
+                                    '$providerAmount',
+                                    {
+                                        $multiply: [
+                                            { $ifNull: ['$serviceAmount', '$amount'] },
+                                            {
+                                                $subtract: [
+                                                    1,
+                                                    { $divide: [{ $ifNull: ['$commissionRate', 5] }, 100] },
+                                                ],
+                                            },
+                                        ],
+                                    },
+                                ],
+                            },
+                        },
+                    },
+                },
+            ]),
+            Payment.countDocuments({
+                payoutStatus: 'hold',
+                status: 'pending',
+            }),
+        ]);
 
-    if (latestComplaint?.status === 'open') {
-        return res.status(400).json({
-            message: 'Service provider has a complaint. Please resolve it and continue payment.'
+        const released = releasedAgg[0] || {
+            totalReleasedPayments: 0,
+            totalCommissionEarned: 0,
+            totalProviderPayout: 0,
+        };
+
+        res.json({
+            totalTransactions,
+            totalCommissionEarned: Math.round(released.totalCommissionEarned * 100) / 100,
+            totalReleasedPayments: released.totalReleasedPayments,
+            totalPendingPayments: pendingPayments,
+            totalProviderPayout: Math.round(released.totalProviderPayout * 100) / 100,
         });
+    } catch (error) {
+        console.error('getPaymentStats error:', error);
+        res.status(500).json({ message: 'Failed to fetch payment statistics' });
     }
-
-    if (latestComplaint?.status === 'resolved' && latestComplaint.reopenUntil && Date.now() < latestComplaint.reopenUntil.getTime()) {
-        return res.status(400).json({
-            message: 'Complaint resolved. Waiting 48 hours for possible reopen before releasing payment.'
-        });
-    }
-
-    payment.status = 'approved';
-    payment.payoutStatus = 'paid';
-    payment.approvedAt = new Date();
-    payment.releasedAt = new Date();
-    await payment.save();
-
-    res.json({ message: 'Payment approved' });
 };
 
 // Get complaints
