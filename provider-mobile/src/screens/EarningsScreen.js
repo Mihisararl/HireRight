@@ -6,6 +6,7 @@ import { getProviderPayments } from '../api/payment';
 import EmptyState from '../components/EmptyState';
 import LoadingView from '../components/LoadingView';
 import { colors, spacing } from '../constants/theme';
+import { getPaymentBreakdown } from '../utils/paymentHelpers';
 
 export default function EarningsScreen() {
   const [payments, setPayments] = useState([]);
@@ -33,8 +34,8 @@ export default function EarningsScreen() {
     }, [load])
   );
 
-  const paid = payments.filter((p) => p.payoutStatus === 'paid');
-  const total = paid.reduce((sum, p) => sum + (p.amount || 0), 0);
+  const paid = payments.filter((p) => p.payoutStatus === 'paid' && p.status === 'approved');
+  const total = paid.reduce((sum, p) => sum + getPaymentBreakdown(p).providerAmount, 0);
 
   if (loading) return <LoadingView message="Loading earnings..." />;
 
@@ -57,9 +58,18 @@ export default function EarningsScreen() {
             load(false);
           }} />
         }
-        renderItem={({ item }) => (
+        renderItem={({ item }) => {
+          const breakdown = getPaymentBreakdown(item);
+          return (
           <View style={styles.card}>
-            <Text style={styles.amount}>Rs. {Number(item.amount || 0).toLocaleString()}</Text>
+            <Text style={styles.amount}>Rs. {breakdown.providerAmount.toLocaleString()}</Text>
+            <Text style={styles.meta}>Service: Rs. {breakdown.serviceAmount.toLocaleString()}</Text>
+            {breakdown.settlementType === 'PARTIAL_RELEASE' && (
+              <Text style={styles.meta}>Settlement: Rs. {breakdown.settlementAmount.toLocaleString()}</Text>
+            )}
+            <Text style={styles.meta}>
+              Commission ({breakdown.commissionRate}%): -Rs. {breakdown.commissionAmount.toLocaleString()}
+            </Text>
             <Text style={styles.meta}>Status: {item.payoutStatus || item.status}</Text>
             <Text style={styles.meta}>
               {item.releasedAt || item.approvedAt
@@ -67,7 +77,8 @@ export default function EarningsScreen() {
                 : 'Pending release'}
             </Text>
           </View>
-        )}
+          );
+        }}
         ListEmptyComponent={
           <EmptyState
             title="No payments yet"

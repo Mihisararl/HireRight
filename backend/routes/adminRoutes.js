@@ -6,7 +6,9 @@ import {
     approveProvider,
     rejectProvider,
     getPayments,
+    getPaymentStats,
     approvePayment,
+    previewSettlement,
     getComplaints,
     resolveComplaint,
     getUserBankDetails
@@ -18,8 +20,10 @@ router.get('/users', auth('admin'), getUsers);
 router.get('/provider-requests', auth('admin'), getProviderRequests);
 router.post('/provider-requests/:id/approve', auth('admin'), approveProvider);
 router.post('/provider-requests/:id/reject', auth('admin'), rejectProvider);
+router.get('/payments/stats', auth('admin'), getPaymentStats);
 router.get('/payments', auth('admin'), getPayments);
 router.post('/payments/:id/approve', auth('admin'), approvePayment);
+router.post('/settlement/preview', auth('admin'), previewSettlement);
 router.get('/complaints', auth('admin'), getComplaints);
 router.post('/complaints/:id/resolve', auth('admin'), resolveComplaint);
 router.get('/users/:id/bank-details', auth('admin'), getUserBankDetails);

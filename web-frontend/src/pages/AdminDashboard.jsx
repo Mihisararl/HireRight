@@ -2,6 +2,15 @@ import React, { useEffect, useState, useContext } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from '../utils/api';
 import { AuthContext } from '../context/AuthContext';
+import {
+  SETTLEMENT_TYPES,
+  calculateSettlement,
+  formatLkr,
+  getPaymentBreakdown,
+  getPaymentStatusLabel,
+  getSettlementTypeLabel,
+  isPaymentSettled,
+} from '../utils/paymentHelpers';
 
 export default function AdminDashboard() {
   const { user, logout } = useContext(AuthContext);
@@ -10,6 +19,14 @@ export default function AdminDashboard() {
   const [users, setUsers] = useState([]);
   const [providers, setProviders] = useState([]);
   const [payments, setPayments] = useState([]);
+  const [paymentStats, setPaymentStats] = useState({
+    totalTransactions: 0,
+    totalCommissionEarned: 0,
+    totalReleasedPayments: 0,
+    totalPendingPayments: 0,
+    totalRefundedAmount: 0,
+    totalPartialSettlements: 0,
+  });
   const [complaints, setComplaints] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -20,6 +37,11 @@ export default function AdminDashboard() {
   const [bankLoading, setBankLoading] = useState(false);
   const [nicModalOpen, setNicModalOpen] = useState(false);
   const [nicProvider, setNicProvider] = useState(null);
+  const [resolveModalOpen, setResolveModalOpen] = useState(false);
+  const [resolveTarget, setResolveTarget] = useState(null);
+  const [resolveSettlementType, setResolveSettlementType] = useState(SETTLEMENT_TYPES.FULL_RELEASE);
+  const [resolveSettlementAmount, setResolveSettlementAmount] = useState('');
+  const [resolveSubmitting, setResolveSubmitting] = useState(false);
 
   const getProviderDisplayName = (provider) => {
     const fullName = [provider?.firstName, provider?.lastName].filter(Boolean).join(' ').trim();
@@ -48,16 +70,23 @@ export default function AdminDashboard() {
   const loadAll = async () => {
     setLoading(true);
     try {
-      const [uRes, pRes, payRes, cRes] = await Promise.all([
+      const [uRes, pRes, payRes, statsRes, cRes] = await Promise.all([
         api.get('/admin/users'),
         api.get('/admin/provider-requests'),
         api.get('/admin/payments'),
+        api.get('/admin/payments/stats'),
         api.get('/admin/complaints')
       ]);
 
       setUsers(uRes.data || []);
       setProviders(pRes.data || []);
       setPayments(payRes.data || []);
+      setPaymentStats(statsRes.data || {
+        totalTransactions: 0,
+        totalCommissionEarned: 0,
+        totalReleasedPayments: 0,
+        totalPendingPayments: 0,
+      });
       setComplaints(cRes.data || []);
     } catch (err) {
       setError('Failed to load dashboard data');
@@ -91,19 +120,52 @@ export default function AdminDashboard() {
 
   const approvePayment = async (id) => {
     try {
-      await api.post(`/admin/payments/${id}/approve`);
-      setPayments((prev) => prev.map((p) => (p._id === id ? { ...p, status: 'approved' } : p)));
+      const response = await api.post(`/admin/payments/${id}/approve`);
+      const releasedPayment = response.data?.payment;
+      setPayments((prev) => prev.map((p) => (
+        p._id === id ? { ...p, ...releasedPayment } : p
+      )));
+      const statsRes = await api.get('/admin/payments/stats');
+      setPaymentStats(statsRes.data || paymentStats);
     } catch (err) {
-      setError(err.response?.data?.message || 'Failed to approve payment');
+      setError(err.response?.data?.message || 'Failed to release payment');
     }
   };
 
-  const resolveComplaint = async (id) => {
+  const getPaymentForComplaint = (complaint) => {
+    if (!complaint?.serviceRequestId) return null;
+    const serviceRequestId = complaint.serviceRequestId._id || complaint.serviceRequestId;
+    return payments.find((p) => String(p.serviceRequestId?._id || p.serviceRequestId) === String(serviceRequestId));
+  };
+
+  const openResolveModal = (complaint) => {
+    setResolveTarget(complaint);
+    setResolveSettlementType(SETTLEMENT_TYPES.FULL_RELEASE);
+    const linkedPayment = getPaymentForComplaint(complaint);
+    const total = linkedPayment?.serviceAmount ?? linkedPayment?.amount ?? 0;
+    setResolveSettlementAmount(total ? String(Math.round(total * 0.6)) : '');
+    setResolveModalOpen(true);
+  };
+
+  const resolveComplaint = async () => {
+    if (!resolveTarget) return;
+    setResolveSubmitting(true);
+    setError('');
     try {
-      await api.post(`/admin/complaints/${id}/resolve`);
-      setComplaints((prev) => prev.map((c) => (c._id === id ? { ...c, status: 'resolved' } : c)));
+      const payload = { settlementType: resolveSettlementType };
+      if (resolveSettlementType === SETTLEMENT_TYPES.PARTIAL_RELEASE) {
+        payload.settlementAmount = Number(resolveSettlementAmount);
+      }
+      const response = await api.post(`/admin/complaints/${resolveTarget._id}/resolve`, payload);
+      const updated = response.data?.complaint;
+      setComplaints((prev) => prev.map((c) => (c._id === resolveTarget._id ? { ...c, ...updated } : c)));
+      setResolveModalOpen(false);
+      setResolveTarget(null);
+      await loadAll();
     } catch (err) {
-      setError('Failed to resolve complaint');
+      setError(err.response?.data?.message || 'Failed to resolve complaint');
+    } finally {
+      setResolveSubmitting(false);
     }
   };
 
@@ -170,8 +232,22 @@ export default function AdminDashboard() {
   }
 
   const pendingProviders = providers.filter(p => p.status === 'pending').length;
-  const pendingPayments = payments.filter(p => p.status === 'pending').length;
+  const pendingPayments = paymentStats.totalPendingPayments
+    || payments.filter((p) => p.payoutStatus === 'hold' && p.status === 'pending').length;
   const openComplaints = complaints.filter(c => c.status === 'open').length;
+
+  const resolveLinkedPayment = resolveTarget ? getPaymentForComplaint(resolveTarget) : null;
+  const resolveTotalAmount = Number(resolveLinkedPayment?.serviceAmount ?? resolveLinkedPayment?.amount ?? 0);
+  const resolvePreview = resolveTotalAmount > 0
+    ? calculateSettlement({
+      totalAmount: resolveTotalAmount,
+      settlementType: resolveSettlementType,
+      settlementAmountInput: resolveSettlementType === SETTLEMENT_TYPES.PARTIAL_RELEASE
+        ? Number(resolveSettlementAmount)
+        : null,
+      commissionRatePercent: resolveLinkedPayment?.commissionRate ?? 5,
+    })
+    : null;
 
   return (
     <div style={styles.root}>
@@ -319,6 +395,63 @@ export default function AdminDashboard() {
                 value={openComplaints}
                 color="#ef4444"
                 bgColor="#fee2e2"
+              />
+            </div>
+
+            <div style={styles.statsGrid}>
+              <StatCard
+                icon={<svg style={styles.statIcon} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                </svg>}
+                title="Total Transactions"
+                value={paymentStats.totalTransactions}
+                color="#6366f1"
+                bgColor="#e0e7ff"
+              />
+              <StatCard
+                icon={<svg style={styles.statIcon} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>}
+                title="Total Commission Earned"
+                value={formatLkr(paymentStats.totalCommissionEarned)}
+                color="#0d9488"
+                bgColor="#ccfbf1"
+              />
+              <StatCard
+                icon={<svg style={styles.statIcon} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                </svg>}
+                title="Total Released Payments"
+                value={paymentStats.totalReleasedPayments}
+                color="#16a34a"
+                bgColor="#dcfce7"
+              />
+              <StatCard
+                icon={<svg style={styles.statIcon} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>}
+                title="Total Pending Payments"
+                value={paymentStats.totalPendingPayments}
+                color="#f59e0b"
+                bgColor="#fef3c7"
+              />
+              <StatCard
+                icon={<svg style={styles.statIcon} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" />
+                </svg>}
+                title="Total Refunded Amount"
+                value={formatLkr(paymentStats.totalRefundedAmount)}
+                color="#dc2626"
+                bgColor="#fee2e2"
+              />
+              <StatCard
+                icon={<svg style={styles.statIcon} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 4a2 2 0 114 0v1a1 1 0 001 1h3a1 1 0 011 1v3a1 1 0 01-1 1h-1a2 2 0 100 4h1a1 1 0 011 1v3a1 1 0 01-1 1h-3a1 1 0 01-1-1v-1a2 2 0 10-4 0v1a1 1 0 01-1 1H7a1 1 0 01-1-1v-3a1 1 0 00-1-1H4a2 2 0 110-4h1a1 1 0 001-1V7a1 1 0 011-1h3a1 1 0 001-1V4z" />
+                </svg>}
+                title="Partial Settlements"
+                value={paymentStats.totalPartialSettlements}
+                color="#7c3aed"
+                bgColor="#ede9fe"
               />
             </div>
 
@@ -530,31 +663,93 @@ export default function AdminDashboard() {
                   <tr>
                     <th style={styles.th}>From</th>
                     <th style={styles.th}>To</th>
-                    <th style={styles.th}>Amount (LKR)</th>
+                    <th style={styles.th}>Original Amount</th>
+                    <th style={styles.th}>Settlement</th>
+                    <th style={styles.th}>Commission</th>
+                    <th style={styles.th}>Provider</th>
+                    <th style={styles.th}>Refund</th>
                     <th style={styles.th}>Task Completion</th>
                     <th style={styles.th}>Status</th>
+                    <th style={styles.th}>Release Date</th>
                     <th style={styles.th}>Actions</th>
                   </tr>
                 </thead>
                 <tbody>
                   {payments.length === 0 ? (
                     <tr>
-                      <td colSpan="6" style={styles.emptyCell}>No payment records</td>
+                      <td colSpan="11" style={styles.emptyCell}>No payment records</td>
                     </tr>
                   ) : (
                     payments.map((p) => {
+                      const breakdown = getPaymentBreakdown(p);
+                      const linkedComplaint = complaints.find((c) => {
+                        const srId = p.serviceRequestId?._id || p.serviceRequestId;
+                        const cSrId = c.serviceRequestId?._id || c.serviceRequestId;
+                        return srId && cSrId && String(srId) === String(cSrId);
+                      });
+                      const pendingSettlement = !isPaymentSettled(p)
+                        && linkedComplaint?.status === 'resolved'
+                        && linkedComplaint?.settlementType;
+                      const displayBreakdown = pendingSettlement
+                        ? calculateSettlement({
+                          totalAmount: breakdown.serviceAmount,
+                          settlementType: linkedComplaint.settlementType,
+                          settlementAmountInput: linkedComplaint.settlementAmount,
+                          commissionRatePercent: breakdown.commissionRate,
+                        })
+                        : breakdown;
                       const isReadyForApproval = p.serviceRequestId
                         ? (p.serviceRequestId.customerCompleted && p.serviceRequestId.providerCompleted)
                         : true;
+                      const statusLabel = getPaymentStatusLabel(p);
+                      const isSettled = isPaymentSettled(p);
 
                       return (
                         <tr key={p._id} style={styles.tableRow}>
-                          <td style={styles.td}>{p.userId?.name || '-'}</td>
                           <td style={styles.td}>
-                            {p.providerId ? `${p.providerId.firstName || ''} ${p.providerId.lastName || ''}`.trim() || '-' : '-'}
+                            {p.userId?.name
+                              || p.serviceRequestId?.userId?.name
+                              || '-'}
                           </td>
                           <td style={styles.td}>
-                            <span style={styles.amountText}>LKR {p.amount?.toLocaleString()}</span>
+                            {(() => {
+                              const provider = p.providerId;
+                              const providerName = provider
+                                ? `${provider.firstName || ''} ${provider.lastName || ''}`.trim()
+                                : '';
+                              if (providerName) return providerName;
+                              const fallbackUser = p.serviceRequestId?.providerId;
+                              if (fallbackUser?.name) return fallbackUser.name;
+                              return '-';
+                            })()}
+                          </td>
+                          <td style={styles.td}>
+                            <span style={styles.amountText}>{formatLkr(displayBreakdown.serviceAmount)}</span>
+                          </td>
+                          <td style={styles.td}>
+                            <div style={{ fontSize: '13px' }}>
+                              {getSettlementTypeLabel(displayBreakdown.settlementType || SETTLEMENT_TYPES.FULL_RELEASE)}
+                              {displayBreakdown.settlementType === SETTLEMENT_TYPES.PARTIAL_RELEASE && (
+                                <div style={{ color: '#64748b', marginTop: '4px' }}>
+                                  {formatLkr(displayBreakdown.settlementAmount)}
+                                </div>
+                              )}
+                            </div>
+                          </td>
+                          <td style={styles.td}>
+                            <span style={{ color: '#0d9488', fontWeight: '600' }}>
+                              {formatLkr(displayBreakdown.commissionAmount)}
+                            </span>
+                          </td>
+                          <td style={styles.td}>
+                            <span style={{ color: '#16a34a', fontWeight: '600' }}>
+                              {formatLkr(displayBreakdown.providerAmount)}
+                            </span>
+                          </td>
+                          <td style={styles.td}>
+                            <span style={{ color: displayBreakdown.refundAmount > 0 ? '#dc2626' : '#94a3b8', fontWeight: '600' }}>
+                              {displayBreakdown.refundAmount > 0 ? formatLkr(displayBreakdown.refundAmount) : '—'}
+                            </span>
                           </td>
                           <td style={styles.td}>
                             {p.serviceRequestId ? (
@@ -577,10 +772,15 @@ export default function AdminDashboard() {
                             )}
                           </td>
                           <td style={styles.td}>
-                            <Badge variant={p.status}>{p.status}</Badge>
+                            <Badge variant={isSettled ? 'approved' : p.status}>{statusLabel}</Badge>
                           </td>
                           <td style={styles.td}>
-                            {p.status === 'pending' && (
+                            {p.releasedAt
+                              ? new Date(p.releasedAt).toLocaleString()
+                              : <span style={{ color: '#94a3b8' }}>—</span>}
+                          </td>
+                          <td style={styles.td}>
+                            {!isSettled && (
                               <button
                                 style={{
                                   ...styles.btnApprove,
@@ -598,7 +798,7 @@ export default function AdminDashboard() {
                                 <svg style={styles.btnIcon} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                                 </svg>
-                                Approve
+                                Release Payment
                               </button>
                             )}
                           </td>
@@ -629,13 +829,14 @@ export default function AdminDashboard() {
                     <th style={styles.th}>Subject</th>
                     <th style={styles.th}>Message</th>
                     <th style={styles.th}>Status</th>
+                    <th style={styles.th}>Settlement</th>
                     <th style={styles.th}>Actions</th>
                   </tr>
                 </thead>
                 <tbody>
                   {complaints.length === 0 ? (
                     <tr>
-                      <td colSpan="7" style={styles.emptyCell}>No complaints</td>
+                      <td colSpan="8" style={styles.emptyCell}>No complaints</td>
                     </tr>
                   ) : (
                     complaints.map((c) => (
@@ -653,8 +854,17 @@ export default function AdminDashboard() {
                           <Badge variant={c.status}>{c.status}</Badge>
                         </td>
                         <td style={styles.td}>
+                          {c.settlementType ? (
+                            <span style={{ fontSize: '13px', fontWeight: '600' }}>
+                              {getSettlementTypeLabel(c.settlementType)}
+                            </span>
+                          ) : (
+                            <span style={{ color: '#94a3b8' }}>—</span>
+                          )}
+                        </td>
+                        <td style={styles.td}>
                           {c.status === 'open' && (
-                            <button style={styles.btnResolve} onClick={() => resolveComplaint(c._id)}>
+                            <button style={styles.btnResolve} onClick={() => openResolveModal(c)}>
                               <svg style={styles.btnIcon} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                               </svg>
@@ -667,6 +877,139 @@ export default function AdminDashboard() {
                   )}
                 </tbody>
               </table>
+            </div>
+          </div>
+        )}
+
+        {resolveModalOpen && resolveTarget && (
+          <div style={styles.modalOverlay} onClick={() => setResolveModalOpen(false)}>
+            <div
+              style={{ ...styles.modalCard, maxWidth: '560px' }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div style={styles.modalHeader}>
+                <div>
+                  <h3 style={styles.modalTitle}>Resolve Complaint</h3>
+                  <p style={styles.modalSubtitle}>{resolveTarget.subject}</p>
+                </div>
+                <button style={styles.modalClose} onClick={() => setResolveModalOpen(false)}>×</button>
+              </div>
+
+              <div style={styles.modalBodyScrollable}>
+                <p style={{ fontSize: '14px', color: '#64748b', marginBottom: '16px' }}>
+                  {resolveTarget.message}
+                </p>
+
+                {resolveTotalAmount > 0 && (
+                  <div style={{
+                    background: '#f8fafc',
+                    border: '1px solid #e2e8f0',
+                    borderRadius: '8px',
+                    padding: '12px',
+                    marginBottom: '16px',
+                    fontSize: '14px',
+                  }}>
+                    <strong>Original Payment:</strong> {formatLkr(resolveTotalAmount)}
+                  </div>
+                )}
+
+                <h4 style={{ fontSize: '15px', fontWeight: '700', marginBottom: '12px', color: '#1e293b' }}>
+                  Settlement Decision
+                </h4>
+
+                <div style={{ display: 'grid', gap: '10px', marginBottom: '16px' }}>
+                  {[
+                    { value: SETTLEMENT_TYPES.FULL_RELEASE, label: 'Full Release', desc: 'Release full payment to provider (5% commission)' },
+                    { value: SETTLEMENT_TYPES.PARTIAL_RELEASE, label: 'Partial Release', desc: 'Provider receives partial amount; remainder refunded' },
+                    { value: SETTLEMENT_TYPES.FULL_REFUND, label: 'Full Refund', desc: 'Refund entire payment to customer' },
+                  ].map((option) => (
+                    <label
+                      key={option.value}
+                      style={{
+                        display: 'flex',
+                        gap: '10px',
+                        padding: '12px',
+                        border: `2px solid ${resolveSettlementType === option.value ? '#2563eb' : '#e2e8f0'}`,
+                        borderRadius: '8px',
+                        cursor: 'pointer',
+                        background: resolveSettlementType === option.value ? '#eff6ff' : '#fff',
+                      }}
+                    >
+                      <input
+                        type="radio"
+                        name="settlementType"
+                        value={option.value}
+                        checked={resolveSettlementType === option.value}
+                        onChange={() => setResolveSettlementType(option.value)}
+                        style={{ marginTop: '3px' }}
+                      />
+                      <span>
+                        <div style={{ fontWeight: '600', color: '#1e293b' }}>{option.label}</div>
+                        <div style={{ fontSize: '13px', color: '#64748b', marginTop: '2px' }}>{option.desc}</div>
+                      </span>
+                    </label>
+                  ))}
+                </div>
+
+                {resolveSettlementType === SETTLEMENT_TYPES.PARTIAL_RELEASE && (
+                  <div style={{ marginBottom: '16px' }}>
+                    <label style={{ display: 'block', fontSize: '14px', fontWeight: '600', marginBottom: '8px', color: '#334155' }}>
+                      Settlement Amount (provider share before commission)
+                    </label>
+                    <input
+                      type="number"
+                      min="0"
+                      max={resolveTotalAmount || undefined}
+                      step="0.01"
+                      value={resolveSettlementAmount}
+                      onChange={(e) => setResolveSettlementAmount(e.target.value)}
+                      style={{
+                        width: '100%',
+                        padding: '12px',
+                        borderRadius: '8px',
+                        border: '1px solid #cbd5e1',
+                        fontSize: '15px',
+                      }}
+                    />
+                  </div>
+                )}
+
+                {resolvePreview && (
+                  <div style={{
+                    background: '#ecfdf5',
+                    border: '1px solid #86efac',
+                    borderRadius: '8px',
+                    padding: '14px',
+                    marginBottom: '16px',
+                  }}>
+                    <div style={{ fontWeight: '700', marginBottom: '10px', color: '#166534' }}>Settlement Preview</div>
+                    <div style={{ display: 'grid', gap: '6px', fontSize: '14px', color: '#14532d' }}>
+                      <div>Commission (5%): <strong>{formatLkr(resolvePreview.commissionAmount)}</strong></div>
+                      <div>Provider Receives: <strong>{formatLkr(resolvePreview.providerAmount)}</strong></div>
+                      <div>Customer Refund: <strong>{formatLkr(resolvePreview.refundAmount)}</strong></div>
+                    </div>
+                  </div>
+                )}
+
+                <p style={{ fontSize: '13px', color: '#64748b', marginBottom: 0 }}>
+                  After resolving, a 48-hour window allows the customer to reopen the complaint before payment settlement.
+                </p>
+              </div>
+
+              <div style={styles.modalFooter}>
+                <button
+                  style={{
+                    ...styles.btnResolve,
+                    width: '100%',
+                    justifyContent: 'center',
+                    opacity: resolveSubmitting ? 0.7 : 1,
+                  }}
+                  disabled={resolveSubmitting}
+                  onClick={resolveComplaint}
+                >
+                  {resolveSubmitting ? 'Resolving...' : 'Confirm Resolution'}
+                </button>
+              </div>
             </div>
           </div>
         )}
@@ -1378,24 +1721,32 @@ const styles = {
     inset: 0,
     backgroundColor: 'rgba(15, 23, 42, 0.5)',
     display: 'flex',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     justifyContent: 'center',
-    zIndex: 999
+    zIndex: 999,
+    padding: '24px 16px',
+    overflowY: 'auto',
   },
   modalCard: {
     width: '90%',
     maxWidth: '520px',
+    maxHeight: 'calc(100vh - 48px)',
     backgroundColor: '#ffffff',
     borderRadius: '16px',
     boxShadow: '0 20px 40px rgba(15, 23, 42, 0.2)',
-    overflow: 'hidden'
+    overflow: 'hidden',
+    display: 'flex',
+    flexDirection: 'column',
+    margin: 'auto 0',
+    flexShrink: 0,
   },
   modalHeader: {
     padding: '20px 24px',
     borderBottom: '1px solid #f1f5f9',
     display: 'flex',
     justifyContent: 'space-between',
-    alignItems: 'center'
+    alignItems: 'center',
+    flexShrink: 0,
   },
   modalTitle: {
     margin: 0,
@@ -1422,6 +1773,21 @@ const styles = {
     padding: '20px 24px',
     fontSize: '14px',
     color: '#475569'
+  },
+  modalBodyScrollable: {
+    padding: '20px 24px',
+    fontSize: '14px',
+    color: '#475569',
+    overflowY: 'auto',
+    flex: 1,
+    minHeight: 0,
+    WebkitOverflowScrolling: 'touch',
+  },
+  modalFooter: {
+    padding: '16px 24px',
+    borderTop: '1px solid #f1f5f9',
+    backgroundColor: '#ffffff',
+    flexShrink: 0,
   },
   detailRow: {
     display: 'flex',

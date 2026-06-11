@@ -5,9 +5,16 @@ import Payment from '../models/Payment.js';
 import ServiceRequest from '../models/ServiceRequest.js';
 import Complaint from '../models/Complaint.js';
 import UserPaymentDetails from '../models/UserPaymentDetails.js';
-
-/** Customer can reopen a resolved complaint within this window before payment release. */
-const COMPLAINT_REOPEN_WINDOW_MS = 48 * 60 * 60 * 1000;
+import { SETTLEMENT_TYPES } from '../constants/settlement.js';
+import { calculateSettlement, validateSettlementRequest } from '../utils/settlement.js';
+import {
+  applyPaymentSettlement,
+  COMPLAINT_REOPEN_WINDOW_MS,
+  getPaymentServiceAmount,
+  resolveSettlementOptions,
+  validatePaymentRelease,
+} from '../utils/paymentRelease.js';
+import { enrichPaymentParties } from '../utils/paymentParties.js';
 
 const loadUserForRegistrationRequest = (email) => User.findOne({ email });
 
@@ -174,101 +181,255 @@ export const rejectProvider = async (req, res) => {
 
 // Get payments
 export const getPayments = async (req, res) => {
-    const payments = await Payment.find()
-        .populate('userId', 'name email')
-        .populate('providerId', 'firstName lastName email phone')
-        .populate('serviceRequestId', 'customerCompleted providerCompleted customerCompletedAt providerCompletedAt');
+    try {
+        const payments = await Payment.find()
+            .populate('userId', 'name email')
+            .populate('providerId', 'firstName lastName email phone')
+            .populate({
+                path: 'serviceRequestId',
+                select: 'customerCompleted providerCompleted customerCompletedAt providerCompletedAt userId providerId',
+                populate: [
+                    { path: 'userId', select: 'name email' },
+                    { path: 'providerId', select: 'name email phone' },
+                ],
+            })
+            .sort({ createdAt: -1 })
+            .lean();
 
-    res.json(payments);
+        const enrichedPayments = await Promise.all(
+            payments.map((payment) => enrichPaymentParties(payment))
+        );
+
+        res.json(enrichedPayments);
+    } catch (error) {
+        console.error('getPayments error:', error);
+        res.status(500).json({ message: 'Failed to fetch payments' });
+    }
 };
 
-// Approve payment
+// Release / settle payment (full, partial, or refund per complaint decision)
 export const approvePayment = async (req, res) => {
-    const { id } = req.params;
-    const payment = await Payment.findById(id);
+    try {
+        const { id } = req.params;
+        const payment = await Payment.findById(id);
 
-    if (!payment) {
-        return res.status(404).json({ message: 'Payment not found' });
-    }
+        const validation = await validatePaymentRelease(payment);
+        if (!validation.ok) {
+            return res.status(validation.statusCode || 400).json({ message: validation.message });
+        }
 
-    if (!payment.serviceRequestId) {
-        return res.status(400).json({ message: 'Payment is not linked to a service request' });
-    }
+        const settlementOptions = resolveSettlementOptions(payment, validation.latestComplaint);
 
-    const serviceRequest = await ServiceRequest.findById(payment.serviceRequestId);
-    if (!serviceRequest) {
-        return res.status(404).json({ message: 'Service request not found' });
-    }
+        if (settlementOptions.settlementType === SETTLEMENT_TYPES.PARTIAL_RELEASE) {
+            const totalAmount = getPaymentServiceAmount(payment);
+            const partialValidation = validateSettlementRequest({
+                settlementType: SETTLEMENT_TYPES.PARTIAL_RELEASE,
+                settlementAmountInput: settlementOptions.settlementAmountInput,
+                totalAmount,
+                requireDispute: true,
+                hasDispute: settlementOptions.hasDispute,
+            });
+            if (!partialValidation.ok) {
+                return res.status(partialValidation.statusCode || 400).json({ message: partialValidation.message });
+            }
+        }
 
-    const bothCompleted = serviceRequest.customerCompleted && serviceRequest.providerCompleted;
-    if (!bothCompleted) {
-        return res.status(400).json({
-            message: 'Cannot release payment until both customer and provider complete the task'
+        applyPaymentSettlement(payment, settlementOptions);
+        await payment.save();
+
+        const settlementLabel = payment.settlementType === SETTLEMENT_TYPES.FULL_REFUND
+            ? 'Payment refunded to customer'
+            : 'Payment settled and released to provider';
+
+        res.json({
+            message: settlementLabel,
+            payment,
         });
+    } catch (error) {
+        console.error('approvePayment error:', error);
+        res.status(500).json({ message: error.message || 'Failed to settle payment' });
     }
+};
 
-    const latestComplaint = await Complaint.findOne({
-        serviceRequestId: serviceRequest._id
-    }).sort({ createdAt: -1 });
+export const previewSettlement = async (req, res) => {
+    try {
+        const { totalAmount, settlementType, settlementAmount, commissionRate } = req.body || {};
 
-    if (latestComplaint?.status === 'open') {
-        return res.status(400).json({
-            message: 'Service provider has a complaint. Please resolve it and continue payment.'
+        const validation = validateSettlementRequest({
+            settlementType: settlementType || SETTLEMENT_TYPES.FULL_RELEASE,
+            settlementAmountInput: settlementAmount,
+            totalAmount,
+            requireDispute: settlementType === SETTLEMENT_TYPES.PARTIAL_RELEASE,
+            hasDispute: true,
         });
-    }
 
-    if (latestComplaint?.status === 'resolved' && latestComplaint.reopenUntil && Date.now() < latestComplaint.reopenUntil.getTime()) {
-        return res.status(400).json({
-            message: 'Complaint resolved. Waiting 48 hours for possible reopen before releasing payment.'
+        if (!validation.ok) {
+            return res.status(validation.statusCode || 400).json({ message: validation.message });
+        }
+
+        const breakdown = calculateSettlement({
+            totalAmount,
+            settlementType: settlementType || SETTLEMENT_TYPES.FULL_RELEASE,
+            settlementAmountInput: settlementAmount,
+            commissionRatePercent: commissionRate,
         });
+
+        res.json(breakdown);
+    } catch (error) {
+        console.error('previewSettlement error:', error);
+        res.status(400).json({ message: error.message || 'Failed to preview settlement' });
     }
+};
 
-    payment.status = 'approved';
-    payment.payoutStatus = 'paid';
-    payment.approvedAt = new Date();
-    payment.releasedAt = new Date();
-    await payment.save();
+export const getPaymentStats = async (req, res) => {
+    try {
+        const [totalTransactions, settledAgg, pendingPayments] = await Promise.all([
+            Payment.countDocuments({
+                payoutStatus: { $in: ['hold', 'paid', 'refunded'] },
+                status: { $in: ['pending', 'approved'] },
+            }),
+            Payment.aggregate([
+                { $match: { status: 'approved', payoutStatus: { $in: ['paid', 'refunded'] } } },
+                {
+                    $group: {
+                        _id: null,
+                        totalReleasedPayments: {
+                            $sum: {
+                                $cond: [{ $eq: ['$payoutStatus', 'paid'] }, 1, 0],
+                            },
+                        },
+                        totalCommissionEarned: {
+                            $sum: { $ifNull: ['$commissionAmount', 0] },
+                        },
+                        totalProviderPayout: {
+                            $sum: { $ifNull: ['$providerAmount', 0] },
+                        },
+                        totalRefundedAmount: {
+                            $sum: { $ifNull: ['$refundAmount', 0] },
+                        },
+                        totalPartialSettlements: {
+                            $sum: {
+                                $cond: [
+                                    { $eq: ['$settlementType', SETTLEMENT_TYPES.PARTIAL_RELEASE] },
+                                    1,
+                                    0,
+                                ],
+                            },
+                        },
+                    },
+                },
+            ]),
+            Payment.countDocuments({
+                payoutStatus: 'hold',
+                status: 'pending',
+            }),
+        ]);
 
-    res.json({ message: 'Payment approved' });
+        const settled = settledAgg[0] || {
+            totalReleasedPayments: 0,
+            totalCommissionEarned: 0,
+            totalProviderPayout: 0,
+            totalRefundedAmount: 0,
+            totalPartialSettlements: 0,
+        };
+
+        res.json({
+            totalTransactions,
+            totalCommissionEarned: Math.round(settled.totalCommissionEarned * 100) / 100,
+            totalReleasedPayments: settled.totalReleasedPayments,
+            totalPendingPayments: pendingPayments,
+            totalProviderPayout: Math.round(settled.totalProviderPayout * 100) / 100,
+            totalRefundedAmount: Math.round(settled.totalRefundedAmount * 100) / 100,
+            totalPartialSettlements: settled.totalPartialSettlements,
+        });
+    } catch (error) {
+        console.error('getPaymentStats error:', error);
+        res.status(500).json({ message: 'Failed to fetch payment statistics' });
+    }
 };
 
 // Get complaints
 export const getComplaints = async (req, res) => {
     const complaints = await Complaint.find()
-        .populate('userId', 'name email');
+        .populate('userId', 'name email')
+        .populate('serviceRequestId', 'serviceTitle customerCompleted providerCompleted');
 
     res.json(complaints);
 };
 
-// Resolve complaint
+// Resolve complaint with settlement decision
 export const resolveComplaint = async (req, res) => {
-    const { id } = req.params;
-    const complaint = await Complaint.findById(id);
+    try {
+        const { id } = req.params;
+        const { settlementType, settlementAmount } = req.body || {};
+        const complaint = await Complaint.findById(id);
 
-    if (!complaint) {
-        return res.status(404).json({ message: 'Complaint not found' });
-    }
-
-    complaint.status = 'resolved';
-    complaint.resolvedAt = new Date();
-    complaint.reopenUntil = new Date(Date.now() + COMPLAINT_REOPEN_WINDOW_MS);
-    await complaint.save();
-
-    if (complaint.serviceRequestId) {
-        const serviceRequest = await ServiceRequest.findById(complaint.serviceRequestId);
-        const bothCompleted = serviceRequest?.customerCompleted && serviceRequest?.providerCompleted;
-
-        if (bothCompleted) {
-            const payment = await Payment.findOne({ serviceRequestId: complaint.serviceRequestId });
-            if (payment) {
-                payment.payoutStatus = 'hold';
-                payment.holdUntil = complaint.reopenUntil;
-                await payment.save();
-            }
+        if (!complaint) {
+            return res.status(404).json({ message: 'Complaint not found' });
         }
-    }
 
-    res.json({ message: 'Complaint resolved' });
+        if (complaint.status !== 'open') {
+            return res.status(400).json({ message: 'Only open complaints can be resolved' });
+        }
+
+        const payment = complaint.serviceRequestId
+            ? await Payment.findOne({ serviceRequestId: complaint.serviceRequestId })
+            : null;
+
+        const totalAmount = payment ? getPaymentServiceAmount(payment) : 0;
+        const chosenType = settlementType || SETTLEMENT_TYPES.FULL_RELEASE;
+
+        if (payment) {
+            const settlementValidation = validateSettlementRequest({
+                settlementType: chosenType,
+                settlementAmountInput: settlementAmount,
+                totalAmount,
+                requireDispute: chosenType === SETTLEMENT_TYPES.PARTIAL_RELEASE,
+                hasDispute: true,
+            });
+
+            if (!settlementValidation.ok) {
+                return res.status(settlementValidation.statusCode || 400).json({
+                    message: settlementValidation.message,
+                });
+            }
+        } else if (chosenType !== SETTLEMENT_TYPES.FULL_RELEASE) {
+            return res.status(400).json({
+                message: 'Cannot apply partial settlement or refund without a linked payment record',
+            });
+        }
+
+        const preview = payment
+            ? calculateSettlement({
+                totalAmount,
+                settlementType: chosenType,
+                settlementAmountInput: settlementAmount,
+                commissionRatePercent: payment.commissionRate,
+            })
+            : null;
+
+        complaint.status = 'resolved';
+        complaint.settlementType = chosenType;
+        complaint.settlementAmount = preview?.settlementAmount ?? 0;
+        complaint.resolvedAt = new Date();
+        complaint.reopenUntil = new Date(Date.now() + COMPLAINT_REOPEN_WINDOW_MS);
+        await complaint.save();
+
+        if (complaint.serviceRequestId && payment) {
+            payment.payoutStatus = 'hold';
+            payment.holdUntil = complaint.reopenUntil;
+            await payment.save();
+        }
+
+        res.json({
+            message: 'Complaint resolved with settlement decision recorded',
+            complaint,
+            settlementPreview: preview,
+        });
+    } catch (error) {
+        console.error('resolveComplaint error:', error);
+        res.status(500).json({ message: error.message || 'Failed to resolve complaint' });
+    }
 };
 
 // Get user bank details (admin only)

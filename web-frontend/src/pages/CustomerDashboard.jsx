@@ -12,6 +12,12 @@ import CustomerProviderTracking from '../components/location/CustomerProviderTra
 import ProviderOfferProfile from '../components/offers/ProviderOfferProfile';
 import LanguageSwitcher from '../components/LanguageSwitcher';
 import { formatLocationDisplay, hasCoordinates, getRequestDailyBudget, getRequestPayableAmount } from '../utils/locationHelpers';
+import {
+  formatLkr,
+  getPaymentBreakdown,
+  getSettlementTypeLabel,
+  isPaymentSettled,
+} from '../utils/paymentHelpers';
 import '../styles/CustomerDashboard.css';
 
 const isPendingProviderOffer = (request) => (
@@ -257,7 +263,9 @@ const CustomerDashboard = () => {
     const payment = payments.find((item) => String(item.serviceRequestId) === String(request._id));
     const payableAmount = getRequestPayableAmount(request);
     const isPaid = Boolean(payment);
+    const paymentSettled = isPaymentSettled(payment);
     const paymentReleased = payment?.payoutStatus === 'paid';
+    const paymentBreakdown = payment ? getPaymentBreakdown(payment) : null;
     const complaint = complaints.find((item) => String(item.serviceRequestId) === String(request._id));
     return {
       id: request._id,
@@ -278,9 +286,11 @@ const CustomerDashboard = () => {
       isPaid,
       canComplete: (request.status === 'Accepted' || request.status === 'Confirmed') && !request.customerCompleted,
       customerCompleted: Boolean(request.customerCompleted),
-      canReport: !paymentReleased,
+      canReport: !paymentSettled,
       complaintStatus: complaint?.status || null,
       paymentReleased,
+      paymentSettled,
+      paymentBreakdown,
     };
   };
 
@@ -1653,10 +1663,32 @@ const CustomerDashboard = () => {
                   )}
                   {b.customerCompleted && !b.canComplete && (
                     <button className="secondary-action-btn" style={{ opacity: 0.7, cursor: 'default' }} disabled>
-                      {b.paymentReleased
-                        ? t('customer.paymentTransferred', { provider: b.provider })
-                        : t('customer.awaitingProvider')}
+                      {b.paymentSettled && b.paymentBreakdown?.settlementType === 'FULL_REFUND'
+                        ? t('customer.paymentRefunded')
+                        : b.paymentReleased
+                          ? t('customer.paymentTransferred', { provider: b.provider })
+                          : t('customer.awaitingProvider')}
                     </button>
+                  )}
+                  {b.isPaid && b.paymentSettled && b.paymentBreakdown && (
+                    <div style={{
+                      width: '100%',
+                      marginTop: '10px',
+                      padding: '12px',
+                      borderRadius: '8px',
+                      background: '#f8fafc',
+                      border: '1px solid #e2e8f0',
+                      fontSize: '13px',
+                      color: '#475569',
+                    }}>
+                      <div><strong>{t('customer.originalPayment')}:</strong> {formatLkr(b.paymentBreakdown.serviceAmount)}</div>
+                      <div><strong>{t('customer.settlementOutcome')}:</strong> {getSettlementTypeLabel(b.paymentBreakdown.settlementType)}</div>
+                      {b.paymentBreakdown.refundAmount > 0 && (
+                        <div style={{ color: '#16a34a', marginTop: '4px' }}>
+                          <strong>{t('customer.refundAmount')}:</strong> {formatLkr(b.paymentBreakdown.refundAmount)}
+                        </div>
+                      )}
+                    </div>
                   )}
                   {b.canPayNow ? (
                     <button
