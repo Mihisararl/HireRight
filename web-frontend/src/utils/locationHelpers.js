@@ -119,13 +119,31 @@ export const getRequestDailyBudget = (request) => (
   Number(request?.dailyBudget ?? request?.budget ?? 0)
 );
 
-/** Total amount customer pays (accepted offer price, or daily budget fallback) */
+/** Total amount customer pays after both parties agree */
 export const getRequestPayableAmount = (request) => {
   if (!request) return 0;
 
-  const offerPrice = request.providerOffer?.proposedPrice;
-  if (offerPrice != null && Number(offerPrice) > 0) {
-    return Number(offerPrice);
+  const confirmed = request.status === 'Accepted' || request.status === 'Confirmed';
+  if (!confirmed) return 0;
+
+  if (request.agreedTotalAmount != null && Number(request.agreedTotalAmount) > 0) {
+    return Number(request.agreedTotalAmount);
+  }
+
+  const offer = request.providerOffer;
+  if (offer?.totalEstimatedCost != null && Number(offer.totalEstimatedCost) > 0
+    && offer.customerResponse === 'accepted') {
+    return Number(offer.totalEstimatedCost);
+  }
+  if (offer?.proposedPrice != null && Number(offer.proposedPrice) > 0
+    && offer.customerResponse === 'accepted') {
+    return Number(offer.proposedPrice);
+  }
+
+  const response = request.providerResponse;
+  if (response?.totalEstimatedCost != null && Number(response.totalEstimatedCost) > 0
+    && response.customerConfirmation === 'accepted') {
+    return Number(response.totalEstimatedCost);
   }
 
   return getRequestDailyBudget(request);

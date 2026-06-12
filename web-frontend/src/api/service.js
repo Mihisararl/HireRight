@@ -60,8 +60,18 @@ export const rejectProviderOffer = async (id) => {
   return response.data;
 };
 
-export const acceptDirectBooking = async (id, responseMessage = '') => {
-  const response = await api.post(`/services/${id}/accept-booking`, { responseMessage });
+export const submitDirectBookingEstimate = async (id, estimateData) => {
+  const response = await api.post(`/services/${id}/submit-estimate`, estimateData);
+  return response.data;
+};
+
+export const confirmDirectBookingProposal = async (id) => {
+  const response = await api.post(`/services/${id}/confirm-proposal`);
+  return response.data;
+};
+
+export const rejectDirectBookingProposal = async (id) => {
+  const response = await api.post(`/services/${id}/reject-proposal`);
   return response.data;
 };
 

@@ -2,7 +2,17 @@ import React, { useState, useEffect, useContext, useCallback, useRef } from "rea
 import { useTranslation } from "react-i18next";
 import { Bell, Settings, LogOut, Calendar, Clock, MapPin, Edit, X, CheckCircle, CreditCard, Plus, FileText, Briefcase } from "lucide-react";
 import { useNavigate, useLocation } from 'react-router-dom';
-import { getUserServiceRequests, updateServiceRequest, acceptProviderOffer, rejectProviderOffer, completeServiceRequestByCustomer } from '../api/service';
+import {
+  getUserServiceRequests,
+  updateServiceRequest,
+  acceptProviderOffer,
+  rejectProviderOffer,
+  confirmDirectBookingProposal,
+  rejectDirectBookingProposal,
+  completeServiceRequestByCustomer,
+} from '../api/service';
+import CustomerEstimateReview from '../components/offers/CustomerEstimateReview';
+import { getEstimateFromRequest, isPendingCustomerConfirmation } from '../utils/serviceAgreement';
 import { getUserPayments } from '../api/payment';
 import { getUserComplaints } from '../api/complaint';
 import { createReview, getUserReviews } from '../api/review';
@@ -20,10 +30,7 @@ import {
 } from '../utils/paymentHelpers';
 import '../styles/CustomerDashboard.css';
 
-const isPendingProviderOffer = (request) => (
-  request?.status === 'OfferSent'
-  && request?.providerOffer?.customerResponse === 'pending'
-);
+const isPendingProviderOffer = (request) => isPendingCustomerConfirmation(request);
 
 const CustomerDashboard = () => {
   const { t } = useTranslation();
@@ -208,6 +215,30 @@ const CustomerDashboard = () => {
       alert(t('customer.alerts.offerRejected'));
     } catch (error) {
       console.error('Failed to reject offer:', error);
+      alert(t('customer.alerts.failedRejectOffer'));
+    }
+  };
+
+  const handleConfirmDirectProposal = async (requestId) => {
+    try {
+      await confirmDirectBookingProposal(requestId);
+      const requests = await refreshServiceRequests();
+      if (requests) setServiceRequests(requests);
+      alert(t('customer.alerts.bookingConfirmed'));
+    } catch (error) {
+      console.error('Failed to confirm booking:', error);
+      alert(error.response?.data?.message || t('customer.alerts.failedAcceptOffer'));
+    }
+  };
+
+  const handleRejectDirectProposal = async (requestId) => {
+    try {
+      await rejectDirectBookingProposal(requestId);
+      const requests = await refreshServiceRequests();
+      if (requests) setServiceRequests(requests);
+      alert(t('customer.alerts.offerRejected'));
+    } catch (error) {
+      console.error('Failed to reject booking proposal:', error);
       alert(t('customer.alerts.failedRejectOffer'));
     }
   };
@@ -1492,8 +1523,8 @@ const CustomerDashboard = () => {
                   </div>
                 </div>
 
-                {/* PROVIDER OFFER SECTION */}
-                {request.status === 'OfferSent' && request.providerOffer && (
+                {/* PROVIDER OFFER SECTION (post requests) */}
+                {request.bookingType !== 'direct' && request.status === 'OfferSent' && request.providerOffer && (
                   <div className="offer-card-section">
                     <div className="offer-title-lbl">
                       🎯 {t('customer.offers.receivedTitle')}
@@ -1504,39 +1535,12 @@ const CustomerDashboard = () => {
                       providerProfile={request.providerProfile}
                     />
 
-                    {request.providerOffer.message && (
-                      <div className="offer-msg-bubble">
-                        "{request.providerOffer.message}"
-                      </div>
-                    )}
-
-                    <div className="offer-details-row">
-                      <div>
-                        <span style={{ color: '#64748b' }}>{t('customer.offers.proposedPrice')} </span>
-                        <span style={{ fontWeight: '700', color: '#1e293b' }}>Rs.{request.providerOffer.proposedPrice}</span>
-                      </div>
-                      <div>
-                        <span style={{ color: '#64748b' }}>{t('customer.offers.proposedDate')} </span>
-                        <span style={{ fontWeight: '600', color: '#1e293b' }}>{request.providerOffer.proposedDate}</span>
-                      </div>
-                    </div>
-
-                    {request.providerOffer.customerResponse === 'pending' && (
-                      <div style={{ display: 'flex', gap: '12px' }}>
-                        <button
-                          onClick={() => handleAcceptOffer(request._id)}
-                          className="offer-btn-accept"
-                        >
-                          ✓ {t('customer.offers.acceptOffer')}
-                        </button>
-                        <button
-                          onClick={() => handleRejectOffer(request._id)}
-                          className="offer-btn-reject"
-                        >
-                          ✗ {t('customer.offers.rejectOffer')}
-                        </button>
-                      </div>
-                    )}
+                    <CustomerEstimateReview
+                      request={request}
+                      showActions={request.providerOffer.customerResponse === 'pending'}
+                      onAccept={() => handleAcceptOffer(request._id)}
+                      onReject={() => handleRejectOffer(request._id)}
+                    />
                   </div>
                 )}
 
@@ -1545,14 +1549,16 @@ const CustomerDashboard = () => {
                   <div style={{
                     marginTop: '16px',
                     padding: '16px',
-                    background: request.providerResponse?.status === 'accepted'
+                    background: request.providerResponse?.customerConfirmation === 'accepted'
+                      || request.providerResponse?.status === 'accepted'
                       ? 'linear-gradient(135deg, #dcfce7, #bbf7d0)'
                       : request.providerResponse?.status === 'rejected'
                         ? 'linear-gradient(135deg, #fee2e2, #fecaca)'
                         : 'linear-gradient(135deg, #f3e8ff, #e9d5ff)',
                     borderRadius: '12px',
                     border: '2px solid ' + (
-                      request.providerResponse?.status === 'accepted'
+                      request.providerResponse?.customerConfirmation === 'accepted'
+                      || request.providerResponse?.status === 'accepted'
                         ? '#10b981'
                         : request.providerResponse?.status === 'rejected'
                           ? '#ef4444'
@@ -1560,20 +1566,27 @@ const CustomerDashboard = () => {
                     )
                   }}>
                     <div style={{ fontSize: '15px', fontWeight: '700', color: '#1e293b', marginBottom: '12px' }}>
-                      {request.providerResponse?.status === 'pending' && `⏳ ${t('customer.providerReviewing')}`}
-                      {request.providerResponse?.status === 'accepted' && `✓ ${t('customer.bookingConfirmed')}`}
+                      {request.providerResponse?.status === 'pending' && `⏳ ${t('customer.awaitingProviderEstimate')}`}
+                      {request.providerResponse?.status === 'estimated'
+                        && request.providerResponse?.customerConfirmation === 'pending'
+                        && `📋 ${t('customer.reviewBookingProposal')}`}
+                      {(request.providerResponse?.customerConfirmation === 'accepted'
+                        || request.providerResponse?.status === 'accepted') && `✓ ${t('customer.bookingConfirmed')}`}
                       {request.providerResponse?.status === 'rejected' && `✗ ${t('customer.bookingRejected')}`}
                     </div>
 
-                    {request.providerResponse?.responseMessage && (
-                      <div style={{ fontSize: '14px', color: '#374151', fontStyle: 'italic', marginBottom: '8px' }}>
-                        "{request.providerResponse.responseMessage}"
-                      </div>
+                    {request.providerResponse?.status === 'estimated' && (
+                      <CustomerEstimateReview
+                        request={request}
+                        showActions={request.providerResponse?.customerConfirmation === 'pending'}
+                        onAccept={() => handleConfirmDirectProposal(request._id)}
+                        onReject={() => handleRejectDirectProposal(request._id)}
+                      />
                     )}
 
-                    {request.providerResponse?.respondedAt && (
-                      <div style={{ fontSize: '12px', color: '#64748b', marginBottom: request.providerResponse?.status === 'rejected' ? '12px' : '0' }}>
-                        {t('customer.respondedAt')} {new Date(request.providerResponse.respondedAt).toLocaleString()}
+                    {request.agreedTotalAmount > 0 && (
+                      <div style={{ fontSize: '14px', color: '#166534', marginTop: '10px', fontWeight: '600' }}>
+                        {t('agreement.agreedTotal')}: Rs. {Number(request.agreedTotalAmount).toLocaleString()}
                       </div>
                     )}
 

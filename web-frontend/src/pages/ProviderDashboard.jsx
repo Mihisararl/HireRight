@@ -20,9 +20,10 @@ import {
   getProviderServiceRequests,
   completeServiceRequest,
   getDirectBookingRequests,
-  acceptDirectBooking,
+  submitDirectBookingEstimate,
   rejectDirectBooking
 } from '../api/service';
+import ProviderEstimateForm from '../components/offers/ProviderEstimateForm';
 import { registerProvider, getMyAvailability, updateAvailability } from '../api/provider';
 import { getProviderPayments } from '../api/payment';
 import {
@@ -82,6 +83,70 @@ const ProviderDashboard = () => {
     agreedToBackgroundCheck: false
   });
   const [regErrors, setRegErrors] = useState({});
+  const [estimateModal, setEstimateModal] = useState(null);
+  const [estimateSubmitting, setEstimateSubmitting] = useState(false);
+
+  const openPostOfferModal = (request) => {
+    setEstimateModal({
+      type: 'post',
+      request,
+      form: {
+        dailyRate: String(getRequestDailyBudget(request) || ''),
+        estimatedDurationDays: '1',
+        providerMessage: '',
+      },
+    });
+  };
+
+  const openDirectEstimateModal = (booking) => {
+    setEstimateModal({
+      type: 'direct',
+      request: booking,
+      form: {
+        dailyRate: String(getRequestDailyBudget(booking) || booking.hourlyRate || ''),
+        estimatedDurationDays: '1',
+        providerMessage: '',
+      },
+    });
+  };
+
+  const closeEstimateModal = () => {
+    setEstimateModal(null);
+    setEstimateSubmitting(false);
+  };
+
+  const submitEstimateModal = async () => {
+    if (!estimateModal) return;
+    const { type, request, form } = estimateModal;
+    const dailyRate = Number(form.dailyRate);
+    const estimatedDurationDays = Number(form.estimatedDurationDays);
+    if (!dailyRate || !estimatedDurationDays) {
+      alert(t('agreement.validationRequired'));
+      return;
+    }
+    setEstimateSubmitting(true);
+    try {
+      const payload = {
+        dailyRate,
+        estimatedDurationDays,
+        providerMessage: form.providerMessage || '',
+      };
+      if (type === 'post') {
+        await acceptServiceRequest(request._id, payload);
+        loadAvailableRequests();
+        alert(t('provider.alerts.offerSent'));
+      } else {
+        await submitDirectBookingEstimate(request._id, payload);
+        loadBookingRequests();
+        alert(t('provider.alerts.estimateSent'));
+      }
+      closeEstimateModal();
+    } catch (err) {
+      alert(err.response?.data?.message || t('provider.alerts.failedSendOffer'));
+    } finally {
+      setEstimateSubmitting(false);
+    }
+  };
 
   useEffect(() => {
     if (activeSection === 'findWork') {
@@ -233,21 +298,6 @@ const ProviderDashboard = () => {
     }
   };
 
-  const handleAcceptBooking = async (requestId) => {
-    try {
-      const responseMessage = prompt(t('provider.prompts.acceptMessage'));
-      if (responseMessage === null) return; // User cancelled
-
-      await acceptDirectBooking(requestId, responseMessage);
-      loadBookingRequests();
-      alert(t('provider.alerts.bookingAccepted'));
-    } catch (err) {
-      const errorMsg = err.response?.data?.message || t('provider.alerts.failedAcceptBooking');
-      alert(errorMsg);
-      console.error(err);
-    }
-  };
-
   const handleRejectBooking = async (requestId) => {
     try {
       const responseMessage = prompt(t('provider.prompts.rejectReason'));
@@ -258,32 +308,6 @@ const ProviderDashboard = () => {
       alert(t('provider.alerts.bookingRejected'));
     } catch (err) {
       const errorMsg = err.response?.data?.message || t('provider.alerts.failedRejectBooking');
-      alert(errorMsg);
-      console.error(err);
-    }
-  };
-
-  const handleAcceptJob = async (requestId, budget, preferredDate) => {
-    try {
-      // Simple prompt for offer details - can be enhanced with a modal later
-      const message = prompt(t('provider.prompts.offerMessage'));
-      const proposedPriceStr = prompt(t('provider.prompts.proposedPrice'), budget);
-      const proposedDate = prompt(t('provider.prompts.proposedDate'), preferredDate);
-
-      if (proposedPriceStr === null) return; // User cancelled
-
-      const proposedPrice = Number(proposedPriceStr) || budget;
-
-      await acceptServiceRequest(requestId, {
-        message: message || '',
-        proposedPrice,
-        proposedDate: proposedDate || preferredDate
-      });
-
-      loadAvailableRequests();
-      alert(t('provider.alerts.offerSent'));
-    } catch (err) {
-      const errorMsg = err.response?.data?.message || t('provider.alerts.failedSendOffer');
       alert(errorMsg);
       console.error(err);
     }
@@ -1016,7 +1040,7 @@ const ProviderDashboard = () => {
 
                             <button
                               className="btn-primary"
-                              onClick={() => handleAcceptJob(request._id, getRequestDailyBudget(request), request.preferredDate)}
+                              onClick={() => openPostOfferModal(request)}
                               disabled={!isApproved}
                               style={!isApproved ? { opacity: 0.6, cursor: 'not-allowed' } : undefined}
                             >
@@ -1136,7 +1160,7 @@ const ProviderDashboard = () => {
 
                           <div style={{ display: 'flex', gap: '12px', paddingTop: '16px', borderTop: '1px solid #e2e8f0' }}>
                             <button
-                              onClick={() => handleAcceptBooking(booking._id)}
+                              onClick={() => openDirectEstimateModal(booking)}
                               className='btn-success'
                               style={{
                                 flex: 1,
@@ -1150,7 +1174,7 @@ const ProviderDashboard = () => {
                                 cursor: 'pointer'
                               }}
                             >
-                              ✓ {t('provider.acceptBooking')}
+                              ✓ {t('agreement.submitEstimate')}
                             </button>
                             <button
                               onClick={() => handleRejectBooking(booking._id)}
@@ -2047,6 +2071,62 @@ const ProviderDashboard = () => {
                   </div>
                 </div>
               )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {estimateModal && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            backgroundColor: 'rgba(15, 23, 42, 0.5)',
+            display: 'flex',
+            alignItems: 'flex-start',
+            justifyContent: 'center',
+            zIndex: 1000,
+            padding: '24px 16px',
+            overflowY: 'auto',
+          }}
+          onClick={closeEstimateModal}
+        >
+          <div
+            style={{
+              width: '100%',
+              maxWidth: '480px',
+              maxHeight: 'calc(100vh - 48px)',
+              backgroundColor: '#fff',
+              borderRadius: '16px',
+              boxShadow: '0 20px 40px rgba(15, 23, 42, 0.2)',
+              overflow: 'hidden',
+              display: 'flex',
+              flexDirection: 'column',
+              margin: 'auto 0',
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div style={{ padding: '20px 24px', borderBottom: '1px solid #f1f5f9' }}>
+              <h3 style={{ margin: 0, fontSize: '18px', fontWeight: '700', color: '#1e293b' }}>
+                {estimateModal.type === 'post'
+                  ? t('agreement.sendOfferEstimate')
+                  : t('agreement.submitBookingEstimate')}
+              </h3>
+              <p style={{ margin: '6px 0 0', fontSize: '13px', color: '#64748b' }}>
+                {estimateModal.request?.serviceTitle}
+              </p>
+            </div>
+            <div style={{ padding: '20px 24px', overflowY: 'auto' }}>
+              <ProviderEstimateForm
+                dailyRate={estimateModal.form.dailyRate}
+                estimatedDurationDays={estimateModal.form.estimatedDurationDays}
+                providerMessage={estimateModal.form.providerMessage}
+                customerBudgetPerDay={getRequestDailyBudget(estimateModal.request)}
+                submitting={estimateSubmitting}
+                onChange={(form) => setEstimateModal((prev) => ({ ...prev, form }))}
+                onSubmit={submitEstimateModal}
+                onCancel={closeEstimateModal}
+              />
             </div>
           </div>
         </div>

@@ -133,6 +133,8 @@
     "reportIssue": "Report Issue",
     "issueResolved": "Issue Resolved",
     "providerReviewing": "Provider Reviewing...",
+    "awaitingProviderEstimate": "Awaiting provider duration estimate",
+    "reviewBookingProposal": "Review provider booking proposal",
     "bookingConfirmed": "Booking Confirmed!",
     "bookingRejected": "Booking Rejected",
     "respondedAt": "Responded at:",
@@ -158,6 +160,7 @@
       "failedAcceptOffer": "Failed to accept offer",
       "offerRejected": "Provider offer rejected. Request is now available for other providers.",
       "failedRejectOffer": "Failed to reject offer",
+      "bookingConfirmed": "Booking confirmed! You can proceed to payment.",
       "completionRecorded": "Completion recorded. Waiting for provider confirmation.",
       "failedComplete": "Failed to mark as completed",
       "failedReview": "Failed to submit review"
@@ -275,6 +278,7 @@
       "failedAcceptBooking": "Failed to accept booking",
       "failedRejectBooking": "Failed to reject booking",
       "failedSendOffer": "Failed to send offer",
+      "estimateSent": "Duration estimate sent to customer",
       "failedCompleteJob": "Failed to complete job",
       "failedUpdateAvailability": "Failed to update availability",
       "failedSubmitRegistration": "Failed to submit registration"
@@ -525,5 +529,19 @@
         }
       ]
     }
+  },
+  "agreement": {
+    "customerBudgetPerDay": "Customer budget per day",
+    "dailyRate": "Daily rate (LKR)",
+    "estimatedDurationDays": "Estimated duration (days)",
+    "totalEstimatedCost": "Total estimated cost",
+    "providerMessage": "Message to customer",
+    "providerMessagePlaceholder": "Explain your estimate, scope of work, or notes...",
+    "submitEstimate": "Submit Estimate",
+    "sendOfferEstimate": "Send Offer with Estimate",
+    "submitBookingEstimate": "Submit Booking Estimate",
+    "providerEstimate": "Provider estimate",
+    "agreedTotal": "Agreed total",
+    "validationRequired": "Daily rate and estimated duration are required"
   }
 }
