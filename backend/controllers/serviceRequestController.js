@@ -7,6 +7,11 @@ import {
   ensureStoredLocation,
 } from "../utils/locationUtils.js";
 import { attachProviderProfilesToRequests } from "../utils/providerProfileUtils.js";
+import {
+  AGREEMENT_STATUSES,
+  applyAgreedTerms,
+  parseProviderEstimate,
+} from "../utils/serviceAgreement.js";
 
 const resolveDailyBudget = (payload) => {
   const value = payload?.dailyBudget ?? payload?.budget;
@@ -22,6 +27,18 @@ export const normalizeServiceRequest = (doc) => {
     obj.dailyBudget = obj.budget;
   }
   delete obj.estimatedDuration;
+
+  if (obj.providerOffer) {
+    if (!obj.providerOffer.totalEstimatedCost && obj.providerOffer.proposedPrice) {
+      obj.providerOffer.totalEstimatedCost = obj.providerOffer.proposedPrice;
+      obj.providerOffer.dailyRate = obj.providerOffer.dailyRate ?? obj.providerOffer.proposedPrice;
+      obj.providerOffer.estimatedDurationDays = obj.providerOffer.estimatedDurationDays ?? 1;
+    }
+    if (!obj.providerOffer.providerMessage && obj.providerOffer.message) {
+      obj.providerOffer.providerMessage = obj.providerOffer.message;
+    }
+  }
+
   return obj;
 };
 
@@ -57,14 +74,14 @@ export const createServiceRequest = async (req, res) => {
     }
     payload.location = locationCheck.location;
 
-    // If this is a direct booking, initialize providerResponse
+    payload.agreementStatus = AGREEMENT_STATUSES.PENDING_PROVIDER_ESTIMATE;
+    payload.status = 'Pending';
+
     if (payload.bookingType === 'direct') {
       payload.providerResponse = {
-        respondedAt: null,
         status: 'pending',
-        responseMessage: null
+        customerConfirmation: 'pending',
       };
-      payload.status = 'Pending';
     }
 
     const newRequest = new ServiceRequest(payload);
@@ -171,7 +188,15 @@ export const updateServiceRequest = async (req, res) => {
 // GET - Get available service requests for providers
 export const getAvailableServiceRequests = async (req, res) => {
   try {
-    const query = { status: "Pending", bookingType: "post" };
+    const query = {
+      status: "Pending",
+      bookingType: "post",
+      $or: [
+        { agreementStatus: AGREEMENT_STATUSES.PENDING_PROVIDER_ESTIMATE },
+        { agreementStatus: { $exists: false } },
+        { agreementStatus: null },
+      ],
+    };
 
     const requests = await ServiceRequest.find(query)
       .populate('userId', 'name email role')
@@ -191,11 +216,18 @@ export const getAvailableServiceRequests = async (req, res) => {
   }
 };
 
-// POST - Accept a service request (Send offer to customer)
+// POST - Send offer with provider duration estimate (post requests)
 export const acceptServiceRequest = async (req, res) => {
   try {
     const { id } = req.params;
-    const { message, proposedPrice, proposedDate } = req.body;
+    const { proposedDate } = req.body;
+
+    let estimate;
+    try {
+      estimate = parseProviderEstimate(req.body);
+    } catch (parseError) {
+      return res.status(400).json({ message: parseError.message });
+    }
 
     const providerAccount = await User.findById(req.user.id);
     const providerProfile = await Provider.findOne({ userId: req.user.id });
@@ -226,20 +258,19 @@ export const acceptServiceRequest = async (req, res) => {
       return res.status(400).json({ message: "This request is not open for offers" });
     }
 
-    const normalizedPrice = Number(proposedPrice);
-    const offerPrice = Number.isFinite(normalizedPrice) && normalizedPrice > 0
-      ? normalizedPrice
-      : (serviceRequest.dailyBudget ?? serviceRequest.budget);
-
-    // Send offer to customer instead of directly accepting
     serviceRequest.status = "OfferSent";
+    serviceRequest.agreementStatus = AGREEMENT_STATUSES.PENDING_CUSTOMER_CONFIRMATION;
     serviceRequest.providerId = req.user.id;
     serviceRequest.providerOffer = {
       sendAt: new Date(),
-      message: message || '',
-      proposedPrice: offerPrice,
+      message: estimate.providerMessage,
+      providerMessage: estimate.providerMessage,
+      dailyRate: estimate.dailyRate,
+      estimatedDurationDays: estimate.estimatedDurationDays,
+      totalEstimatedCost: estimate.totalEstimatedCost,
+      proposedPrice: estimate.totalEstimatedCost,
       proposedDate: proposedDate || serviceRequest.preferredDate,
-      customerResponse: 'pending'
+      customerResponse: 'pending',
     };
 
     await saveServiceRequest(serviceRequest);
@@ -296,6 +327,9 @@ export const completeServiceRequest = async (req, res) => {
     if (serviceRequest.customerCompleted) {
       serviceRequest.status = "Completed";
       serviceRequest.completedAt = new Date();
+      serviceRequest.agreementStatus = AGREEMENT_STATUSES.COMPLETED;
+    } else {
+      serviceRequest.agreementStatus = AGREEMENT_STATUSES.IN_PROGRESS;
     }
 
     serviceRequest.journeyActive = false;
@@ -339,6 +373,9 @@ export const completeServiceRequestByCustomer = async (req, res) => {
     if (serviceRequest.providerCompleted) {
       serviceRequest.status = "Completed";
       serviceRequest.completedAt = new Date();
+      serviceRequest.agreementStatus = AGREEMENT_STATUSES.COMPLETED;
+    } else {
+      serviceRequest.agreementStatus = AGREEMENT_STATUSES.IN_PROGRESS;
     }
 
     serviceRequest.journeyActive = false;
@@ -379,10 +416,22 @@ export const acceptProviderOffer = async (req, res) => {
       return res.status(400).json({ message: "No pending offer for this request" });
     }
 
+    const estimate = {
+      dailyRate: serviceRequest.providerOffer.dailyRate
+        ?? serviceRequest.providerOffer.proposedPrice,
+      estimatedDurationDays: serviceRequest.providerOffer.estimatedDurationDays ?? 1,
+      totalEstimatedCost: serviceRequest.providerOffer.totalEstimatedCost
+        ?? serviceRequest.providerOffer.proposedPrice,
+      providerMessage: serviceRequest.providerOffer.providerMessage
+        ?? serviceRequest.providerOffer.message,
+    };
+
     serviceRequest.status = "Accepted";
     serviceRequest.acceptedAt = new Date();
     serviceRequest.providerOffer.customerResponse = 'accepted';
     serviceRequest.providerOffer.customerResponseAt = new Date();
+    applyAgreedTerms(serviceRequest, estimate);
+    serviceRequest.agreementStatus = AGREEMENT_STATUSES.PAYMENT_PENDING;
 
     await saveServiceRequest(serviceRequest);
 
@@ -417,11 +466,12 @@ export const rejectProviderOffer = async (req, res) => {
       return res.status(400).json({ message: "No pending offer for this request" });
     }
 
-    // Reset to pending and clear provider offer
     serviceRequest.status = "Pending";
+    serviceRequest.agreementStatus = AGREEMENT_STATUSES.PENDING_PROVIDER_ESTIMATE;
     serviceRequest.providerOffer.customerResponse = 'rejected';
     serviceRequest.providerOffer.customerResponseAt = new Date();
     serviceRequest.providerId = null;
+    serviceRequest.set('providerOffer', undefined);
 
     await saveServiceRequest(serviceRequest);
 
@@ -444,7 +494,12 @@ export const getDirectBookingRequests = async (req, res) => {
     const requests = await ServiceRequest.find({
       providerId: req.user.id,
       bookingType: 'direct',
-      'providerResponse.status': 'pending'
+      'providerResponse.status': 'pending',
+      $or: [
+        { agreementStatus: AGREEMENT_STATUSES.PENDING_PROVIDER_ESTIMATE },
+        { agreementStatus: { $exists: false } },
+        { agreementStatus: null },
+      ],
     })
       .populate('userId', 'name email phone')
       .sort({ createdAt: -1 });
@@ -459,16 +514,22 @@ export const getDirectBookingRequests = async (req, res) => {
   }
 };
 
-// POST - Provider accepts direct booking from Services page
-export const acceptDirectBooking = async (req, res) => {
+// POST - Provider submits duration estimate for direct booking
+export const submitDirectBookingEstimate = async (req, res) => {
   try {
     const { id } = req.params;
-    const { responseMessage } = req.body;
+
+    let estimate;
+    try {
+      estimate = parseProviderEstimate(req.body);
+    } catch (parseError) {
+      return res.status(400).json({ message: parseError.message });
+    }
 
     const serviceRequest = await ServiceRequest.findOne({
       _id: id,
       providerId: req.user.id,
-      bookingType: 'direct'
+      bookingType: 'direct',
     });
 
     if (!serviceRequest) {
@@ -479,24 +540,124 @@ export const acceptDirectBooking = async (req, res) => {
       return res.status(400).json({ message: "This booking has already been responded to" });
     }
 
-    serviceRequest.status = "Confirmed";
+    serviceRequest.status = 'OfferSent';
+    serviceRequest.agreementStatus = AGREEMENT_STATUSES.PENDING_CUSTOMER_CONFIRMATION;
     serviceRequest.providerResponse = {
       respondedAt: new Date(),
-      status: 'accepted',
-      responseMessage: responseMessage || 'Booking accepted'
+      status: 'estimated',
+      providerMessage: estimate.providerMessage,
+      responseMessage: estimate.providerMessage,
+      dailyRate: estimate.dailyRate,
+      estimatedDurationDays: estimate.estimatedDurationDays,
+      totalEstimatedCost: estimate.totalEstimatedCost,
+      customerConfirmation: 'pending',
     };
-    serviceRequest.acceptedAt = new Date();
 
     await saveServiceRequest(serviceRequest);
 
     res.status(200).json({
-      message: "Booking accepted successfully",
+      message: "Booking estimate sent to customer",
       serviceRequest: normalizeServiceRequest(serviceRequest),
     });
   } catch (error) {
-    console.error('acceptDirectBooking error:', error);
+    console.error('submitDirectBookingEstimate error:', error);
     res.status(500).json({
-      message: "Failed to accept booking",
+      message: "Failed to submit booking estimate",
+      error: error.message,
+    });
+  }
+};
+
+/** @deprecated Use submitDirectBookingEstimate */
+export const acceptDirectBooking = submitDirectBookingEstimate;
+
+// POST - Customer confirms direct booking proposal
+export const confirmDirectBookingProposal = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const serviceRequest = await ServiceRequest.findOne({
+      _id: id,
+      userId: req.user.id,
+      bookingType: 'direct',
+    });
+
+    if (!serviceRequest) {
+      return res.status(404).json({ message: "Booking not found or not authorized" });
+    }
+
+    if (serviceRequest.status !== 'OfferSent'
+      || serviceRequest.providerResponse?.status !== 'estimated'
+      || serviceRequest.providerResponse?.customerConfirmation !== 'pending') {
+      return res.status(400).json({ message: "No pending booking proposal to confirm" });
+    }
+
+    const estimate = {
+      dailyRate: serviceRequest.providerResponse.dailyRate,
+      estimatedDurationDays: serviceRequest.providerResponse.estimatedDurationDays,
+      totalEstimatedCost: serviceRequest.providerResponse.totalEstimatedCost,
+      providerMessage: serviceRequest.providerResponse.providerMessage,
+    };
+
+    serviceRequest.status = 'Confirmed';
+    serviceRequest.acceptedAt = new Date();
+    serviceRequest.providerResponse.status = 'accepted';
+    serviceRequest.providerResponse.customerConfirmation = 'accepted';
+    serviceRequest.providerResponse.customerConfirmedAt = new Date();
+    applyAgreedTerms(serviceRequest, estimate);
+    serviceRequest.agreementStatus = AGREEMENT_STATUSES.PAYMENT_PENDING;
+
+    await saveServiceRequest(serviceRequest);
+
+    res.status(200).json({
+      message: "Booking proposal confirmed",
+      serviceRequest: normalizeServiceRequest(serviceRequest),
+    });
+  } catch (error) {
+    console.error('confirmDirectBookingProposal error:', error);
+    res.status(500).json({
+      message: "Failed to confirm booking proposal",
+      error: error.message,
+    });
+  }
+};
+
+// POST - Customer rejects direct booking proposal
+export const rejectDirectBookingProposal = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const serviceRequest = await ServiceRequest.findOne({
+      _id: id,
+      userId: req.user.id,
+      bookingType: 'direct',
+    });
+
+    if (!serviceRequest) {
+      return res.status(404).json({ message: "Booking not found or not authorized" });
+    }
+
+    if (serviceRequest.status !== 'OfferSent'
+      || serviceRequest.providerResponse?.status !== 'estimated') {
+      return res.status(400).json({ message: "No pending booking proposal to reject" });
+    }
+
+    serviceRequest.status = 'ProviderRejected';
+    serviceRequest.agreementStatus = AGREEMENT_STATUSES.REJECTED;
+    serviceRequest.providerResponse.status = 'rejected';
+    serviceRequest.providerResponse.customerConfirmation = 'rejected';
+    serviceRequest.providerResponse.customerConfirmedAt = new Date();
+
+    await saveServiceRequest(serviceRequest);
+
+    res.status(200).json({
+      message: "Booking proposal rejected",
+      serviceRequest: normalizeServiceRequest(serviceRequest),
+    });
+  } catch (error) {
+    console.error('rejectDirectBookingProposal error:', error);
+    res.status(500).json({
+      message: "Failed to reject booking proposal",
       error: error.message,
     });
   }
@@ -523,11 +684,11 @@ export const rejectDirectBooking = async (req, res) => {
     }
 
     serviceRequest.status = "ProviderRejected";
-    serviceRequest.providerResponse = {
-      respondedAt: new Date(),
-      status: 'rejected',
-      responseMessage: responseMessage || 'Booking rejected'
-    };
+    serviceRequest.agreementStatus = AGREEMENT_STATUSES.REJECTED;
+    serviceRequest.providerResponse.respondedAt = new Date();
+    serviceRequest.providerResponse.status = 'rejected';
+    serviceRequest.providerResponse.responseMessage = responseMessage || 'Booking rejected';
+    serviceRequest.providerResponse.customerConfirmation = 'rejected';
 
     await saveServiceRequest(serviceRequest);
 
