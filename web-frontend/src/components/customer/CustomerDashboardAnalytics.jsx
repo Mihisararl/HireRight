@@ -117,6 +117,9 @@ export default function CustomerDashboardAnalytics({
   pendingOfferCount,
   onTabChange,
   onNavigate,
+  onPaymentDueClick,
+  onReviewClick,
+  onComplaintClick,
 }) {
   const analytics = useMemo(() => {
     const months = getLast6Months();
@@ -211,7 +214,7 @@ export default function CustomerDashboardAnalytics({
             description={t('customer.analytics.notifPaymentDesc')}
             count={analytics.paymentsDueBookings}
             actionLabel={t('customer.payNow')}
-            onClick={() => onTabChange('active')}
+            onClick={onPaymentDueClick}
           />
           <NotificationCard
             icon={AlertCircle}
@@ -220,7 +223,7 @@ export default function CustomerDashboardAnalytics({
             description={t('customer.analytics.notifComplaintDesc')}
             count={analytics.openComplaints}
             actionLabel={t('customer.reportIssue')}
-            onClick={() => onTabChange('active')}
+            onClick={onComplaintClick || (() => onTabChange('active'))}
           />
           <NotificationCard
             icon={Star}
@@ -229,7 +232,7 @@ export default function CustomerDashboardAnalytics({
             description={t('customer.analytics.notifReviewDesc')}
             count={analytics.reviewsPending}
             actionLabel={t('customer.analytics.leaveReview')}
-            onClick={() => onTabChange('completed')}
+            onClick={onReviewClick}
           />
         </div>
       )}

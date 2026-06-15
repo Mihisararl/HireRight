@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useContext, useCallback, useRef } from "react";
 import { useTranslation } from "react-i18next";
-import { Bell, Settings, LogOut, Calendar, Clock, MapPin, Edit, X, CheckCircle, CreditCard, Plus, FileText, Briefcase } from "lucide-react";
+import { Bell, Settings, LogOut, Calendar, MapPin, Edit, X, CheckCircle, Plus, FileText, Briefcase, LayoutDashboard } from "lucide-react";
 import { useNavigate, useLocation } from 'react-router-dom';
 import {
   getUserServiceRequests,
@@ -22,7 +22,7 @@ import LocationPicker from '../components/location/LocationPicker';
 import CustomerProviderTracking from '../components/location/CustomerProviderTracking';
 import ProviderOfferProfile from '../components/offers/ProviderOfferProfile';
 import LanguageSwitcher from '../components/LanguageSwitcher';
-import { formatLocationDisplay, hasCoordinates, getRequestDailyBudget, getRequestPayableAmount } from '../utils/locationHelpers';
+import { formatLocationDisplay, hasCoordinates, getRequestDailyBudget, getRequestPayableAmount, getRequestDisplayAmount } from '../utils/locationHelpers';
 import {
   formatLkr,
   getPaymentBreakdown,
@@ -38,7 +38,7 @@ const CustomerDashboard = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const { user } = useContext(AuthContext);
-  const [activeTab, setActiveTab] = useState("active");
+  const [activeTab, setActiveTab] = useState("overview");
   const [serviceRequests, setServiceRequests] = useState([]);
   const [payments, setPayments] = useState([]);
   const [complaints, setComplaints] = useState([]);
@@ -49,6 +49,8 @@ const CustomerDashboard = () => {
   const [reviewComment, setReviewComment] = useState('');
   const [reviewSaving, setReviewSaving] = useState(false);
   const [reviewThanks, setReviewThanks] = useState('');
+  const [highlightBookingId, setHighlightBookingId] = useState(null);
+  const bookingCardRefs = useRef({});
   const [isEditing, setIsEditing] = useState(false);
   const [editingRequest, setEditingRequest] = useState(null);
   const [formData, setFormData] = useState({});
@@ -80,7 +82,7 @@ const CustomerDashboard = () => {
     if (location.state?.tab) {
       setActiveTab(location.state.tab);
     }
-  }, [location.state]);
+  }, [location.state?.tab]);
 
   const refreshPayments = useCallback(async () => {
     try {
@@ -114,7 +116,7 @@ const CustomerDashboard = () => {
     if (!location.state?.paymentSuccess) return;
 
     refreshPayments();
-    setActiveTab(location.state?.tab || 'active');
+    setActiveTab(location.state?.tab || 'overview');
     navigate(location.pathname, { replace: true, state: { tab: location.state?.tab || 'active' } });
   }, [location.state?.paymentSuccess, location.pathname, location.state?.tab, navigate, refreshPayments]);
 
@@ -265,7 +267,10 @@ const CustomerDashboard = () => {
   const pendingOffers = serviceRequests.filter(isPendingProviderOffer);
   const pendingOfferCount = pendingOffers.length;
 
-  const totalSpent = completedBookings.reduce((sum, request) => sum + getRequestDailyBudget(request), 0);
+  const totalSpent = completedBookings.reduce((sum, request) => {
+    const payment = payments.find((item) => String(item.serviceRequestId) === String(request._id));
+    return sum + getRequestDisplayAmount(request, payment);
+  }, 0);
 
   const stats = [
     { key: 'active', label: t('customer.stats.active'), value: String(activeBookings.length) },
@@ -275,6 +280,7 @@ const CustomerDashboard = () => {
   ];
 
   const tabDescriptions = {
+    overview: t('customer.tabDesc.overview'),
     active: t('customer.tabDesc.active'),
     completed: t('customer.tabDesc.completed'),
     posts: t('customer.tabDesc.posts'),
@@ -297,8 +303,12 @@ const CustomerDashboard = () => {
     const statusLabel = getStatusDisplay(request.status);
     const isConfirmed = request.status === 'Accepted' || request.status === 'Confirmed';
     const payment = payments.find((item) => String(item.serviceRequestId) === String(request._id));
-    const payableAmount = getRequestPayableAmount(request);
     const isPaid = Boolean(payment);
+    const payableAmount = getRequestPayableAmount(request);
+    const displayAmount = getRequestDisplayAmount(request, payment);
+    const amountForCard = request.status === 'Completed' || isPaid
+      ? displayAmount
+      : payableAmount;
     const paymentSettled = isPaymentSettled(payment);
     const paymentReleased = payment?.payoutStatus === 'paid';
     const paymentBreakdown = payment ? getPaymentBreakdown(payment) : null;
@@ -316,8 +326,8 @@ const CustomerDashboard = () => {
       date: `${request.preferredDate} at ${request.preferredTime}`,
       location: formatLocationDisplay(request.location),
       customerLocation: request.location,
-      amount: `Rs.${payableAmount.toLocaleString()}`,
-      amountValue: payableAmount,
+      amount: `Rs.${amountForCard.toLocaleString()}`,
+      amountValue: amountForCard,
       canPayNow: (request.status === 'Accepted' || request.status === 'Confirmed') && !isPaid,
       isPaid,
       canComplete: (request.status === 'Accepted' || request.status === 'Confirmed') && !request.customerCompleted,
@@ -367,6 +377,69 @@ const CustomerDashboard = () => {
     request.status === 'Pending' || request.status === 'OfferSent' || request.status === 'ProviderRejected'
   ));
   const offersInitializedRef = useRef(false);
+
+  const scrollToBooking = (bookingId) => {
+    setTimeout(() => {
+      bookingCardRefs.current[bookingId]?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }, 150);
+  };
+
+  const handlePaymentDueClick = () => {
+    const dueBookings = bookings.filter((b) => b.canPayNow);
+    if (dueBookings.length === 0) {
+      setActiveTab('active');
+      return;
+    }
+    if (dueBookings.length === 1) {
+      navigate('/payment', { state: { booking: dueBookings[0], fromDashboard: true } });
+      return;
+    }
+    setActiveTab('active');
+    setHighlightBookingId(dueBookings[0].id);
+    scrollToBooking(dueBookings[0].id);
+    setTimeout(() => setHighlightBookingId(null), 4000);
+  };
+
+  const handleReviewClick = () => {
+    const reviewedIds = new Set(reviews.map((review) => String(review.serviceRequestId)));
+    const target = completedCards.find((card) => (
+      card.paymentReleased && !reviewedIds.has(String(card.id))
+    ));
+    setActiveTab('completed');
+    if (!target) return;
+    scrollToBooking(target.id);
+    setReviewTarget(target);
+    setReviewRating(5);
+    setReviewComment('');
+    setReviewModalOpen(true);
+  };
+
+  const handleComplaintClick = () => {
+    const openComplaint = complaints.find((c) => c.status === 'open');
+    if (!openComplaint) {
+      setActiveTab('active');
+      return;
+    }
+    const serviceRequestId = String(openComplaint.serviceRequestId?._id || openComplaint.serviceRequestId);
+    const activeMatch = bookings.find((b) => String(b.id) === serviceRequestId);
+    const completedMatch = completedCards.find((b) => String(b.id) === serviceRequestId);
+    const target = activeMatch || completedMatch;
+    if (target) {
+      setActiveTab(activeMatch ? 'active' : 'completed');
+      setHighlightBookingId(target.id);
+      scrollToBooking(target.id);
+      setTimeout(() => setHighlightBookingId(null), 4000);
+      return;
+    }
+    setActiveTab('active');
+  };
+
+  const sectionTitles = {
+    overview: t('customer.sidebar.dashboard'),
+    active: t('customer.activeBookings'),
+    completed: t('customer.sidebar.completedTasks'),
+    posts: t('customer.myPosts'),
+  };
 
   useEffect(() => {
     const baseTitle = t('customer.dashboardTitle');
@@ -543,9 +616,9 @@ const CustomerDashboard = () => {
         }
 
         .dashboard-container {
-          max-width: 1100px;
-          margin: 0 auto;
-          padding: 24px 20px 40px;
+          max-width: none;
+          margin: 0;
+          padding: 24px 28px 40px;
           position: relative;
           z-index: 1;
         }
@@ -1287,7 +1360,7 @@ const CustomerDashboard = () => {
 
           <div
             className="icon-btn notification-bell-btn"
-            onClick={() => setActiveTab('posts')}
+            onClick={() => setActiveTab('overview')}
             title={pendingOfferCount > 0 ? t('customer.newProviderOffers') : t('customer.notifications')}
           >
             <Bell size={20} color={pendingOfferCount > 0 ? '#ea580c' : '#64748b'} />
@@ -1298,13 +1371,6 @@ const CustomerDashboard = () => {
             )}
           </div>
 
-          <div
-            className="icon-btn"
-            onClick={() => navigate("/customer-settings")}
-          >
-            <Settings size={20} color="#64748b" />
-          </div>
-
           <div onClick={() => navigate('/login')} className="logout-btn">
             <LogOut size={18} />
             <span>{t('logout')}</span>
@@ -1312,6 +1378,74 @@ const CustomerDashboard = () => {
         </div>
       </div>
 
+      <div className="dashboard-layout">
+        <aside className="dashboard-sidebar">
+          <div className="dashboard-sidebar-brand">
+            <span className="dashboard-sidebar-brand-text">{t('customer.sidebar.title')}</span>
+          </div>
+          <nav className="dashboard-sidebar-nav">
+            <button
+              type="button"
+              className={`dashboard-sidebar-link ${activeTab === 'overview' ? 'dashboard-sidebar-link-active' : ''}`}
+              onClick={() => setActiveTab('overview')}
+            >
+              <LayoutDashboard size={20} />
+              <span>{t('customer.sidebar.dashboard')}</span>
+            </button>
+            <button
+              type="button"
+              className={`dashboard-sidebar-link ${activeTab === 'active' ? 'dashboard-sidebar-link-active' : ''}`}
+              onClick={() => setActiveTab('active')}
+            >
+              <Briefcase size={20} />
+              <span>{t('customer.activeBookings')}</span>
+              {bookings.length > 0 && (
+                <span className="dashboard-sidebar-badge">{bookings.length}</span>
+              )}
+            </button>
+            <button
+              type="button"
+              className={`dashboard-sidebar-link ${activeTab === 'completed' ? 'dashboard-sidebar-link-active' : ''}`}
+              onClick={() => setActiveTab('completed')}
+            >
+              <CheckCircle size={20} />
+              <span>{t('customer.sidebar.completedTasks')}</span>
+              {completedCards.length > 0 && (
+                <span className="dashboard-sidebar-badge">{completedCards.length}</span>
+              )}
+            </button>
+            <button
+              type="button"
+              className={`dashboard-sidebar-link ${activeTab === 'posts' ? 'dashboard-sidebar-link-active' : ''}`}
+              onClick={() => setActiveTab('posts')}
+            >
+              <FileText size={20} />
+              <span>{t('customer.myPosts')}</span>
+              {pendingOfferCount > 0 && (
+                <span className="dashboard-sidebar-badge dashboard-sidebar-badge-alert">
+                  {pendingOfferCount > 9 ? '9+' : pendingOfferCount}
+                </span>
+              )}
+            </button>
+            <button
+              type="button"
+              className="dashboard-sidebar-link"
+              onClick={() => navigate('/customer-settings')}
+            >
+              <Settings size={20} />
+              <span>{t('customer.sidebar.settings')}</span>
+            </button>
+          </nav>
+          <div className="dashboard-sidebar-user">
+            <div className="dashboard-sidebar-avatar">{renderAvatar()}</div>
+            <div className="dashboard-sidebar-user-info">
+              <div className="dashboard-sidebar-user-name">{user?.name}</div>
+              <div className="dashboard-sidebar-user-email">{user?.email}</div>
+            </div>
+          </div>
+        </aside>
+
+        <div className="dashboard-main">
       {/* CONTAINER */}
       <div className="dashboard-container">
         {reviewThanks && (
@@ -1329,7 +1463,7 @@ const CustomerDashboard = () => {
           </div>
         )}
 
-        {pendingOfferCount > 0 && activeTab !== 'posts' && (
+        {pendingOfferCount > 0 && activeTab === 'overview' && (
           <div
             className="offer-alert-banner"
             onClick={() => setActiveTab('posts')}
@@ -1357,6 +1491,8 @@ const CustomerDashboard = () => {
             </button>
           </div>
         )}
+        {activeTab === 'overview' && (
+          <>
         {/* HERO — welcome, quick stats, primary action */}
         <div className="dashboard-hero">
           <div className="dashboard-hero-left">
@@ -1402,42 +1538,20 @@ const CustomerDashboard = () => {
           pendingOfferCount={pendingOfferCount}
           onTabChange={setActiveTab}
           onNavigate={navigate}
+          onPaymentDueClick={handlePaymentDueClick}
+          onReviewClick={handleReviewClick}
+          onComplaintClick={handleComplaintClick}
         />
+          </>
+        )}
 
-        {/* MAIN CONTENT */}
+        {/* MAIN CONTENT — list views only (no charts) */}
+        {activeTab !== 'overview' && (
         <div className="dashboard-section">
-          <div className="dashboard-tabs">
-            <button
-              type="button"
-              onClick={() => setActiveTab('active')}
-              className={`dashboard-tab ${activeTab === 'active' ? 'dashboard-tab-active' : ''}`}
-            >
-              <Briefcase size={16} />
-              {t('customer.activeBookings')}
-            </button>
-            <button
-              type="button"
-              onClick={() => setActiveTab('completed')}
-              className={`dashboard-tab ${activeTab === 'completed' ? 'dashboard-tab-active' : ''}`}
-            >
-              <CheckCircle size={16} />
-              {t('customer.completed')}
-            </button>
-            <button
-              type="button"
-              onClick={() => setActiveTab('posts')}
-              className={`dashboard-tab ${activeTab === 'posts' ? 'dashboard-tab-active' : ''}`}
-            >
-              <FileText size={16} />
-              {t('customer.myPosts')}
-              {pendingOfferCount > 0 && (
-                <span className="dashboard-tab-badge">
-                  {pendingOfferCount > 9 ? '9+' : pendingOfferCount}
-                </span>
-              )}
-            </button>
+          <div className="dashboard-section-header">
+            <h2 className="dashboard-section-title">{sectionTitles[activeTab]}</h2>
+            <p className="dashboard-section-desc">{tabDescriptions[activeTab]}</p>
           </div>
-          <p className="dashboard-section-desc">{tabDescriptions[activeTab]}</p>
 
         {/* BOOKINGS GRID */}
         {activeTab === 'posts' && pendingPosts.length === 0 && (
@@ -1641,7 +1755,11 @@ const CustomerDashboard = () => {
         ) : activeTab !== 'posts' && (activeTab === 'active' ? bookings.length > 0 : completedCards.length > 0) ? (
           <div className="dashboard-grid">
             {(activeTab === 'active' ? bookings : completedCards).map((b) => (
-              <div key={b.id} className="item-card">
+              <div
+                key={b.id}
+                ref={(el) => { bookingCardRefs.current[b.id] = el; }}
+                className={`item-card ${highlightBookingId === b.id ? 'item-card-highlight' : ''}`}
+              >
                 {/* PROVIDER */}
                 <div className="provider-profile-flex">
                   <div className="provider-avatar-circle">
@@ -1740,6 +1858,21 @@ const CustomerDashboard = () => {
                       ✓ {t('customer.paid')}
                     </button>
                   ) : null}
+                  {activeTab === 'completed' && b.paymentReleased && !reviews.some((r) => String(r.serviceRequestId) === String(b.id)) && (
+                    <button
+                      type="button"
+                      className="secondary-action-btn"
+                      style={{ marginTop: '10px', borderColor: '#c4b5fd', color: '#7c3aed', background: '#f5f3ff' }}
+                      onClick={() => {
+                        setReviewTarget(b);
+                        setReviewRating(5);
+                        setReviewComment('');
+                        setReviewModalOpen(true);
+                      }}
+                    >
+                      ★ {t('customer.analytics.leaveReview')}
+                    </button>
+                  )}
                 </div>
                 {b.canReport && (
                   <button
@@ -1760,6 +1893,9 @@ const CustomerDashboard = () => {
             ))}
           </div>
         ) : null}
+        </div>
+        )}
+      </div>
         </div>
       </div>
 

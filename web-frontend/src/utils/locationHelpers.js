@@ -148,3 +148,33 @@ export const getRequestPayableAmount = (request) => {
 
   return getRequestDailyBudget(request);
 };
+
+/** Amount to display on cards (works for completed jobs and paid bookings) */
+export const getRequestDisplayAmount = (request, payment) => {
+  if (payment) {
+    const fromPayment = Number(payment.serviceAmount ?? payment.amount ?? 0);
+    if (fromPayment > 0) return fromPayment;
+  }
+
+  if (request?.agreedTotalAmount != null && Number(request.agreedTotalAmount) > 0) {
+    return Number(request.agreedTotalAmount);
+  }
+
+  const offer = request?.providerOffer;
+  if (offer?.totalEstimatedCost != null && Number(offer.totalEstimatedCost) > 0) {
+    return Number(offer.totalEstimatedCost);
+  }
+  if (offer?.proposedPrice != null && Number(offer.proposedPrice) > 0) {
+    return Number(offer.proposedPrice);
+  }
+
+  const response = request?.providerResponse;
+  if (response?.totalEstimatedCost != null && Number(response.totalEstimatedCost) > 0) {
+    return Number(response.totalEstimatedCost);
+  }
+  if (response?.proposedPrice != null && Number(response.proposedPrice) > 0) {
+    return Number(response.proposedPrice);
+  }
+
+  return getRequestDailyBudget(request);
+};

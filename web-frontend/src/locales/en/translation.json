@@ -74,6 +74,12 @@
     "activeBookings": "Active bookings",
     "completed": "Completed",
     "myPosts": "My posts",
+    "sidebar": {
+      "title": "My Dashboard",
+      "dashboard": "Dashboard",
+      "completedTasks": "Completed tasks",
+      "settings": "Settings"
+    },
     "stats": {
       "active": "Active",
       "completed": "Completed",
@@ -118,6 +124,7 @@
       "leaveReview": "Review"
     },
     "tabDesc": {
+      "overview": "Your overview — activity charts, notifications, and quick shortcuts.",
       "active": "Jobs in progress — pay your provider, track their location, or mark work complete.",
       "completed": "Finished jobs and your payment history.",
       "posts": "Service requests you posted — review provider offers and manage bookings."
