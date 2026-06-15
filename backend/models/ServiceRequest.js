@@ -1,4 +1,7 @@
 import mongoose from "mongoose";
+import { AGREEMENT_STATUSES } from "../utils/serviceAgreement.js";
+
+const agreementStatusValues = Object.values(AGREEMENT_STATUSES);
 
 const serviceRequestSchema = new mongoose.Schema(
   {
@@ -52,24 +55,35 @@ const serviceRequestSchema = new mongoose.Schema(
     specificRequirements: {
       type: String,
     },
-    // Booking type: 'direct' (from Services page) or 'post' (customer created post)
     bookingType: {
       type: String,
       enum: ['direct', 'post'],
       default: 'post'
     },
+    agreementStatus: {
+      type: String,
+      enum: agreementStatusValues,
+      default: AGREEMENT_STATUSES.PENDING_PROVIDER_ESTIMATE,
+    },
+    dailyRate: { type: Number },
+    estimatedDurationDays: { type: Number },
+    agreedTotalAmount: { type: Number },
     status: {
       type: String,
-      default: "Pending", // Pending / OfferSent / Accepted / Completed / Rejected / ProviderRejected
+      default: "Pending",
     },
     providerId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'User',
     },
-    // For 'post' type bookings - provider sends offer to customer
+    /** Post requests — provider offer to customer */
     providerOffer: {
       sendAt: { type: Date },
       message: { type: String },
+      providerMessage: { type: String },
+      dailyRate: { type: Number },
+      estimatedDurationDays: { type: Number },
+      totalEstimatedCost: { type: Number },
       proposedPrice: { type: Number },
       proposedDate: { type: String },
       customerResponse: {
@@ -79,15 +93,25 @@ const serviceRequestSchema = new mongoose.Schema(
       },
       customerResponseAt: { type: Date }
     },
-    // For 'direct' type bookings - customer books provider, provider accepts/rejects
+    /** Direct bookings — provider estimate and customer confirmation */
     providerResponse: {
       respondedAt: { type: Date },
       status: {
         type: String,
-        enum: ['pending', 'accepted', 'rejected'],
+        enum: ['pending', 'estimated', 'accepted', 'rejected'],
         default: 'pending'
       },
-      responseMessage: { type: String }
+      responseMessage: { type: String },
+      providerMessage: { type: String },
+      dailyRate: { type: Number },
+      estimatedDurationDays: { type: Number },
+      totalEstimatedCost: { type: Number },
+      customerConfirmation: {
+        type: String,
+        enum: ['pending', 'accepted', 'rejected'],
+        default: 'pending',
+      },
+      customerConfirmedAt: { type: Date },
     },
     acceptedAt: {
       type: Date,
@@ -114,7 +138,6 @@ const serviceRequestSchema = new mongoose.Schema(
 );
 
 serviceRequestSchema.pre('validate', function preValidateDailyBudget(next) {
-  // Legacy MongoDB documents may still have `budget` instead of `dailyBudget`
   if ((this.dailyBudget == null || this.dailyBudget === undefined) && this.get('budget') != null) {
     this.dailyBudget = Number(this.get('budget'));
   }

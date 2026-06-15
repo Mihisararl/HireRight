@@ -187,7 +187,7 @@ export const getPayments = async (req, res) => {
             .populate('providerId', 'firstName lastName email phone')
             .populate({
                 path: 'serviceRequestId',
-                select: 'customerCompleted providerCompleted customerCompletedAt providerCompletedAt userId providerId',
+                select: 'customerCompleted providerCompleted customerCompletedAt providerCompletedAt userId providerId dailyBudget dailyRate estimatedDurationDays agreedTotalAmount agreementStatus providerOffer providerResponse bookingType serviceTitle',
                 populate: [
                     { path: 'userId', select: 'name email' },
                     { path: 'providerId', select: 'name email phone' },

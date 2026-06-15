@@ -12,7 +12,9 @@ import {
   User,
   CheckCircle,
   LogOut,
-  Settings
+  Settings,
+  LayoutDashboard,
+  FileText,
 } from 'lucide-react';
 import {
   getAvailableServiceRequests,
@@ -20,9 +22,12 @@ import {
   getProviderServiceRequests,
   completeServiceRequest,
   getDirectBookingRequests,
-  acceptDirectBooking,
+  submitDirectBookingEstimate,
   rejectDirectBooking
 } from '../api/service';
+import ProviderEstimateForm from '../components/offers/ProviderEstimateForm';
+import ProviderDashboardAnalytics from '../components/provider/ProviderDashboardAnalytics';
+import '../styles/ProviderDashboard.css';
 import { registerProvider, getMyAvailability, updateAvailability } from '../api/provider';
 import { getProviderPayments } from '../api/payment';
 import {
@@ -47,7 +52,7 @@ const ProviderDashboard = () => {
   const { t } = useTranslation();
   const { user, refreshUser, logout } = useContext(AuthContext);
   const navigate = useNavigate();
-  const [activeSection, setActiveSection] = useState('findWork');
+  const [activeSection, setActiveSection] = useState('overview');
   const [availableRequests, setAvailableRequests] = useState([]);
   const [myRequests, setMyRequests] = useState([]);
   const [bookingRequests, setBookingRequests] = useState([]);
@@ -82,9 +87,80 @@ const ProviderDashboard = () => {
     agreedToBackgroundCheck: false
   });
   const [regErrors, setRegErrors] = useState({});
+  const [estimateModal, setEstimateModal] = useState(null);
+  const [estimateSubmitting, setEstimateSubmitting] = useState(false);
+
+  const openPostOfferModal = (request) => {
+    setEstimateModal({
+      type: 'post',
+      request,
+      form: {
+        dailyRate: String(getRequestDailyBudget(request) || ''),
+        estimatedDurationDays: '1',
+        providerMessage: '',
+      },
+    });
+  };
+
+  const openDirectEstimateModal = (booking) => {
+    setEstimateModal({
+      type: 'direct',
+      request: booking,
+      form: {
+        dailyRate: String(getRequestDailyBudget(booking) || booking.hourlyRate || ''),
+        estimatedDurationDays: '1',
+        providerMessage: '',
+      },
+    });
+  };
+
+  const closeEstimateModal = () => {
+    setEstimateModal(null);
+    setEstimateSubmitting(false);
+  };
+
+  const submitEstimateModal = async () => {
+    if (!estimateModal) return;
+    const { type, request, form } = estimateModal;
+    const dailyRate = Number(form.dailyRate);
+    const estimatedDurationDays = Number(form.estimatedDurationDays);
+    if (!dailyRate || !estimatedDurationDays) {
+      alert(t('agreement.validationRequired'));
+      return;
+    }
+    setEstimateSubmitting(true);
+    try {
+      const payload = {
+        dailyRate,
+        estimatedDurationDays,
+        providerMessage: form.providerMessage || '',
+      };
+      if (type === 'post') {
+        await acceptServiceRequest(request._id, payload);
+        loadAvailableRequests();
+        alert(t('provider.alerts.offerSent'));
+      } else {
+        await submitDirectBookingEstimate(request._id, payload);
+        loadBookingRequests();
+        alert(t('provider.alerts.estimateSent'));
+      }
+      closeEstimateModal();
+    } catch (err) {
+      alert(err.response?.data?.message || t('provider.alerts.failedSendOffer'));
+    } finally {
+      setEstimateSubmitting(false);
+    }
+  };
 
   useEffect(() => {
-    if (activeSection === 'findWork') {
+    if (activeSection === 'overview') {
+      loadMyRequests();
+      loadPayments();
+      loadReviews();
+      if (user?.providerStatus === 'approved') {
+        loadAvailableRequests();
+      }
+    } else if (activeSection === 'findWork') {
       loadAvailableRequests();
     } else if (['myRequests', 'upcoming', 'history', 'earnings', 'reviews'].includes(activeSection)) {
       loadMyRequests();
@@ -98,6 +174,13 @@ const ProviderDashboard = () => {
       loadBookingRequests();
     }
   }, [activeSection]);
+
+  useEffect(() => {
+    if (!user || user.role !== 'provider') return;
+    loadMyRequests();
+    loadPayments();
+    loadReviews();
+  }, [user?.id]);
 
   useEffect(() => {
     if (!user) return;
@@ -233,21 +316,6 @@ const ProviderDashboard = () => {
     }
   };
 
-  const handleAcceptBooking = async (requestId) => {
-    try {
-      const responseMessage = prompt(t('provider.prompts.acceptMessage'));
-      if (responseMessage === null) return; // User cancelled
-
-      await acceptDirectBooking(requestId, responseMessage);
-      loadBookingRequests();
-      alert(t('provider.alerts.bookingAccepted'));
-    } catch (err) {
-      const errorMsg = err.response?.data?.message || t('provider.alerts.failedAcceptBooking');
-      alert(errorMsg);
-      console.error(err);
-    }
-  };
-
   const handleRejectBooking = async (requestId) => {
     try {
       const responseMessage = prompt(t('provider.prompts.rejectReason'));
@@ -258,32 +326,6 @@ const ProviderDashboard = () => {
       alert(t('provider.alerts.bookingRejected'));
     } catch (err) {
       const errorMsg = err.response?.data?.message || t('provider.alerts.failedRejectBooking');
-      alert(errorMsg);
-      console.error(err);
-    }
-  };
-
-  const handleAcceptJob = async (requestId, budget, preferredDate) => {
-    try {
-      // Simple prompt for offer details - can be enhanced with a modal later
-      const message = prompt(t('provider.prompts.offerMessage'));
-      const proposedPriceStr = prompt(t('provider.prompts.proposedPrice'), budget);
-      const proposedDate = prompt(t('provider.prompts.proposedDate'), preferredDate);
-
-      if (proposedPriceStr === null) return; // User cancelled
-
-      const proposedPrice = Number(proposedPriceStr) || budget;
-
-      await acceptServiceRequest(requestId, {
-        message: message || '',
-        proposedPrice,
-        proposedDate: proposedDate || preferredDate
-      });
-
-      loadAvailableRequests();
-      alert(t('provider.alerts.offerSent'));
-    } catch (err) {
-      const errorMsg = err.response?.data?.message || t('provider.alerts.failedSendOffer');
       alert(errorMsg);
       console.error(err);
     }
@@ -623,315 +665,156 @@ const ProviderDashboard = () => {
         }
       `}</style>
 
-      <div style={{
-        minHeight: '100vh',
-        background: 'linear-gradient(135deg, #f8fafc 0%, #e0f2fe 50%, #e0e7ff 100%)',
-        fontFamily: "'Outfit', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
-        padding: '20px'
-      }}>
-        <div style={{ maxWidth: '1400px', margin: '0 auto' }}>
-          {/* Header */}
-          <div style={{
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-            marginBottom: '30px',
-            flexWrap: 'wrap',
-            gap: '16px'
-          }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-              <div style={{
-                width: '56px',
-                height: '56px',
-                borderRadius: '50%',
-                background: 'linear-gradient(135deg, #3b82f6, #2563eb)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                color: 'white',
-                fontSize: '20px',
-                fontWeight: '700',
-                boxShadow: '0 4px 12px rgba(59, 130, 246, 0.3)',
-                overflow: 'hidden',
-                flexShrink: 0
-              }}>
-                {user?.profilePhoto ? (
-                  <img
-                    src={user.profilePhoto}
-                    alt={user?.name || t('provider.profile')}
-                    style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                  />
-                ) : (
-                  (user?.name || 'P')
-                    .split(' ')
-                    .filter(Boolean)
-                    .map((n) => n[0])
-                    .join('')
-                    .substring(0, 2)
-                    .toUpperCase()
-                )}
-              </div>
-              <div>
-                <h1 style={{ fontSize: '28px', fontWeight: '700', color: '#1e293b', margin: 0 }}>
-                  {t('common.appName')}
-                </h1>
-                <p style={{ fontSize: '14px', color: '#64748b', margin: '4px 0 0 0' }}>
-                  {t('provider.welcome', { name: user?.name || t('provider.providerFallback') })}
-                </p>
-              </div>
+      <div className="provider-dashboard-page">
+        <div className="provider-dashboard-header">
+          <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+            <div className="provider-sidebar-avatar" style={{ width: 48, height: 48, borderRadius: '50%' }}>
+              {user?.profilePhoto ? (
+                <img src={user.profilePhoto} alt={user?.name || t('provider.profile')} />
+              ) : (
+                (user?.name || 'P').split(' ').filter(Boolean).map((n) => n[0]).join('').substring(0, 2).toUpperCase()
+              )}
             </div>
-
-            <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
-              {user?.providerStatus !== 'approved' && (
-                <button
-                  onClick={() => setIsModalOpen(true)}
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '8px',
-                    padding: '10px 20px',
-                    borderRadius: '8px',
-                    border: 'none',
-                    background: 'linear-gradient(135deg, #f6573b, #cc3737)',
-                    color: 'white',
-                    fontSize: '14px',
-                    fontWeight: '600',
-                    cursor: 'pointer',
-                    transition: 'all 0.3s ease'
-                  }}
-                >
-                  {t('provider.createWorkerProfile')}
-                </button>
-              )}
-
-              {user?.providerStatus === 'approved' && (
-                <>
-                  <div style={{
-                    padding: '10px 20px',
-                    borderRadius: '8px',
-                    background: 'linear-gradient(135deg, #10b981, #059669)',
-                    color: 'white',
-                    fontSize: '14px',
-                    fontWeight: '600',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '8px'
-                  }}>
-                    <CheckCircle size={18} />
-                    {t('provider.profileApproved')}
-                  </div>
-                  <button
-                    type="button"
-                    onClick={handleAvailabilityToggle}
-                    disabled={availabilitySaving}
-                    style={{
-                      padding: '10px 20px',
-                      borderRadius: '8px',
-                      border: 'none',
-                      background: isAvailableToday
-                        ? '#e2e8f0'
-                        : 'linear-gradient(135deg, #ef4444, #dc2626)',
-                      color: isAvailableToday ? '#475569' : 'white',
-                      fontSize: '14px',
-                      fontWeight: '600',
-                      cursor: availabilitySaving ? 'wait' : 'pointer',
-                      opacity: availabilitySaving ? 0.7 : 1
-                    }}
-                  >
-                    {availabilitySaving
-                      ? t('provider.updating')
-                      : isAvailableToday
-                        ? t('provider.markUnavailableToday')
-                        : t('provider.markAvailableToday')}
-                  </button>
-                  {bookedDates.length > 0 && (
-                    <div style={{
-                      padding: '8px 14px',
-                      borderRadius: '8px',
-                      backgroundColor: '#fff7ed',
-                      border: '1px solid #fed7aa',
-                      color: '#9a3412',
-                      fontSize: '13px',
-                      fontWeight: '500',
-                      maxWidth: '320px'
-                    }}>
-                      {t('provider.bookedDates')}: {bookedDates.map((d) => {
-                        const parsed = new Date(`${d}T00:00:00`);
-                        return Number.isNaN(parsed.getTime())
-                          ? d
-                          : parsed.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-                      }).join(', ')}
-                    </div>
-                  )}
-                </>
-              )}
-
-              <LanguageSwitcher />
-
-              <button
-                onClick={() => navigate('/provider-settings')}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '8px',
-                  padding: '10px 20px',
-                  borderRadius: '8px',
-                  border: '1px solid #e2e8f0',
-                  backgroundColor: 'white',
-                  color: '#64748b',
-                  fontSize: '14px',
-                  fontWeight: '600',
-                  cursor: 'pointer',
-                  transition: 'all 0.3s ease'
-                }}
-              >
-                <Settings size={18} />
-                {t('provider.settings')}
-              </button>
-
-              <button
-                onClick={handleLogout}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '8px',
-                  padding: '10px 20px',
-                  borderRadius: '8px',
-                  border: '1px solid #e2e8f0',
-                  backgroundColor: 'white',
-                  color: '#64748b',
-                  fontSize: '14px',
-                  fontWeight: '600',
-                  cursor: 'pointer',
-                  transition: 'all 0.3s ease'
-                }}
-              >
-                <LogOut size={18} />
-                {t('provider.logout')}
-              </button>
+            <div>
+              <h1 style={{ fontSize: '22px', fontWeight: '700', color: '#1e293b', margin: 0 }}>{t('common.appName')}</h1>
+              <p style={{ fontSize: '13px', color: '#64748b', margin: '2px 0 0' }}>
+                {t('provider.welcome', { name: user?.name || t('provider.providerFallback') })}
+              </p>
             </div>
           </div>
 
-          {!isApproved && (
-            <div style={{
-              marginBottom: '20px',
-              padding: '14px 16px',
-              borderRadius: '12px',
-              background: isRejected ? '#fee2e2' : '#fff7ed',
-              border: `1px solid ${isRejected ? '#fecaca' : '#fed7aa'}`,
-              color: isRejected ? '#991b1b' : '#9a3412',
-              fontSize: '14px',
-              fontWeight: '600'
-            }}>
-              {isRejected
-                ? t('provider.registrationRejected')
-                : t('provider.registrationPending')}
+          <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
+            {user?.providerStatus !== 'approved' && (
+              <button type="button" onClick={() => setIsModalOpen(true)} className="btn-primary">
+                {t('provider.createWorkerProfile')}
+              </button>
+            )}
+            {user?.providerStatus === 'approved' && (
+              <>
+                <div style={{ padding: '8px 14px', borderRadius: '8px', background: '#dcfce7', color: '#166534', fontSize: '13px', fontWeight: '600', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <CheckCircle size={16} />
+                  {t('provider.profileApproved')}
+                </div>
+                <button
+                  type="button"
+                  onClick={handleAvailabilityToggle}
+                  disabled={availabilitySaving}
+                  style={{
+                    padding: '8px 14px',
+                    borderRadius: '8px',
+                    border: 'none',
+                    background: isAvailableToday ? '#e2e8f0' : '#ef4444',
+                    color: isAvailableToday ? '#475569' : '#fff',
+                    fontSize: '13px',
+                    fontWeight: '600',
+                    cursor: availabilitySaving ? 'wait' : 'pointer',
+                  }}
+                >
+                  {availabilitySaving ? t('provider.updating') : isAvailableToday ? t('provider.markUnavailableToday') : t('provider.markAvailableToday')}
+                </button>
+              </>
+            )}
+            <LanguageSwitcher />
+            <button type="button" onClick={handleLogout} className="btn-primary" style={{ background: '#64748b', display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <LogOut size={16} />
+              {t('provider.logout')}
+            </button>
+          </div>
+        </div>
+
+        {!isApproved && (
+          <div style={{ margin: '16px 28px 0', padding: '14px 16px', borderRadius: '12px', background: isRejected ? '#fee2e2' : '#fff7ed', border: `1px solid ${isRejected ? '#fecaca' : '#fed7aa'}`, color: isRejected ? '#991b1b' : '#9a3412', fontSize: '14px', fontWeight: '600' }}>
+            {isRejected ? t('provider.registrationRejected') : t('provider.registrationPending')}
+          </div>
+        )}
+
+        <div className="provider-dashboard-layout">
+          <aside className="provider-sidebar">
+            <div className="provider-sidebar-brand">
+              <span className="provider-sidebar-brand-text">{t('provider.navigation')}</span>
             </div>
-          )}
-
-          {/* Main Dashboard Container */}
-          <div className="dashboard-container" style={{
-            display: 'flex',
-            gap: '20px',
-            alignItems: 'flex-start'
-          }}>
-            {/* Sidebar */}
-            <div className="sidebar" style={{
-              width: '260px',
-              background: 'white',
-              borderRadius: '16px',
-              padding: '20px',
-              boxShadow: '0 4px 16px rgba(0, 0, 0, 0.06)',
-              position: 'sticky',
-              top: '20px'
-            }}>
-              <div style={{ marginBottom: '10px', paddingLeft: '8px' }}>
-                <h3 style={{ fontSize: '16px', fontWeight: '600', color: '#1e293b' }}>
-                  {t('provider.navigation')}
-                </h3>
+            <nav className="provider-sidebar-nav">
+              <button type="button" className={`provider-sidebar-link ${activeSection === 'overview' ? 'provider-sidebar-link-active' : ''}`} onClick={() => setActiveSection('overview')}>
+                <LayoutDashboard size={20} />
+                <span>{t('provider.dashboard')}</span>
+              </button>
+              <button type="button" className={`provider-sidebar-link ${activeSection === 'findWork' ? 'provider-sidebar-link-active' : ''}`} onClick={() => setActiveSection('findWork')}>
+                <Search size={20} />
+                <span>{t('provider.findWork')}</span>
+                {availableRequests.length > 0 && <span className="provider-sidebar-badge">{availableRequests.length}</span>}
+              </button>
+              <button type="button" className={`provider-sidebar-link ${activeSection === 'bookingRequests' ? 'provider-sidebar-link-active' : ''}`} onClick={() => setActiveSection('bookingRequests')}>
+                <Briefcase size={20} />
+                <span>{t('provider.bookingRequests')}</span>
+                {bookingRequests.length > 0 && <span className="provider-sidebar-badge provider-sidebar-badge-alert">{bookingRequests.length}</span>}
+              </button>
+              <button type="button" className={`provider-sidebar-link ${activeSection === 'upcoming' ? 'provider-sidebar-link-active' : ''}`} onClick={() => setActiveSection('upcoming')}>
+                <Clock size={20} />
+                <span>{t('provider.upcoming')}</span>
+                {upcomingRequests.length > 0 && <span className="provider-sidebar-badge">{upcomingRequests.length}</span>}
+              </button>
+              <button type="button" className={`provider-sidebar-link ${activeSection === 'myRequests' ? 'provider-sidebar-link-active' : ''}`} onClick={() => setActiveSection('myRequests')}>
+                <FileText size={20} />
+                <span>{t('provider.myRequests')}</span>
+              </button>
+              <button type="button" className={`provider-sidebar-link ${activeSection === 'history' ? 'provider-sidebar-link-active' : ''}`} onClick={() => setActiveSection('history')}>
+                <HistoryIcon size={20} />
+                <span>{t('provider.history')}</span>
+              </button>
+              <button type="button" className={`provider-sidebar-link ${activeSection === 'earnings' ? 'provider-sidebar-link-active' : ''}`} onClick={() => setActiveSection('earnings')}>
+                <DollarSign size={20} />
+                <span>{t('provider.earnings')}</span>
+              </button>
+              <button type="button" className={`provider-sidebar-link ${activeSection === 'reviews' ? 'provider-sidebar-link-active' : ''}`} onClick={() => setActiveSection('reviews')}>
+                <CheckCircle size={20} />
+                <span>{t('provider.reviews')}</span>
+              </button>
+              <button type="button" className="provider-sidebar-link" onClick={() => navigate('/provider-settings')}>
+                <Settings size={20} />
+                <span>{t('provider.settings')}</span>
+              </button>
+            </nav>
+            <div className="provider-sidebar-user">
+              <div className="provider-sidebar-avatar">
+                {user?.profilePhoto ? (
+                  <img src={user.profilePhoto} alt={user?.name || ''} />
+                ) : (
+                  (user?.name || 'P').split(' ').filter(Boolean).map((n) => n[0]).join('').substring(0, 2).toUpperCase()
+                )}
               </div>
-
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                <div
-                  className={`sidebar-item ${activeSection === 'findWork' ? 'sidebar-item-active' : ''}`}
-                  onClick={() => setActiveSection('findWork')}
-                >
-                  <Search size={20} />
-                  <span>{t('provider.findWork')}</span>
-                </div>
-
-                <div
-                  className={`sidebar-item ${activeSection === 'bookingRequests' ? 'sidebar-item-active' : ''}`}
-                  onClick={() => setActiveSection('bookingRequests')}
-                  style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}
-                >
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                    <Briefcase size={20} />
-                    <span>{t('provider.bookingRequests')}</span>
-                  </div>
-                  {bookingRequests.length > 0 && (
-                    <span style={{
-                      backgroundColor: activeSection === 'bookingRequests' ? '#fff' : '#ef4444',
-                      color: activeSection === 'bookingRequests' ? '#ef4444' : '#fff',
-                      borderRadius: '50%',
-                      padding: '2px 8px',
-                      fontSize: '11px',
-                      fontWeight: '700',
-                      minWidth: '16px',
-                      textAlign: 'center'
-                    }}>
-                      {bookingRequests.length}
-                    </span>
-                  )}
-                </div>
-
-                <div
-                  className={`sidebar-item ${activeSection === 'myRequests' ? 'sidebar-item-active' : ''}`}
-                  onClick={() => setActiveSection('myRequests')}
-                >
-                  <Briefcase size={20} />
-                  <span>{t('provider.myRequests')}</span>
-                </div>
-
-                <div
-                  className={`sidebar-item ${activeSection === 'upcoming' ? 'sidebar-item-active' : ''}`}
-                  onClick={() => setActiveSection('upcoming')}
-                >
-                  <Clock size={20} />
-                  <span>{t('provider.upcoming')}</span>
-                </div>
-
-                <div
-                  className={`sidebar-item ${activeSection === 'history' ? 'sidebar-item-active' : ''}`}
-                  onClick={() => setActiveSection('history')}
-                >
-                  <HistoryIcon size={20} />
-                  <span>{t('provider.history')}</span>
-                </div>
-
-                <div
-                  className={`sidebar-item ${activeSection === 'earnings' ? 'sidebar-item-active' : ''}`}
-                  onClick={() => setActiveSection('earnings')}
-                >
-                  <DollarSign size={20} />
-                  <span>{t('provider.earnings')}</span>
-                </div>
-
-                <div
-                  className={`sidebar-item ${activeSection === 'reviews' ? 'sidebar-item-active' : ''}`}
-                  onClick={() => setActiveSection('reviews')}
-                >
-                  <CheckCircle size={20} />
-                  <span>{t('provider.reviews')}</span>
-                </div>
+              <div className="provider-sidebar-user-info">
+                <div className="provider-sidebar-user-name">{user?.name}</div>
+                <div className="provider-sidebar-user-email">{user?.email}</div>
               </div>
             </div>
+          </aside>
 
-            {/* Main Content Area */}
-            <div style={{ flex: 1 }}>
-              {/* Find Work Section */}
-              {activeSection === 'findWork' && (
-                <div>
+          <main className="provider-dashboard-main">
+            {activeSection === 'overview' && (
+              <>
+                <div className="provider-welcome-banner">
+                  <h2>{t('provider.welcome', { name: user?.name?.split(' ')[0] || t('provider.providerFallback') })}</h2>
+                  <p>{t('provider.analytics.subtitle')}</p>
+                </div>
+                <ProviderDashboardAnalytics
+                  t={t}
+                  availableRequests={availableRequests}
+                  bookingRequests={bookingRequests}
+                  myRequests={myRequests}
+                  upcomingRequests={upcomingRequests}
+                  historyRequests={historyRequests}
+                  payments={payments}
+                  reviews={reviews}
+                  totalEarnings={totalEarnings}
+                  averageRating={averageRating}
+                  onSectionChange={setActiveSection}
+                />
+              </>
+            )}
+
+            {/* Find Work Section */}
+            {activeSection === 'findWork' && (
+              <div className="provider-section-card">
                   <div style={{ marginBottom: '24px' }}>
                     <h2 style={{ fontSize: '24px', fontWeight: '700', color: '#1e293b', marginBottom: '8px' }}>
                       {t('provider.findWorkTitle')}
@@ -1016,7 +899,7 @@ const ProviderDashboard = () => {
 
                             <button
                               className="btn-primary"
-                              onClick={() => handleAcceptJob(request._id, getRequestDailyBudget(request), request.preferredDate)}
+                              onClick={() => openPostOfferModal(request)}
                               disabled={!isApproved}
                               style={!isApproved ? { opacity: 0.6, cursor: 'not-allowed' } : undefined}
                             >
@@ -1032,7 +915,7 @@ const ProviderDashboard = () => {
 
               {/* Booking Requests Section (from Services page) */}
               {activeSection === 'bookingRequests' && (
-                <div>
+                <div className="provider-section-card">
                   <div style={{ marginBottom: '24px' }}>
                     <h2 style={{ fontSize: '24px', fontWeight: '700', color: '#1e293b', marginBottom: '8px' }}>
                       {t('provider.bookingRequestsTitle')}
@@ -1136,7 +1019,7 @@ const ProviderDashboard = () => {
 
                           <div style={{ display: 'flex', gap: '12px', paddingTop: '16px', borderTop: '1px solid #e2e8f0' }}>
                             <button
-                              onClick={() => handleAcceptBooking(booking._id)}
+                              onClick={() => openDirectEstimateModal(booking)}
                               className='btn-success'
                               style={{
                                 flex: 1,
@@ -1150,7 +1033,7 @@ const ProviderDashboard = () => {
                                 cursor: 'pointer'
                               }}
                             >
-                              ✓ {t('provider.acceptBooking')}
+                              ✓ {t('agreement.submitEstimate')}
                             </button>
                             <button
                               onClick={() => handleRejectBooking(booking._id)}
@@ -1178,7 +1061,7 @@ const ProviderDashboard = () => {
 
               {/* My Requests Section */}
               {activeSection === 'myRequests' && (
-                <div>
+                <div className="provider-section-card">
                   <div style={{ marginBottom: '24px' }}>
                     <h2 style={{ fontSize: '24px', fontWeight: '700', color: '#1e293b', marginBottom: '8px' }}>
                       {t('provider.myRequestsTitle')}
@@ -1300,7 +1183,7 @@ const ProviderDashboard = () => {
 
               {/* Upcoming Section */}
               {activeSection === 'upcoming' && (
-                <div>
+                <div className="provider-section-card">
                   <div style={{ marginBottom: '24px' }}>
                     <h2 style={{ fontSize: '24px', fontWeight: '700', color: '#1e293b', marginBottom: '8px' }}>
                       {t('provider.upcomingJobs')}
@@ -1408,7 +1291,7 @@ const ProviderDashboard = () => {
 
               {/* History Section */}
               {activeSection === 'history' && (
-                <div>
+                <div className="provider-section-card">
                   <div style={{ marginBottom: '24px' }}>
                     <h2 style={{ fontSize: '24px', fontWeight: '700', color: '#1e293b', marginBottom: '8px' }}>
                       {t('provider.jobHistory')}
@@ -1511,7 +1394,7 @@ const ProviderDashboard = () => {
 
               {/* Earnings Section */}
               {activeSection === 'earnings' && (
-                <div>
+                <div className="provider-section-card">
                   <div style={{ marginBottom: '24px' }}>
                     <h2 style={{ fontSize: '24px', fontWeight: '700', color: '#1e293b', marginBottom: '8px' }}>
                       {t('provider.earningsTitle')}
@@ -1636,7 +1519,7 @@ const ProviderDashboard = () => {
               )}
 
               {activeSection === 'reviews' && (
-                <div>
+                <div className="provider-section-card">
                   <div style={{ marginBottom: '24px' }}>
                     <h2 style={{ fontSize: '24px', fontWeight: '700', color: '#1e293b', marginBottom: '8px' }}>
                       {t('provider.reviewsTitle')}
@@ -1684,8 +1567,7 @@ const ProviderDashboard = () => {
                   )}
                 </div>
               )}
-            </div>
-          </div>
+          </main>
         </div>
       </div>
 
@@ -2047,6 +1929,62 @@ const ProviderDashboard = () => {
                   </div>
                 </div>
               )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {estimateModal && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            backgroundColor: 'rgba(15, 23, 42, 0.5)',
+            display: 'flex',
+            alignItems: 'flex-start',
+            justifyContent: 'center',
+            zIndex: 1000,
+            padding: '24px 16px',
+            overflowY: 'auto',
+          }}
+          onClick={closeEstimateModal}
+        >
+          <div
+            style={{
+              width: '100%',
+              maxWidth: '480px',
+              maxHeight: 'calc(100vh - 48px)',
+              backgroundColor: '#fff',
+              borderRadius: '16px',
+              boxShadow: '0 20px 40px rgba(15, 23, 42, 0.2)',
+              overflow: 'hidden',
+              display: 'flex',
+              flexDirection: 'column',
+              margin: 'auto 0',
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div style={{ padding: '20px 24px', borderBottom: '1px solid #f1f5f9' }}>
+              <h3 style={{ margin: 0, fontSize: '18px', fontWeight: '700', color: '#1e293b' }}>
+                {estimateModal.type === 'post'
+                  ? t('agreement.sendOfferEstimate')
+                  : t('agreement.submitBookingEstimate')}
+              </h3>
+              <p style={{ margin: '6px 0 0', fontSize: '13px', color: '#64748b' }}>
+                {estimateModal.request?.serviceTitle}
+              </p>
+            </div>
+            <div style={{ padding: '20px 24px', overflowY: 'auto' }}>
+              <ProviderEstimateForm
+                dailyRate={estimateModal.form.dailyRate}
+                estimatedDurationDays={estimateModal.form.estimatedDurationDays}
+                providerMessage={estimateModal.form.providerMessage}
+                customerBudgetPerDay={getRequestDailyBudget(estimateModal.request)}
+                submitting={estimateSubmitting}
+                onChange={(form) => setEstimateModal((prev) => ({ ...prev, form }))}
+                onSubmit={submitEstimateModal}
+                onCancel={closeEstimateModal}
+              />
             </div>
           </div>
         </div>
