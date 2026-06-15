@@ -12,6 +12,7 @@ import {
   completeServiceRequestByCustomer,
 } from '../api/service';
 import CustomerEstimateReview from '../components/offers/CustomerEstimateReview';
+import CustomerDashboardAnalytics from '../components/customer/CustomerDashboardAnalytics';
 import { getEstimateFromRequest, isPendingCustomerConfirmation } from '../utils/serviceAgreement';
 import { getUserPayments } from '../api/payment';
 import { getUserComplaints } from '../api/complaint';
@@ -261,12 +262,16 @@ const CustomerDashboard = () => {
 
   const completedBookings = serviceRequests.filter((request) => request.status === 'Completed');
 
+  const pendingOffers = serviceRequests.filter(isPendingProviderOffer);
+  const pendingOfferCount = pendingOffers.length;
+
   const totalSpent = completedBookings.reduce((sum, request) => sum + getRequestDailyBudget(request), 0);
 
   const stats = [
     { key: 'active', label: t('customer.stats.active'), value: String(activeBookings.length) },
     { key: 'completed', label: t('customer.stats.completed'), value: String(completedBookings.length) },
     { key: 'spent', label: t('customer.stats.totalSpent'), value: `Rs.${totalSpent.toLocaleString()}` },
+    { key: 'offers', label: t('customer.analytics.offers'), value: String(pendingOfferCount) },
   ];
 
   const tabDescriptions = {
@@ -361,8 +366,6 @@ const CustomerDashboard = () => {
   const pendingPosts = serviceRequests.filter((request) => (
     request.status === 'Pending' || request.status === 'OfferSent' || request.status === 'ProviderRejected'
   ));
-  const pendingOffers = serviceRequests.filter(isPendingProviderOffer);
-  const pendingOfferCount = pendingOffers.length;
   const offersInitializedRef = useRef(false);
 
   useEffect(() => {
@@ -1366,23 +1369,40 @@ const CustomerDashboard = () => {
             </div>
           </div>
           <div className="dashboard-hero-right">
-            {stats.map((s) => (
-              <button
-                key={s.key}
-                type="button"
-                className="dashboard-stat-pill"
-                onClick={() => setActiveTab(s.key === 'spent' ? 'completed' : s.key)}
-              >
-                <span className="dashboard-stat-pill-value">{s.value}</span>
-                <span className="dashboard-stat-pill-label">{s.label}</span>
-              </button>
-            ))}
+            <div className="dashboard-hero-kpis">
+              {stats.map((s) => (
+                <button
+                  key={s.key}
+                  type="button"
+                  className="dashboard-hero-kpi"
+                  onClick={() => setActiveTab(
+                    s.key === 'spent' ? 'completed' : s.key === 'offers' ? 'posts' : s.key
+                  )}
+                >
+                  <span className="dashboard-hero-kpi-value">{s.value}</span>
+                  <span className="dashboard-hero-kpi-label">{s.label}</span>
+                </button>
+              ))}
+            </div>
             <button type="button" className="dashboard-primary-btn" onClick={() => navigate('/service-request')}>
               <Plus size={18} />
               {t('customer.newRequest')}
             </button>
           </div>
         </div>
+
+        <CustomerDashboardAnalytics
+          t={t}
+          serviceRequests={serviceRequests}
+          payments={payments}
+          complaints={complaints}
+          reviews={reviews}
+          bookings={bookings}
+          completedCards={completedCards}
+          pendingOfferCount={pendingOfferCount}
+          onTabChange={setActiveTab}
+          onNavigate={navigate}
+        />
 
         {/* MAIN CONTENT */}
         <div className="dashboard-section">
