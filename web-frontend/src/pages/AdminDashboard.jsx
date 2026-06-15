@@ -11,6 +11,8 @@ import {
   getSettlementTypeLabel,
   isPaymentSettled,
 } from '../utils/paymentHelpers';
+import AdminOverviewCharts from '../components/admin/AdminOverviewCharts';
+import '../components/admin/AdminDashboard.css';
 
 export default function AdminDashboard() {
   const { user, logout } = useContext(AuthContext);
@@ -184,18 +186,6 @@ export default function AdminDashboard() {
     }
   };
 
-  const StatCard = ({ icon, title, value, color, bgColor }) => (
-    <div style={styles.statCard}>
-      <div style={{ ...styles.statIconWrapper, backgroundColor: bgColor }}>
-        {icon}
-      </div>
-      <div style={styles.statContent}>
-        <div style={styles.statValue}>{value}</div>
-        <div style={styles.statTitle}>{title}</div>
-      </div>
-    </div>
-  );
-
   const Badge = ({ children, variant = 'default' }) => {
     const badgeColors = {
       pending: { bg: '#fee2e2', text: '#991b1b' },
@@ -339,7 +329,11 @@ export default function AdminDashboard() {
               {activeTab === 'payments' && 'Payment Approvals'}
               {activeTab === 'complaints' && 'Complaints & Reports'}
             </h1>
-            <p style={styles.pageSubtitle}>Manage your platform from here</p>
+            <p style={styles.pageSubtitle}>
+              {activeTab === 'overview'
+                ? 'Platform analytics, revenue insights, and quick actions'
+                : 'Manage your platform from here'}
+            </p>
           </div>
           <button style={styles.refreshBtn} onClick={loadAll}>
             Refresh
@@ -358,121 +352,17 @@ export default function AdminDashboard() {
 
         {/* Overview Tab */}
         {activeTab === 'overview' && (
-          <>
-            <div style={styles.statsGrid}>
-              <StatCard
-                icon={<svg style={styles.statIcon} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
-                </svg>}
-                title="Total Users"
-                value={users.length}
-                color="#2563eb"
-                bgColor="#dbeafe"
-              />
-              <StatCard
-                icon={<svg style={styles.statIcon} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>}
-                title="Awaiting Approval"
-                value={pendingProviders}
-                color="#f59e0b"
-                bgColor="#fef3c7"
-              />
-              <StatCard
-                icon={<svg style={styles.statIcon} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>}
-                title="Pending Payments"
-                value={pendingPayments}
-                color="#10b981"
-                bgColor="#d1fae5"
-              />
-              <StatCard
-                icon={<svg style={styles.statIcon} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                </svg>}
-                title="Open Complaints"
-                value={openComplaints}
-                color="#ef4444"
-                bgColor="#fee2e2"
-              />
-            </div>
-
-            <div style={styles.statsGrid}>
-              <StatCard
-                icon={<svg style={styles.statIcon} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
-                </svg>}
-                title="Total Transactions"
-                value={paymentStats.totalTransactions}
-                color="#6366f1"
-                bgColor="#e0e7ff"
-              />
-              <StatCard
-                icon={<svg style={styles.statIcon} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>}
-                title="Total Commission Earned"
-                value={formatLkr(paymentStats.totalCommissionEarned)}
-                color="#0d9488"
-                bgColor="#ccfbf1"
-              />
-              <StatCard
-                icon={<svg style={styles.statIcon} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                </svg>}
-                title="Total Released Payments"
-                value={paymentStats.totalReleasedPayments}
-                color="#16a34a"
-                bgColor="#dcfce7"
-              />
-              <StatCard
-                icon={<svg style={styles.statIcon} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>}
-                title="Total Pending Payments"
-                value={paymentStats.totalPendingPayments}
-                color="#f59e0b"
-                bgColor="#fef3c7"
-              />
-              <StatCard
-                icon={<svg style={styles.statIcon} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" />
-                </svg>}
-                title="Total Refunded Amount"
-                value={formatLkr(paymentStats.totalRefundedAmount)}
-                color="#dc2626"
-                bgColor="#fee2e2"
-              />
-              <StatCard
-                icon={<svg style={styles.statIcon} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 4a2 2 0 114 0v1a1 1 0 001 1h3a1 1 0 011 1v3a1 1 0 01-1 1h-1a2 2 0 100 4h1a1 1 0 011 1v3a1 1 0 01-1 1h-3a1 1 0 01-1-1v-1a2 2 0 10-4 0v1a1 1 0 01-1 1H7a1 1 0 01-1-1v-3a1 1 0 00-1-1H4a2 2 0 110-4h1a1 1 0 001-1V7a1 1 0 011-1h3a1 1 0 001-1V4z" />
-                </svg>}
-                title="Partial Settlements"
-                value={paymentStats.totalPartialSettlements}
-                color="#7c3aed"
-                bgColor="#ede9fe"
-              />
-            </div>
-
-            <div style={styles.quickActionsGrid}>
-              <div style={styles.quickActionCard} onClick={() => setActiveTab('providers')}>
-                <h3 style={styles.quickActionTitle}>Provider Requests</h3>
-                <p style={styles.quickActionDesc}>{pendingProviders} pending approvals</p>
-                <div style={styles.quickActionArrow}>→</div>
-              </div>
-              <div style={styles.quickActionCard} onClick={() => setActiveTab('payments')}>
-                <h3 style={styles.quickActionTitle}>Payment Approvals</h3>
-                <p style={styles.quickActionDesc}>{pendingPayments} pending payments</p>
-                <div style={styles.quickActionArrow}>→</div>
-              </div>
-              <div style={styles.quickActionCard} onClick={() => setActiveTab('complaints')}>
-                <h3 style={styles.quickActionTitle}>Complaints</h3>
-                <p style={styles.quickActionDesc}>{openComplaints} open issues</p>
-                <div style={styles.quickActionArrow}>→</div>
-              </div>
-            </div>
-          </>
+          <AdminOverviewCharts
+            users={users}
+            providers={providers}
+            payments={payments}
+            paymentStats={paymentStats}
+            complaints={complaints}
+            pendingProviders={pendingProviders}
+            pendingPayments={pendingPayments}
+            openComplaints={openComplaints}
+            onNavigate={setActiveTab}
+          />
         )}
 
         {/* Users Tab */}
@@ -1145,21 +1035,21 @@ const styles = {
   root: {
     display: 'flex',
     minHeight: '100vh',
-    backgroundColor: '#f0f4ff',
+    backgroundColor: '#f1f5f9',
     fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif'
   },
 
   // Sidebar Styles
   sidebar: {
     width: '280px',
-    backgroundColor: '#ffffff',
-    borderRight: '1px solid #e0e7ff',
+    backgroundColor: '#0f172a',
+    borderRight: '1px solid #1e293b',
     display: 'flex',
     flexDirection: 'column',
     position: 'sticky',
     top: 0,
     height: '100vh',
-    boxShadow: '2px 0 12px rgba(37, 99, 235, 0.05)'
+    boxShadow: '4px 0 24px rgba(15, 23, 42, 0.15)'
   },
   sidebarContent: {
     display: 'flex',
@@ -1191,13 +1081,13 @@ const styles = {
     margin: '0 0 4px 0',
     fontSize: '24px',
     fontWeight: '700',
-    color: '#1e293b',
+    color: '#f8fafc',
     letterSpacing: '-0.5px'
   },
   brandSubtitle: {
     margin: 0,
     fontSize: '13px',
-    color: '#64748b',
+    color: '#94a3b8',
     fontWeight: '500'
   },
   nav: {
@@ -1213,7 +1103,7 @@ const styles = {
     marginBottom: '4px',
     fontSize: '14px',
     fontWeight: '500',
-    color: '#64748b',
+    color: '#94a3b8',
     backgroundColor: 'transparent',
     border: 'none',
     borderRadius: '10px',
@@ -1223,8 +1113,8 @@ const styles = {
     position: 'relative'
   },
   navLinkActive: {
-    backgroundColor: '#dbeafe',
-    color: '#2563eb',
+    backgroundColor: 'rgba(37, 99, 235, 0.2)',
+    color: '#60a5fa',
     fontWeight: '600'
   },
   navIcon: {
@@ -1253,7 +1143,7 @@ const styles = {
   adminUser: {
     margin: '24px 24px 0',
     padding: '16px',
-    backgroundColor: '#f8fafc',
+    backgroundColor: '#1e293b',
     borderRadius: '12px',
     display: 'flex',
     alignItems: 'center',
@@ -1279,7 +1169,7 @@ const styles = {
   adminName: {
     fontSize: '14px',
     fontWeight: '600',
-    color: '#1e293b',
+    color: '#f1f5f9',
     marginBottom: '2px',
     overflow: 'hidden',
     textOverflow: 'ellipsis',
@@ -1287,7 +1177,7 @@ const styles = {
   },
   adminEmail: {
     fontSize: '12px',
-    color: '#64748b',
+    color: '#94a3b8',
     overflow: 'hidden',
     textOverflow: 'ellipsis',
     whiteSpace: 'nowrap'
@@ -1297,7 +1187,7 @@ const styles = {
     height: '36px',
     padding: 0,
     backgroundColor: 'transparent',
-    border: '1px solid #e2e8f0',
+    border: '1px solid #334155',
     borderRadius: '8px',
     cursor: 'pointer',
     display: 'flex',
@@ -1309,7 +1199,7 @@ const styles = {
   logoutIcon: {
     width: '18px',
     height: '18px',
-    color: '#64748b'
+    color: '#94a3b8'
   },
 
   // Content Styles
