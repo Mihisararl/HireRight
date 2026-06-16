@@ -1,20 +1,5 @@
 import React, { useMemo } from 'react';
 import {
-  Area,
-  AreaChart,
-  Bar,
-  BarChart,
-  CartesianGrid,
-  Cell,
-  Legend,
-  Pie,
-  PieChart,
-  ResponsiveContainer,
-  Tooltip,
-  XAxis,
-  YAxis,
-} from 'recharts';
-import {
   Briefcase,
   Calendar,
   DollarSign,
@@ -36,51 +21,165 @@ function getLast6Months() {
   return months;
 }
 
-const CountTooltip = ({ active, payload, label }) => {
-  if (!active || !payload?.length) return null;
-  return (
-    <div className="provider-chart-tooltip">
-      <p className="provider-chart-tooltip-label">{label}</p>
-      {payload.map((entry) => (
-        <p key={entry.name} style={{ color: entry.color }}>
-          {entry.name}: {entry.value}
-        </p>
-      ))}
-    </div>
-  );
-};
+function getPaymentRequestId(payment) {
+  return String(payment?.serviceRequestId?._id || payment?.serviceRequestId || '');
+}
 
-const CurrencyTooltip = ({ active, payload, label }) => {
-  if (!active || !payload?.length) return null;
+function ChartCard({ title, subtitle, children, className = '' }) {
   return (
-    <div className="provider-chart-tooltip">
-      <p className="provider-chart-tooltip-label">{label}</p>
-      {payload.map((entry) => (
-        <p key={entry.name} style={{ color: entry.color }}>
-          {entry.name}: Rs. {Number(entry.value || 0).toLocaleString()}
-        </p>
-      ))}
-    </div>
-  );
-};
-
-const PieTooltip = ({ active, payload }) => {
-  if (!active || !payload?.length) return null;
-  return (
-    <div className="provider-chart-tooltip">
-      <p>{payload[0].name}: {payload[0].value}</p>
-    </div>
-  );
-};
-
-function ChartCard({ title, subtitle, children }) {
-  return (
-    <div className="provider-chart-card">
+    <div className={`provider-chart-card ${className}`}>
       <div className="provider-chart-card-header">
         <h3>{title}</h3>
         {subtitle && <p>{subtitle}</p>}
       </div>
       <div className="provider-chart-card-body">{children}</div>
+    </div>
+  );
+}
+
+function SimpleBarChart({ data }) {
+  const max = Math.max(...data.map((d) => d.value), 1);
+
+  return (
+    <div className="simple-bar-chart" role="img" aria-label="Job pipeline chart">
+      {data.map((item) => {
+        const heightPct = item.value > 0 ? Math.max((item.value / max) * 100, 14) : 4;
+        return (
+          <div key={item.key || item.name} className="simple-bar-chart-item">
+            <span className="simple-bar-chart-value">{item.value}</span>
+            <div className="simple-bar-chart-track">
+              <div
+                className="simple-bar-chart-fill"
+                style={{
+                  height: `${heightPct}%`,
+                  backgroundColor: item.value > 0 ? item.fill : '#cbd5e1',
+                }}
+                title={`${item.name}: ${item.value}`}
+              />
+            </div>
+            <span className="simple-bar-chart-label">{item.name}</span>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function SimpleDonutChart({ data, centerLabel, formatValue }) {
+  const total = data.reduce((sum, item) => sum + item.value, 0);
+  if (total <= 0) return null;
+
+  let cumulative = 0;
+  const gradientStops = data.map((item) => {
+    const start = cumulative;
+    cumulative += (item.value / total) * 100;
+    return `${item.fill} ${start}% ${cumulative}%`;
+  }).join(', ');
+
+  const formatDisplay = formatValue || ((value) => value);
+
+  return (
+    <div className="simple-donut-chart">
+      <div
+        className="simple-donut-chart-ring"
+        style={{ background: `conic-gradient(${gradientStops})` }}
+      >
+        <div className="simple-donut-chart-hole">
+          <span className="simple-donut-chart-total">{formatDisplay(total)}</span>
+          <span className="simple-donut-chart-total-label">{centerLabel}</span>
+        </div>
+      </div>
+      <div className="simple-donut-legend">
+        {data.map((item) => (
+          <div key={item.name} className="simple-donut-legend-item">
+            <span className="simple-donut-legend-dot" style={{ backgroundColor: item.fill }} />
+            <span className="simple-donut-legend-name">{item.name}</span>
+            <strong>{formatDisplay(item.value)}</strong>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function SimpleEarningsChart({ data, formatValue }) {
+  const max = Math.max(...data.map((d) => d.earnings), 1);
+  const width = 640;
+  const height = 220;
+  const pad = { top: 24, right: 24, bottom: 36, left: 52 };
+  const chartW = width - pad.left - pad.right;
+  const chartH = height - pad.top - pad.bottom;
+
+  const points = data.map((d, i) => {
+    const x = pad.left + (data.length <= 1 ? chartW / 2 : (i / (data.length - 1)) * chartW);
+    const y = pad.top + chartH - (d.earnings / max) * chartH;
+    return { ...d, x, y };
+  });
+
+  const linePath = points.map((p, i) => `${i === 0 ? 'M' : 'L'} ${p.x.toFixed(1)} ${p.y.toFixed(1)}`).join(' ');
+  const areaPath = points.length
+    ? `${linePath} L ${points[points.length - 1].x.toFixed(1)} ${(pad.top + chartH).toFixed(1)} L ${points[0].x.toFixed(1)} ${(pad.top + chartH).toFixed(1)} Z`
+    : '';
+
+  const gridLines = [0, 0.25, 0.5, 0.75, 1];
+
+  return (
+    <div className="simple-earnings-chart">
+      <svg viewBox={`0 0 ${width} ${height}`} className="simple-earnings-chart-svg" role="img" aria-label="Earnings trend chart">
+        {gridLines.map((ratio) => {
+          const y = pad.top + chartH * (1 - ratio);
+          const val = max * ratio;
+          return (
+            <g key={ratio}>
+              <line
+                x1={pad.left}
+                y1={y}
+                x2={width - pad.right}
+                y2={y}
+                stroke="#e2e8f0"
+                strokeDasharray="4 4"
+              />
+              <text x={pad.left - 6} y={y + 4} textAnchor="end" fontSize="10" fill="#94a3b8">
+                {val >= 1000 ? `${Math.round(val / 1000)}k` : Math.round(val)}
+              </text>
+            </g>
+          );
+        })}
+        {areaPath && <path d={areaPath} fill="rgba(16, 185, 129, 0.18)" />}
+        {linePath && (
+          <path
+            d={linePath}
+            fill="none"
+            stroke="#10b981"
+            strokeWidth="3"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+        )}
+        {points.map((p) => (
+          <g key={p.name}>
+            <circle
+              cx={p.x}
+              cy={p.y}
+              r={p.earnings > 0 ? 5 : 3}
+              fill={p.earnings > 0 ? '#10b981' : '#cbd5e1'}
+              stroke="#ffffff"
+              strokeWidth="2"
+            />
+            <text x={p.x} y={height - 10} textAnchor="middle" fontSize="11" fill="#64748b">
+              {p.name}
+            </text>
+          </g>
+        ))}
+      </svg>
+      <div className="simple-earnings-chart-summary">
+        {data.filter((d) => d.earnings > 0).map((d) => (
+          <div key={d.name} className="simple-earnings-chart-pill">
+            <span>{d.name}</span>
+            <strong>{formatValue(d.earnings)}</strong>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
@@ -133,40 +232,81 @@ export default function ProviderDashboardAnalytics({
       months.map((m) => [m.key, { name: m.label, earnings: 0 }])
     );
 
-    payments
-      .filter((p) => p.payoutStatus === 'paid' && p.status === 'approved')
-      .forEach((payment) => {
-        const date = new Date(payment.releasedAt || payment.updatedAt || payment.createdAt);
-        const key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
-        if (!monthlyMap[key]) return;
-        const { providerAmount } = getPaymentBreakdown(payment);
-        monthlyMap[key].earnings += providerAmount;
-      });
+    historyRequests.forEach((request) => {
+      const payment = payments.find((p) => getPaymentRequestId(p) === String(request._id));
+      if (!payment || payment.payoutStatus !== 'paid') return;
+
+      const date = new Date(
+        payment.releasedAt
+        || payment.paidAt
+        || payment.updatedAt
+        || request.completedAt
+        || request.updatedAt
+        || request.createdAt
+      );
+      if (Number.isNaN(date.getTime())) return;
+
+      const key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+      if (!monthlyMap[key]) return;
+
+      const { providerAmount } = getPaymentBreakdown(payment);
+      monthlyMap[key].earnings += providerAmount;
+    });
+
+    const addPaymentToMonth = (payment) => {
+      const date = new Date(payment.releasedAt || payment.paidAt || payment.updatedAt || payment.createdAt);
+      if (Number.isNaN(date.getTime())) return;
+      const key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+      if (!monthlyMap[key]) return;
+      const { providerAmount } = getPaymentBreakdown(payment);
+      monthlyMap[key].earnings += providerAmount;
+    };
+
+    if (!Object.values(monthlyMap).some((m) => m.earnings > 0)) {
+      payments
+        .filter((payment) => payment.payoutStatus === 'paid')
+        .forEach(addPaymentToMonth);
+    }
 
     const jobPipeline = [
-      { name: t('provider.analytics.available'), value: availableRequests.length, fill: '#2563eb' },
-      { name: t('provider.analytics.bookings'), value: bookingRequests.length, fill: '#f59e0b' },
-      { name: t('provider.analytics.upcoming'), value: upcomingRequests.length, fill: '#8b5cf6' },
-      { name: t('provider.analytics.completed'), value: historyRequests.length, fill: '#10b981' },
-    ].filter((item) => item.value > 0);
+      { key: 'available', name: t('provider.analytics.available'), value: availableRequests.length, fill: '#2563eb' },
+      { key: 'bookings', name: t('provider.analytics.bookings'), value: bookingRequests.length, fill: '#f59e0b' },
+      { key: 'upcoming', name: t('provider.analytics.upcoming'), value: upcomingRequests.length, fill: '#8b5cf6' },
+      { key: 'completed', name: t('provider.analytics.completed'), value: historyRequests.length, fill: '#10b981' },
+    ];
+
+    const paymentBuckets = { released: 0, onHold: 0, pending: 0 };
+    payments.forEach((payment) => {
+      const { providerAmount } = getPaymentBreakdown(payment);
+      if (payment.payoutStatus === 'paid') {
+        paymentBuckets.released += providerAmount;
+      } else if (payment.payoutStatus === 'hold') {
+        paymentBuckets.onHold += providerAmount;
+      } else {
+        paymentBuckets.pending += providerAmount;
+      }
+    });
 
     const paymentStatus = [
-      { name: t('provider.analytics.released'), value: payments.filter((p) => p.payoutStatus === 'paid').length, fill: '#10b981' },
-      { name: t('provider.analytics.onHold'), value: payments.filter((p) => p.payoutStatus === 'hold' || (p.status === 'pending' && p.payoutStatus !== 'paid')).length, fill: '#6366f1' },
-      { name: t('provider.analytics.pending'), value: payments.filter((p) => p.payoutStatus === 'pending').length, fill: '#f59e0b' },
+      { name: t('provider.analytics.released'), value: paymentBuckets.released, fill: '#10b981' },
+      { name: t('provider.analytics.onHold'), value: paymentBuckets.onHold, fill: '#6366f1' },
+      { name: t('provider.analytics.pending'), value: paymentBuckets.pending, fill: '#f59e0b' },
     ].filter((item) => item.value > 0);
-
-    const ratingBuckets = [1, 2, 3, 4, 5].map((rating) => ({
-      name: `${rating}★`,
-      value: reviews.filter((r) => r.rating === rating).length,
-      fill: rating >= 4 ? '#10b981' : rating === 3 ? '#f59e0b' : '#ef4444',
-    })).filter((b) => b.value > 0);
 
     const monthlyEarnings = months.map((m) => monthlyMap[m.key]);
     const hasEarningsData = monthlyEarnings.some((m) => m.earnings > 0);
+    const hasJobData = jobPipeline.some((item) => item.value > 0);
+    const hasPaymentData = paymentStatus.length > 0;
 
-    return { jobPipeline, paymentStatus, ratingBuckets, monthlyEarnings, hasEarningsData };
-  }, [availableRequests, bookingRequests, upcomingRequests, historyRequests, payments, reviews, t]);
+    return {
+      jobPipeline,
+      paymentStatus,
+      monthlyEarnings,
+      hasEarningsData,
+      hasJobData,
+      hasPaymentData,
+    };
+  }, [availableRequests, bookingRequests, upcomingRequests, historyRequests, payments, t]);
 
   const hasNotifications = (
     bookingRequests.length > 0
@@ -241,96 +381,37 @@ export default function ProviderDashboardAnalytics({
 
       <div className="provider-charts-grid">
         <ChartCard title={t('provider.analytics.jobPipeline')} subtitle={t('provider.analytics.jobPipelineDesc')}>
-          {analytics.jobPipeline.length > 0 ? (
-            <ResponsiveContainer width="100%" height={260}>
-              <BarChart data={analytics.jobPipeline} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" vertical={false} />
-                <XAxis dataKey="name" tick={{ fill: '#64748b', fontSize: 11 }} axisLine={false} tickLine={false} />
-                <YAxis allowDecimals={false} tick={{ fill: '#64748b', fontSize: 12 }} axisLine={false} tickLine={false} />
-                <Tooltip content={<CountTooltip />} />
-                <Bar dataKey="value" name={t('provider.analytics.jobs')} radius={[8, 8, 0, 0]}>
-                  {analytics.jobPipeline.map((entry) => (
-                    <Cell key={entry.name} fill={entry.fill} />
-                  ))}
-                </Bar>
-              </BarChart>
-            </ResponsiveContainer>
+          {analytics.hasJobData ? (
+            <SimpleBarChart data={analytics.jobPipeline} />
           ) : (
             <div className="provider-chart-empty">{t('provider.analytics.noJobs')}</div>
           )}
         </ChartCard>
 
         <ChartCard title={t('provider.analytics.paymentOverview')} subtitle={t('provider.analytics.paymentOverviewDesc')}>
-          {analytics.paymentStatus.length > 0 ? (
-            <ResponsiveContainer width="100%" height={260}>
-              <PieChart>
-                <Pie
-                  data={analytics.paymentStatus}
-                  cx="50%"
-                  cy="50%"
-                  innerRadius={60}
-                  outerRadius={95}
-                  paddingAngle={3}
-                  dataKey="value"
-                  nameKey="name"
-                >
-                  {analytics.paymentStatus.map((entry) => (
-                    <Cell key={entry.name} fill={entry.fill} />
-                  ))}
-                </Pie>
-                <Tooltip content={<PieTooltip />} />
-                <Legend verticalAlign="bottom" height={36} />
-              </PieChart>
-            </ResponsiveContainer>
+          {analytics.hasPaymentData ? (
+            <SimpleDonutChart
+              data={analytics.paymentStatus}
+              centerLabel={t('provider.analytics.paymentsTotal')}
+              formatValue={formatLkr}
+            />
           ) : (
             <div className="provider-chart-empty">{t('provider.analytics.noPayments')}</div>
           )}
         </ChartCard>
       </div>
 
-      <div className="provider-charts-grid">
-        <ChartCard title={t('provider.analytics.earningsTrend')} subtitle={t('provider.analytics.earningsTrendDesc')}>
-          {analytics.hasEarningsData ? (
-            <ResponsiveContainer width="100%" height={240}>
-              <AreaChart data={analytics.monthlyEarnings} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
-                <defs>
-                  <linearGradient id="providerEarnGrad" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#10b981" stopOpacity={0.35} />
-                    <stop offset="95%" stopColor="#10b981" stopOpacity={0} />
-                  </linearGradient>
-                </defs>
-                <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-                <XAxis dataKey="name" tick={{ fill: '#64748b', fontSize: 12 }} axisLine={false} tickLine={false} />
-                <YAxis tick={{ fill: '#64748b', fontSize: 12 }} axisLine={false} tickLine={false} tickFormatter={(v) => `${(v / 1000).toFixed(0)}k`} />
-                <Tooltip content={<CurrencyTooltip />} />
-                <Area type="monotone" dataKey="earnings" name={t('provider.earnings')} stroke="#10b981" fill="url(#providerEarnGrad)" strokeWidth={2} />
-              </AreaChart>
-            </ResponsiveContainer>
-          ) : (
-            <div className="provider-chart-empty">{t('provider.analytics.noEarnings')}</div>
-          )}
-        </ChartCard>
-
-        <ChartCard title={t('provider.analytics.ratingBreakdown')} subtitle={t('provider.analytics.ratingBreakdownDesc')}>
-          {analytics.ratingBuckets.length > 0 ? (
-            <ResponsiveContainer width="100%" height={240}>
-              <BarChart data={analytics.ratingBuckets} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" vertical={false} />
-                <XAxis dataKey="name" tick={{ fill: '#64748b', fontSize: 12 }} axisLine={false} tickLine={false} />
-                <YAxis allowDecimals={false} tick={{ fill: '#64748b', fontSize: 12 }} axisLine={false} tickLine={false} />
-                <Tooltip content={<CountTooltip />} />
-                <Bar dataKey="value" name={t('provider.reviews')} radius={[8, 8, 0, 0]}>
-                  {analytics.ratingBuckets.map((entry) => (
-                    <Cell key={entry.name} fill={entry.fill} />
-                  ))}
-                </Bar>
-              </BarChart>
-            </ResponsiveContainer>
-          ) : (
-            <div className="provider-chart-empty">{t('provider.noReviews')}</div>
-          )}
-        </ChartCard>
-      </div>
+      <ChartCard
+        title={t('provider.analytics.earningsTrend')}
+        subtitle={t('provider.analytics.earningsTrendDesc')}
+        className="provider-chart-card--full"
+      >
+        {analytics.hasEarningsData ? (
+          <SimpleEarningsChart data={analytics.monthlyEarnings} formatValue={formatLkr} />
+        ) : (
+          <div className="provider-chart-empty">{t('provider.analytics.noEarnings')}</div>
+        )}
+      </ChartCard>
 
       <div className="provider-quick-insights">
         <button type="button" className="provider-insight-card" onClick={() => onSectionChange('findWork')}>

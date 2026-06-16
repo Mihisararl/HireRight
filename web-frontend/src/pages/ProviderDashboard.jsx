@@ -157,6 +157,7 @@ const ProviderDashboard = () => {
       loadMyRequests();
       loadPayments();
       loadReviews();
+      loadBookingRequests(false);
       if (user?.providerStatus === 'approved') {
         loadAvailableRequests();
       }
@@ -561,7 +562,7 @@ const ProviderDashboard = () => {
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap');
         
-        * { margin: 0; padding: 0; box-sizing: border-box; }
+        .provider-dashboard-page * { box-sizing: border-box; }
         
         .sidebar-item {
           display: flex;
