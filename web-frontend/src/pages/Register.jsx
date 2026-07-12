@@ -5,6 +5,7 @@ import API from '../utils/api';
 import { loginWithGoogle } from '../api/auth';
 import { AuthContext } from '../context/AuthContext';
 import LanguageSwitcher from '../components/LanguageSwitcher';
+import AuthHomeLink from '../components/AuthHomeLink';
 import GoogleSignInButton from '../components/GoogleSignInButton';
 import { navigateAfterAuth } from '../utils/authNavigation';
 
@@ -88,6 +89,9 @@ export default function Register() {
         position: "relative",
       }}
     >
+      <div style={{ position: 'absolute', top: 20, left: 20 }}>
+        <AuthHomeLink />
+      </div>
       <div style={{ position: 'absolute', top: 20, right: 20 }}>
         <LanguageSwitcher />
       </div>

@@ -1,17 +1,23 @@
 import User from '../models/User.js';
 import UserPaymentDetails from '../models/UserPaymentDetails.js';
 import Provider from '../models/Provider.js';
+import WorkerRegistrationRequest from '../models/WorkerRegistrationRequest.js';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import crypto from 'crypto';
 import { OAuth2Client } from 'google-auth-library';
-import { Resend } from 'resend';
 import dotenv from 'dotenv';
 import { buildAuthUserResponse, signAuthToken } from '../utils/authHelpers.js';
+import {
+  buildPasswordResetEmailHtml,
+  buildPasswordResetUrl,
+  buildVerificationEmailHtml,
+  buildVerificationUrl,
+  sendEmail
+} from '../services/emailService.js';
 
 dotenv.config();
 
-const resend = new Resend(process.env.RESEND_API_KEY);
 const JWT_SECRET = process.env.JWT_SECRET;
 
 // ================= REGISTER =================
@@ -53,29 +59,31 @@ export const register = async (req, res) => {
 
     await user.save();
 
-    const verifyUrl = `${process.env.FRONTEND_URL}/verify/${verificationToken}`;
+    const verifyUrl = buildVerificationUrl(verificationToken);
 
-    console.log("Sending verification email to:", email);
-
-    await resend.emails.send({
-      from: process.env.RESEND_FROM_EMAIL,
-      to: email,
-      subject: "Verify Your HireRight Account",
-      html: `
-        <h2>Welcome to HireRight, ${name}!</h2>
-        <p>Please verify your email by clicking below:</p>
-        <a href="${verifyUrl}"
-           style="display:inline-block;padding:10px 20px;background:#0066ff;color:#fff;text-decoration:none;border-radius:5px;">
-           Verify Email
-        </a>
-        <p>If button doesn't work, copy this link:</p>
-        <p>${verifyUrl}</p>
-        <p>This link expires in 24 hours.</p>
-      `
-    });
+    try {
+      await sendEmail({
+        to: email,
+        subject: 'Verify Your HireRight Account',
+        html: buildVerificationEmailHtml({ name, verifyUrl }),
+        context: 'verification'
+      });
+    } catch (emailErr) {
+      await User.findByIdAndDelete(user._id);
+      console.error('Register verification email failed:', emailErr.message);
+      if (emailErr.mailError) {
+        console.error('Register SMTP error details:', emailErr.mailError);
+      }
+      return res.status(500).json({
+        message: 'Failed to send verification email. Please try again later.',
+        ...(process.env.NODE_ENV !== 'production' && emailErr.message
+          ? { detail: emailErr.message }
+          : {})
+      });
+    }
 
     res.status(201).json({
-      message: "Registration successful. Please check your email to verify your account."
+      message: 'Registration successful. Please check your email to verify your account.'
     });
 
   } catch (err) {
@@ -141,29 +149,26 @@ export const forgotPassword = async (req, res) => {
       user.passwordResetExpires = new Date(Date.now() + PASSWORD_RESET_EXPIRY_MS);
       await user.save();
 
-      const resetUrl = `${process.env.FRONTEND_URL}/reset-password/${resetToken}`;
+      const resetUrl = buildPasswordResetUrl(resetToken);
 
       try {
-        await resend.emails.send({
-          from: process.env.RESEND_FROM_EMAIL,
+        await sendEmail({
           to: email,
           subject: 'Reset your HireRight password',
-          html: `
-            <h2>Password reset request</h2>
-            <p>Hi ${user.name},</p>
-            <p>We received a request to reset your password. Click the button below to choose a new password:</p>
-            <a href="${resetUrl}"
-               style="display:inline-block;padding:10px 20px;background:#0066ff;color:#fff;text-decoration:none;border-radius:5px;">
-               Reset Password
-            </a>
-            <p>If the button does not work, copy and paste this link into your browser:</p>
-            <p>${resetUrl}</p>
-            <p>This link expires in 1 hour. If you did not request a reset, you can ignore this email.</p>
-          `
+          html: buildPasswordResetEmailHtml({ name: user.name, resetUrl }),
+          context: 'password-reset'
         });
       } catch (emailErr) {
-        console.error('forgotPassword email error:', emailErr);
-        return res.status(500).json({ message: 'Failed to send reset email. Please try again later.' });
+        console.error('forgotPassword email error:', emailErr.message);
+        if (emailErr.mailError) {
+          console.error('forgotPassword SMTP error details:', emailErr.mailError);
+        }
+        return res.status(500).json({
+          message: 'Failed to send reset email. Please try again later.',
+          ...(process.env.NODE_ENV !== 'production' && emailErr.message
+            ? { detail: emailErr.message }
+            : {})
+        });
       }
     }
 
@@ -423,6 +428,13 @@ export const getMe = async (req, res) => {
     };
 
     if (user.role === 'provider') {
+      const registrationRequest = await WorkerRegistrationRequest.findOne({
+        email: user.email
+      }).select('status');
+
+      resp.workerProfileSubmitted = Boolean(registrationRequest);
+      resp.workerRegistrationStatus = registrationRequest?.status || null;
+
       const providerDoc = await Provider.findOne({ userId: user._id });
       if (providerDoc) {
         resp.bankName = providerDoc.bankName || '';

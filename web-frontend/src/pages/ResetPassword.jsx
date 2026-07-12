@@ -3,6 +3,7 @@ import { Link, useNavigate, useParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { resetPasswordWithToken, validatePasswordResetToken } from '../api/auth';
 import LanguageSwitcher from '../components/LanguageSwitcher';
+import AuthHomeLink from '../components/AuthHomeLink';
 
 export default function ResetPassword() {
   const { t } = useTranslation();
@@ -68,6 +69,9 @@ export default function ResetPassword() {
   if (validating) {
     return (
       <div style={pageStyle}>
+        <div style={{ position: 'absolute', top: 20, left: 20 }}>
+          <AuthHomeLink />
+        </div>
         <div style={cardStyle}>
           <p style={{ textAlign: 'center', color: '#64748b' }}>{t('auth.validatingResetLink')}</p>
         </div>
@@ -78,6 +82,9 @@ export default function ResetPassword() {
   if (!tokenValid) {
     return (
       <div style={pageStyle}>
+        <div style={{ position: 'absolute', top: 20, left: 20 }}>
+          <AuthHomeLink />
+        </div>
         <div style={{ position: 'absolute', top: 20, right: 20 }}>
           <LanguageSwitcher />
         </div>
@@ -99,6 +106,9 @@ export default function ResetPassword() {
 
   return (
     <div style={pageStyle}>
+      <div style={{ position: 'absolute', top: 20, left: 20 }}>
+        <AuthHomeLink />
+      </div>
       <div style={{ position: 'absolute', top: 20, right: 20 }}>
         <LanguageSwitcher />
       </div>

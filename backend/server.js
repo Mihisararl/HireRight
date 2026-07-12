@@ -14,6 +14,7 @@ import paymentRoutes from './routes/paymentRoutes.js';
 import complaintRoutes from './routes/complaintRoutes.js';
 import reviewRoutes from './routes/reviewRoutes.js';
 import User from './models/User.js';
+import { logEmailConfig } from './services/emailService.js';
 
 const app = express();
 
@@ -44,6 +45,7 @@ const start = async () => {
     await mongoose.connect(process.env.MONGO_URI);
 
     console.log('MongoDB connected');
+    await logEmailConfig();
 
     // ✅ Ensure default admin exists
     const adminEmail = process.env.ADMIN_EMAIL || 'admin@hireright.lk';
@@ -69,9 +71,20 @@ const start = async () => {
     const PORT = process.env.PORT || 5000;
     const HOST = process.env.HOST || '0.0.0.0';
 
-    app.listen(PORT, HOST, () => {
+    const server = app.listen(PORT, HOST, () => {
       console.log(`Server running on http://${HOST === '0.0.0.0' ? 'localhost' : HOST}:${PORT}`);
       console.log(`Mobile app: use http://<your-pc-lan-ip>:${PORT}/api (same Wi‑Fi as phone)`);
+    });
+
+    server.on('error', (err) => {
+      if (err.code === 'EADDRINUSE') {
+        console.error(`Port ${PORT} is already in use. Stop the other backend process first:`);
+        console.error(`  netstat -ano | findstr :${PORT}`);
+        console.error('  taskkill /PID <pid> /F');
+        process.exit(1);
+      }
+      console.error('Server error:', err);
+      process.exit(1);
     });
 
   } catch (err) {

@@ -3,6 +3,7 @@ import React, { useState, useContext } from 'react';
 import api from '../utils/api';
 import { AuthContext } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
+import AuthHomeLink from '../components/AuthHomeLink';
 
 export default function AdminLogin() {
   const [email, setEmail] = useState('admin@hireright.lk');
@@ -40,6 +41,10 @@ export default function AdminLogin() {
     <div style={styles.container}>
       {/* Background Overlay */}
       <div style={styles.overlay}></div>
+
+      <div style={{ position: 'absolute', top: 20, left: 20, zIndex: 2 }}>
+        <AuthHomeLink />
+      </div>
 
       <div style={styles.loginCard}>
         {/* Header */}
