@@ -23,6 +23,12 @@ const userSchema = new mongoose.Schema({
   serviceCategory: { type: String },
   yearsOfExperience: { type: Number },
   hourlyRate: { type: Number },
+  dailyRate: { type: Number },
+  rateType: {
+    type: String,
+    enum: ['hourly', 'daily'],
+    default: 'hourly'
+  },
   professionalBio: { type: String },
   portfolioPhoto: { type: String }, // URL or path
   idDocument: { type: String }, // URL or path to ID document

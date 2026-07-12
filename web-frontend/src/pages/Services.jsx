@@ -6,6 +6,11 @@ import { getApprovedProviders, getProvidersByCategory } from '../api/provider';
 import { createServiceRequest } from '../api/service';
 import LocationPicker from '../components/location/LocationPicker';
 import { hasCoordinates } from '../utils/locationHelpers';
+import {
+  formatProviderRateLong,
+  getProviderRateAmount,
+  getProviderRateTitle,
+} from '../utils/providerRate';
 
 export default function Services() {
   const navigate = useNavigate();
@@ -93,7 +98,12 @@ export default function Services() {
       location: `${provider.city}`,
       rating: provider.rating,
       reviews: provider.totalReviews,
-      price: provider.hourlyRate,
+      rateType: provider.rateType || 'hourly',
+      hourlyRate: provider.hourlyRate,
+      dailyRate: provider.dailyRate,
+      price: getProviderRateAmount(provider) ?? 0,
+      priceLabel: formatProviderRateLong(provider) || 'Rate not set',
+      rateTitle: getProviderRateTitle(provider),
       responseTime: '1 hour',
       category: provider.serviceCategory,
       experience: provider.yearsOfExperience,
@@ -623,7 +633,7 @@ export default function Services() {
                           color: '#1f2937',
                           whiteSpace: 'nowrap'
                         }}>
-                          Rs. {service.price} per hour
+                          {service.priceLabel}
                         </span>
                       </div>
                       <button
@@ -777,9 +787,9 @@ export default function Services() {
                 <div style={{ fontSize: '16px', fontWeight: '600', color: '#1f2937', marginBottom: '8px' }}>
                   {bookingModal.category}
                 </div>
-                <div style={{ fontSize: '14px', color: '#6b7280', marginBottom: '4px' }}>Hourly Rate</div>
+                <div style={{ fontSize: '14px', color: '#6b7280', marginBottom: '4px' }}>{bookingModal.rateTitle}</div>
                 <div style={{ fontSize: '16px', fontWeight: '600', color: '#1f2937', whiteSpace: 'nowrap' }}>
-                  Rs. {bookingModal.price} per hour
+                  {bookingModal.priceLabel}
                 </div>
               </div>
 

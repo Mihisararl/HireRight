@@ -15,6 +15,7 @@ import {
   buildVerificationUrl,
   sendEmail
 } from '../services/emailService.js';
+import { resolveRateFields, applyResolvedRate } from '../utils/rateUtils.js';
 
 dotenv.config();
 
@@ -420,6 +421,8 @@ export const getMe = async (req, res) => {
       serviceCategory: user.serviceCategory,
       yearsOfExperience: user.yearsOfExperience,
       hourlyRate: user.hourlyRate,
+      dailyRate: user.dailyRate,
+      rateType: user.rateType || 'hourly',
       professionalBio: user.professionalBio,
       portfolioPhoto: user.portfolioPhoto,
       city: user.city,
@@ -478,6 +481,8 @@ export const updateProfile = async (req, res) => {
       serviceCategory,
       yearsOfExperience,
       hourlyRate,
+      dailyRate,
+      rateType,
       professionalBio,
       portfolioPhoto,
       city,
@@ -520,7 +525,16 @@ export const updateProfile = async (req, res) => {
     if (user.role === 'provider') {
       if (serviceCategory !== undefined) user.serviceCategory = serviceCategory;
       if (yearsOfExperience !== undefined) user.yearsOfExperience = Number(yearsOfExperience) || 0;
-      if (hourlyRate !== undefined) user.hourlyRate = Number(hourlyRate) || 0;
+
+      const rateFieldsProvided = [rateType, hourlyRate, dailyRate].some((value) => value !== undefined);
+      if (rateFieldsProvided) {
+        const resolvedRate = resolveRateFields({ rateType, hourlyRate, dailyRate });
+        if (resolvedRate.error) {
+          return res.status(400).json({ message: resolvedRate.error });
+        }
+        applyResolvedRate(user, resolvedRate);
+      }
+
       if (professionalBio !== undefined) user.professionalBio = professionalBio;
       if (portfolioPhoto !== undefined) user.portfolioPhoto = portfolioPhoto;
       if (city !== undefined) user.city = city;
@@ -543,7 +557,12 @@ export const updateProfile = async (req, res) => {
         if (postalCode !== undefined) providerDoc.postalCode = postalCode;
         if (serviceCategory !== undefined) providerDoc.serviceCategory = serviceCategory;
         if (yearsOfExperience !== undefined) providerDoc.yearsOfExperience = Number(yearsOfExperience) || 0;
-        if (hourlyRate !== undefined) providerDoc.hourlyRate = Number(hourlyRate) || 0;
+
+        if (rateFieldsProvided) {
+          const resolvedRate = resolveRateFields({ rateType, hourlyRate, dailyRate });
+          applyResolvedRate(providerDoc, resolvedRate);
+        }
+
         if (professionalBio !== undefined) providerDoc.professionalBio = professionalBio;
         if (portfolioPhoto !== undefined) providerDoc.portfolioPhoto = portfolioPhoto;
 
@@ -629,6 +648,8 @@ export const updateProfile = async (req, res) => {
         serviceCategory: user.serviceCategory,
         yearsOfExperience: user.yearsOfExperience,
         hourlyRate: user.hourlyRate,
+        dailyRate: user.dailyRate,
+        rateType: user.rateType || 'hourly',
         professionalBio: user.professionalBio,
         portfolioPhoto: user.portfolioPhoto,
         city: user.city,

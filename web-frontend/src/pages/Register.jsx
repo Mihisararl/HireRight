@@ -8,6 +8,7 @@ import LanguageSwitcher from '../components/LanguageSwitcher';
 import AuthHomeLink from '../components/AuthHomeLink';
 import GoogleSignInButton from '../components/GoogleSignInButton';
 import { navigateAfterAuth } from '../utils/authNavigation';
+import { SRI_LANKAN_DISTRICTS } from '../constants/sriLankanDistricts';
 
 export default function Register() {
   const { t } = useTranslation();
@@ -128,8 +129,12 @@ export default function Register() {
           <input type="tel" placeholder={t("common.phone")} value={phone}
             onChange={(e) => setPhone(e.target.value)} required style={inputStyle} />
 
-          <input type="text" placeholder={t("auth.district")} value={district}
-            onChange={(e) => setDistrict(e.target.value)} style={inputStyle} />
+          <select value={district} onChange={(e) => setDistrict(e.target.value)} style={inputStyle}>
+            <option value="">{t('auth.selectDistrict')}</option>
+            {SRI_LANKAN_DISTRICTS.map((d) => (
+              <option key={d} value={d}>{d}</option>
+            ))}
+          </select>
 
           <input type="text" placeholder={t("auth.postalCode")} value={postalCode}
             onChange={(e) => setPostalCode(e.target.value)} style={inputStyle} />

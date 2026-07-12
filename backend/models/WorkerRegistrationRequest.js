@@ -67,8 +67,18 @@ const workerRegistrationRequestSchema = new mongoose.Schema(
 
     hourlyRate: {
       type: Number,
-      required: true,
       min: 0
+    },
+
+    dailyRate: {
+      type: Number,
+      min: 0
+    },
+
+    rateType: {
+      type: String,
+      enum: ['hourly', 'daily'],
+      default: 'hourly'
     },
 
     professionalBio: {

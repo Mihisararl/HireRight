@@ -11,6 +11,7 @@ import {
   getSettlementTypeLabel,
   isPaymentSettled,
 } from '../utils/paymentHelpers';
+import { formatProviderRate } from '../utils/providerRate';
 import AdminOverviewCharts from '../components/admin/AdminOverviewCharts';
 import '../components/admin/AdminDashboard.css';
 
@@ -493,7 +494,7 @@ export default function AdminDashboard() {
                         <td style={{ ...styles.td, ...(p.status === 'pending' ? styles.pendingCell : {}) }}>{p.serviceCategory || '-'}</td>
                         <td style={{ ...styles.td, ...(p.status === 'pending' ? styles.pendingCell : {}) }}>{[p.city, p.district].filter(Boolean).join(', ') || '-'}</td>
                         <td style={{ ...styles.td, ...(p.status === 'pending' ? styles.pendingCell : {}) }}>{p.yearsOfExperience ?? '-'} years</td>
-                        <td style={{ ...styles.td, ...(p.status === 'pending' ? styles.pendingCell : {}) }}>Rs. {p.hourlyRate ?? '-'}</td>
+                        <td style={{ ...styles.td, ...(p.status === 'pending' ? styles.pendingCell : {}) }}>{formatProviderRate(p) || '-'}</td>
                         <td style={{ ...styles.td, ...(p.status === 'pending' ? styles.pendingCell : {}) }}>
                           {p.nicNumber || '-'}
                         </td>
