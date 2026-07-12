@@ -157,6 +157,7 @@ const ProviderDashboard = () => {
       loadMyRequests();
       loadPayments();
       loadReviews();
+      loadBookingRequests(false);
       if (user?.providerStatus === 'approved') {
         loadAvailableRequests();
       }
@@ -501,6 +502,7 @@ const ProviderDashboard = () => {
 
         await registerProvider(payload);
         alert(t('provider.alerts.registrationSubmitted'));
+        await refreshUser();
         setIsModalOpen(false);
         setRegStep(1);
         setRegForm({
@@ -555,13 +557,17 @@ const ProviderDashboard = () => {
   const providerStatus = user?.providerStatus || 'pending';
   const isApproved = providerStatus === 'approved';
   const isRejected = providerStatus === 'rejected';
+  const hasSubmittedWorkerProfile = Boolean(user?.workerProfileSubmitted);
+  const showCreateProfileAction = !isApproved && (!hasSubmittedWorkerProfile || isRejected);
+  const showIncompleteProfileNotice = !isApproved && !isRejected && !hasSubmittedWorkerProfile;
+  const showPendingReviewNotice = !isApproved && !isRejected && hasSubmittedWorkerProfile;
 
   return (
     <>
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap');
         
-        * { margin: 0; padding: 0; box-sizing: border-box; }
+        .provider-dashboard-page * { box-sizing: border-box; }
         
         .sidebar-item {
           display: flex;
@@ -684,7 +690,7 @@ const ProviderDashboard = () => {
           </div>
 
           <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
-            {user?.providerStatus !== 'approved' && (
+            {showCreateProfileAction && (
               <button type="button" onClick={() => setIsModalOpen(true)} className="btn-primary">
                 {t('provider.createWorkerProfile')}
               </button>
@@ -723,8 +729,21 @@ const ProviderDashboard = () => {
         </div>
 
         {!isApproved && (
-          <div style={{ margin: '16px 28px 0', padding: '14px 16px', borderRadius: '12px', background: isRejected ? '#fee2e2' : '#fff7ed', border: `1px solid ${isRejected ? '#fecaca' : '#fed7aa'}`, color: isRejected ? '#991b1b' : '#9a3412', fontSize: '14px', fontWeight: '600' }}>
-            {isRejected ? t('provider.registrationRejected') : t('provider.registrationPending')}
+          <div style={{
+            margin: '16px 28px 0',
+            padding: '14px 16px',
+            borderRadius: '12px',
+            background: isRejected ? '#fee2e2' : showIncompleteProfileNotice ? '#eff6ff' : '#fff7ed',
+            border: `1px solid ${isRejected ? '#fecaca' : showIncompleteProfileNotice ? '#bfdbfe' : '#fed7aa'}`,
+            color: isRejected ? '#991b1b' : showIncompleteProfileNotice ? '#1e40af' : '#9a3412',
+            fontSize: '14px',
+            fontWeight: '600'
+          }}>
+            {isRejected
+              ? t('provider.registrationRejected')
+              : showPendingReviewNotice
+                ? t('provider.registrationPending')
+                : t('provider.registrationIncomplete')}
           </div>
         )}
 

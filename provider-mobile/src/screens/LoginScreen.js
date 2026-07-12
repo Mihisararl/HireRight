@@ -9,17 +9,13 @@ import {
   TextInput,
   View,
 } from 'react-native';
-import * as WebBrowser from 'expo-web-browser';
 import { getErrorMessage } from '../api/client';
 import { useAuth } from '../context/AuthContext';
-import GoogleSignInButton from '../components/GoogleSignInButton';
-import { API_BASE_URL, GOOGLE_CLIENT_ID } from '../utils/config';
+import { API_BASE_URL } from '../utils/config';
 import { colors, spacing } from '../constants/theme';
 
-WebBrowser.maybeCompleteAuthSession();
-
 export default function LoginScreen() {
-  const { login, loginWithGoogle } = useAuth();
+  const { login } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
@@ -79,17 +75,6 @@ export default function LoginScreen() {
         >
           <Text style={styles.buttonText}>{loading ? 'Signing in...' : 'Sign In'}</Text>
         </Pressable>
-
-        {GOOGLE_CLIENT_ID ? (
-          <>
-            <Text style={styles.orText}>or</Text>
-            <GoogleSignInButton
-              onSignIn={loginWithGoogle}
-              busy={loading}
-              disabled={loading}
-            />
-          </>
-        ) : null}
 
         <Text style={styles.apiHint}>API: {API_BASE_URL}</Text>
       </View>
@@ -152,12 +137,6 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontWeight: '700',
     fontSize: 16,
-  },
-  orText: {
-    textAlign: 'center',
-    marginVertical: spacing.md,
-    color: colors.textMuted,
-    fontSize: 14,
   },
   apiHint: {
     marginTop: spacing.md,
