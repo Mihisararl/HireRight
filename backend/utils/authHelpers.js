@@ -1,5 +1,7 @@
 import jwt from 'jsonwebtoken';
 
+export const normalizeEmail = (email) => String(email || '').trim().toLowerCase();
+
 const getJwtSecret = () => {
   const secret = process.env.JWT_SECRET;
   if (!secret) {
