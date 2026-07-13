@@ -3,9 +3,15 @@ import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Text } from 'react-native';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { useAuth } from '../context/AuthContext';
+import { PublicNavProvider } from '../context/PublicNavContext';
 import LoadingView from '../components/LoadingView';
 import LoginScreen from '../screens/LoginScreen';
+import HomeScreen from '../screens/public/HomeScreen';
+import PublicServicesScreen from '../screens/public/PublicServicesScreen';
+import HowItWorksScreen from '../screens/public/HowItWorksScreen';
+import BecomeWorkerScreen from '../screens/public/BecomeWorkerScreen';
 import JobsScreen from '../screens/JobsScreen';
 import JobDetailsScreen from '../screens/JobDetailsScreen';
 import EarningsScreen from '../screens/EarningsScreen';
@@ -81,6 +87,23 @@ function MainTabs() {
   );
 }
 
+function PublicStack() {
+  return (
+    <PublicNavProvider>
+      <Stack.Navigator
+        initialRouteName="Home"
+        screenOptions={{ headerShown: false }}
+      >
+        <Stack.Screen name="Home" component={HomeScreen} />
+        <Stack.Screen name="Services" component={PublicServicesScreen} />
+        <Stack.Screen name="HowItWorks" component={HowItWorksScreen} />
+        <Stack.Screen name="BecomeWorker" component={BecomeWorkerScreen} />
+        <Stack.Screen name="Login" component={LoginScreen} />
+      </Stack.Navigator>
+    </PublicNavProvider>
+  );
+}
+
 export default function AppNavigator() {
   const { loading, isAuthenticated } = useAuth();
 
@@ -89,14 +112,16 @@ export default function AppNavigator() {
   }
 
   return (
-    <NavigationContainer>
-      <Stack.Navigator screenOptions={{ headerShown: false }}>
-        {isAuthenticated ? (
-          <Stack.Screen name="Main" component={MainTabs} />
-        ) : (
-          <Stack.Screen name="Login" component={LoginScreen} />
-        )}
-      </Stack.Navigator>
-    </NavigationContainer>
+    <SafeAreaProvider>
+      <NavigationContainer>
+        <Stack.Navigator screenOptions={{ headerShown: false }}>
+          {isAuthenticated ? (
+            <Stack.Screen name="Main" component={MainTabs} />
+          ) : (
+            <Stack.Screen name="Public" component={PublicStack} />
+          )}
+        </Stack.Navigator>
+      </NavigationContainer>
+    </SafeAreaProvider>
   );
 }

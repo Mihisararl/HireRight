@@ -1,15 +1,8 @@
 import express from 'express';
-import {
-  register,
-  login,
-  verifyEmail,
-  forgotPassword,
-  validateResetToken,
-  resetPassword,
-  googleAuth,
-  getMe,
-  updateProfile
-} from '../controllers/authController.js';
+import { register, verifyEmail } from '../controllers/auth/authRegistrationController.js';
+import { forgotPassword, validateResetToken, resetPassword } from '../controllers/auth/authPasswordController.js';
+import { login, googleAuth } from '../controllers/auth/authSessionController.js';
+import { getMe, updateProfile } from '../controllers/profile/profileController.js';
 import auth from '../middleware/authMiddleware.js';
 
 const router = express.Router();

@@ -50,7 +50,8 @@ const emptyForm = {
   district: '',
   serviceCategory: '',
   yearsOfExperience: '',
-  hourlyRate: '',
+  rateType: 'hourly',
+  rateAmount: '',
   professionalBio: '',
   bankName: '',
   accountNumber: '',
@@ -75,6 +76,12 @@ function Field({ label, value, onChangeText, ...inputProps }) {
 
 function userToForm(user) {
   if (!user) return { ...emptyForm };
+
+  const rateType = user.rateType === 'daily' ? 'daily' : 'hourly';
+  const rateAmount = rateType === 'daily'
+    ? (user.dailyRate != null ? String(user.dailyRate) : '')
+    : (user.hourlyRate != null ? String(user.hourlyRate) : '');
+
   return {
     name: user.name || '',
     email: user.email || '',
@@ -85,7 +92,8 @@ function userToForm(user) {
     district: user.district || '',
     serviceCategory: user.serviceCategory || '',
     yearsOfExperience: user.yearsOfExperience != null ? String(user.yearsOfExperience) : '',
-    hourlyRate: user.hourlyRate != null ? String(user.hourlyRate) : '',
+    rateType,
+    rateAmount,
     professionalBio: user.professionalBio || '',
     bankName: user.bankName || '',
     accountNumber: user.accountNumber || '',
@@ -163,7 +171,9 @@ export default function ProfileScreen() {
         district: form.district.trim(),
         serviceCategory: form.serviceCategory.trim(),
         yearsOfExperience: form.yearsOfExperience ? Number(form.yearsOfExperience) : 0,
-        hourlyRate: form.hourlyRate ? Number(form.hourlyRate) : 0,
+        rateType: form.rateType,
+        hourlyRate: form.rateType === 'hourly' && form.rateAmount ? Number(form.rateAmount) : null,
+        dailyRate: form.rateType === 'daily' && form.rateAmount ? Number(form.rateAmount) : null,
         professionalBio: form.professionalBio.trim(),
         bankName: form.bankName.trim(),
         accountNumber: form.accountNumber.trim(),
@@ -298,11 +308,33 @@ export default function ProfileScreen() {
             onChangeText={(v) => updateField('yearsOfExperience', v)}
             keyboardType="numeric"
           />
+
+          <Text style={styles.label}>Charge type</Text>
+          <View style={styles.rateTypeRow}>
+            <Pressable
+              style={[styles.rateTypeBtn, form.rateType === 'hourly' && styles.rateTypeBtnActive]}
+              onPress={() => updateField('rateType', 'hourly')}
+            >
+              <Text style={[styles.rateTypeText, form.rateType === 'hourly' && styles.rateTypeTextActive]}>
+                Hourly rate
+              </Text>
+            </Pressable>
+            <Pressable
+              style={[styles.rateTypeBtn, form.rateType === 'daily' && styles.rateTypeBtnActive]}
+              onPress={() => updateField('rateType', 'daily')}
+            >
+              <Text style={[styles.rateTypeText, form.rateType === 'daily' && styles.rateTypeTextActive]}>
+                Daily charge
+              </Text>
+            </Pressable>
+          </View>
+
           <Field
-            label="Hourly rate (Rs.)"
-            value={form.hourlyRate}
-            onChangeText={(v) => updateField('hourlyRate', v)}
+            label={form.rateType === 'daily' ? 'Daily charge (Rs.)' : 'Hourly rate (Rs.)'}
+            value={form.rateAmount}
+            onChangeText={(v) => updateField('rateAmount', v)}
             keyboardType="numeric"
+            placeholder={form.rateType === 'daily' ? '8000' : '1200'}
           />
           <Field
             label="Professional bio"
@@ -421,6 +453,32 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: colors.text,
     marginBottom: 6,
+  },
+  rateTypeRow: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+    marginBottom: spacing.md,
+  },
+  rateTypeBtn: {
+    flex: 1,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 10,
+    paddingVertical: 12,
+    alignItems: 'center',
+    backgroundColor: '#f8fafc',
+  },
+  rateTypeBtnActive: {
+    borderColor: colors.primary,
+    backgroundColor: '#eff6ff',
+  },
+  rateTypeText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: colors.textMuted,
+  },
+  rateTypeTextActive: {
+    color: colors.primary,
   },
   input: {
     borderWidth: 1,

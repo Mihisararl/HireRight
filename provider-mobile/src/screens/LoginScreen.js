@@ -4,6 +4,7 @@ import {
   KeyboardAvoidingView,
   Platform,
   Pressable,
+  ScrollView,
   StyleSheet,
   Text,
   TextInput,
@@ -11,10 +12,12 @@ import {
 } from 'react-native';
 import { getErrorMessage } from '../api/client';
 import { useAuth } from '../context/AuthContext';
+import PublicHeader from '../components/PublicHeader';
+import PublicSidebar from '../components/PublicSidebar';
 import { API_BASE_URL } from '../utils/config';
 import { colors, spacing } from '../constants/theme';
 
-export default function LoginScreen() {
+export default function LoginScreen({ navigation }) {
   const { login } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -36,48 +39,57 @@ export default function LoginScreen() {
     }
   };
 
-  const busy = loading;
-
   return (
     <KeyboardAvoidingView
       style={styles.container}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
-      <View style={styles.card}>
-        <Text style={styles.brand}>HireRight</Text>
-        <Text style={styles.subtitle}>Provider App</Text>
-
-        <Text style={styles.label}>Email</Text>
-        <TextInput
-          style={styles.input}
-          value={email}
-          onChangeText={setEmail}
-          autoCapitalize="none"
-          keyboardType="email-address"
-          placeholder="provider@example.com"
-          placeholderTextColor={colors.textMuted}
-        />
-
-        <Text style={styles.label}>Password</Text>
-        <TextInput
-          style={styles.input}
-          value={password}
-          onChangeText={setPassword}
-          secureTextEntry
-          placeholder="••••••••"
-          placeholderTextColor={colors.textMuted}
-        />
-
-        <Pressable
-          style={[styles.button, busy && styles.buttonDisabled]}
-          onPress={handleLogin}
-          disabled={busy}
-        >
-          <Text style={styles.buttonText}>{loading ? 'Signing in...' : 'Sign In'}</Text>
+      <PublicHeader navigation={navigation} activeRoute="Login" />
+      <PublicSidebar />
+      <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+        <Pressable onPress={() => navigation.navigate('Home')}>
+          <Text style={styles.backLink}>← Back to Home</Text>
         </Pressable>
 
-        <Text style={styles.apiHint}>API: {API_BASE_URL}</Text>
-      </View>
+        <View style={styles.card}>
+          <Text style={styles.brand}>HireRight</Text>
+          <Text style={styles.subtitle}>Provider App Login</Text>
+          <Text style={styles.hint}>
+            Sign in after creating your provider account on the website.
+          </Text>
+
+          <Text style={styles.label}>Email</Text>
+          <TextInput
+            style={styles.input}
+            value={email}
+            onChangeText={setEmail}
+            autoCapitalize="none"
+            keyboardType="email-address"
+            placeholder="provider@example.com"
+            placeholderTextColor={colors.textMuted}
+          />
+
+          <Text style={styles.label}>Password</Text>
+          <TextInput
+            style={styles.input}
+            value={password}
+            onChangeText={setPassword}
+            secureTextEntry
+            placeholder="••••••••"
+            placeholderTextColor={colors.textMuted}
+          />
+
+          <Pressable
+            style={[styles.button, loading && styles.buttonDisabled]}
+            onPress={handleLogin}
+            disabled={loading}
+          >
+            <Text style={styles.buttonText}>{loading ? 'Signing in...' : 'Sign In'}</Text>
+          </Pressable>
+
+          <Text style={styles.apiHint}>API: {API_BASE_URL}</Text>
+        </View>
+      </ScrollView>
     </KeyboardAvoidingView>
   );
 }
@@ -86,8 +98,17 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.background,
-    justifyContent: 'center',
+  },
+  content: {
     padding: spacing.lg,
+    flexGrow: 1,
+    justifyContent: 'center',
+  },
+  backLink: {
+    color: colors.primary,
+    fontWeight: '700',
+    fontSize: 15,
+    marginBottom: spacing.md,
   },
   card: {
     backgroundColor: colors.card,
@@ -102,9 +123,16 @@ const styles = StyleSheet.create({
     color: colors.text,
   },
   subtitle: {
-    marginBottom: spacing.lg,
+    marginTop: spacing.xs,
     color: colors.textMuted,
     fontSize: 15,
+  },
+  hint: {
+    marginTop: spacing.sm,
+    marginBottom: spacing.md,
+    color: colors.textMuted,
+    fontSize: 13,
+    lineHeight: 20,
   },
   label: {
     fontSize: 14,

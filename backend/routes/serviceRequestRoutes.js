@@ -1,22 +1,28 @@
 import express from "express";
 import {
   createServiceRequest,
-  getAllServiceRequests,
   getServiceRequestsByUser,
   updateServiceRequest,
+} from "../controllers/serviceRequest/customerRequestController.js";
+import { getAllServiceRequests } from "../controllers/serviceRequest/requestQueryController.js";
+import {
   getAvailableServiceRequests,
   acceptServiceRequest,
   getProviderServiceRequests,
-  completeServiceRequest,
-  completeServiceRequestByCustomer,
   acceptProviderOffer,
   rejectProviderOffer,
+} from "../controllers/serviceRequest/providerOfferController.js";
+import {
+  completeServiceRequest,
+  completeServiceRequestByCustomer,
+} from "../controllers/serviceRequest/completionController.js";
+import {
   getDirectBookingRequests,
   submitDirectBookingEstimate,
   rejectDirectBooking,
   confirmDirectBookingProposal,
   rejectDirectBookingProposal,
-} from "../controllers/serviceRequestController.js";
+} from "../controllers/serviceRequest/directBookingController.js";
 import auth from "../middleware/authMiddleware.js";
 
 const router = express.Router();

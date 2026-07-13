@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { ChevronLeft } from 'lucide-react';
 import { registerProvider } from '../api/provider';
+import { buildRatePayload } from '../utils/providerRate';
 
 const fileToDataUrl = (file) => new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -25,7 +26,8 @@ const ProviderRegistration = () => {
         // Step 2: Professional Details
         serviceCategory: '',
         yearsOfExperience: '',
-        hourlyRate: '',
+        rateType: 'hourly',
+        rateAmount: '',
         professionalBio: '',
         portfolioPhoto: null,
 
@@ -116,10 +118,12 @@ const ProviderRegistration = () => {
             newErrors.yearsOfExperience = 'Must be a positive number';
         }
 
-        if (!formData.hourlyRate) {
-            newErrors.hourlyRate = 'Hourly rate is required';
-        } else if (formData.hourlyRate < 0) {
-            newErrors.hourlyRate = 'Must be a positive number';
+        if (!formData.rateAmount) {
+            newErrors.rateAmount = formData.rateType === 'daily'
+                ? 'Daily charge is required'
+                : 'Hourly rate is required';
+        } else if (Number(formData.rateAmount) < 0) {
+            newErrors.rateAmount = 'Must be a positive number';
         }
 
         setErrors(newErrors);
@@ -180,7 +184,7 @@ const ProviderRegistration = () => {
                     password: formData.password,
                     serviceCategory: formData.serviceCategory,
                     yearsOfExperience: Number(formData.yearsOfExperience),
-                    hourlyRate: Number(formData.hourlyRate),
+                    ...buildRatePayload(formData.rateType, formData.rateAmount),
                     professionalBio: formData.professionalBio,
                     city: formData.city,
                     district: formData.district,
@@ -500,20 +504,40 @@ const ProviderRegistration = () => {
 
                                     <div>
                                         <label className="block text-sm font-semibold text-slate-700 mb-2">
-                                            Hourly Rate (Rs.) <span className="text-red-500">*</span>
+                                            Charge Type <span className="text-red-500">*</span>
                                         </label>
-                                        <input
-                                            type="number"
-                                            name="hourlyRate"
-                                            value={formData.hourlyRate}
+                                        <select
+                                            name="rateType"
+                                            value={formData.rateType}
                                             onChange={handleInputChange}
-                                            placeholder="1200"
-                                            min="0"
-                                            className={`form-input w-full px-4 py-3 rounded-lg border-2 focus:outline-none focus:border-blue-500
-                        ${errors.hourlyRate ? 'border-red-300 bg-red-50' : 'border-slate-200'}`}
-                                        />
-                                        {errors.hourlyRate && <p className="text-red-500 text-xs mt-1">{errors.hourlyRate}</p>}
+                                            className="form-input w-full px-4 py-3 rounded-lg border-2 border-slate-200 focus:outline-none focus:border-blue-500"
+                                        >
+                                            <option value="hourly">Hourly Rate</option>
+                                            <option value="daily">Daily Charge</option>
+                                        </select>
                                     </div>
+                                </div>
+
+                                <div>
+                                    <label className="block text-sm font-semibold text-slate-700 mb-2">
+                                        {formData.rateType === 'daily' ? 'Daily Charge (Rs.)' : 'Hourly Rate (Rs.)'} <span className="text-red-500">*</span>
+                                    </label>
+                                    <input
+                                        type="number"
+                                        name="rateAmount"
+                                        value={formData.rateAmount}
+                                        onChange={handleInputChange}
+                                        placeholder={formData.rateType === 'daily' ? '8000' : '1200'}
+                                        min="0"
+                                        className={`form-input w-full px-4 py-3 rounded-lg border-2 focus:outline-none focus:border-blue-500
+                        ${errors.rateAmount ? 'border-red-300 bg-red-50' : 'border-slate-200'}`}
+                                    />
+                                    <p className="text-xs text-slate-500 mt-1">
+                                        {formData.rateType === 'daily'
+                                            ? 'Amount you charge for one full day of work'
+                                            : 'Amount you charge per hour of work'}
+                                    </p>
+                                    {errors.rateAmount && <p className="text-red-500 text-xs mt-1">{errors.rateAmount}</p>}
                                 </div>
 
                                 <div>

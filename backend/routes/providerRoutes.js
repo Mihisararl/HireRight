@@ -6,7 +6,7 @@ import {
   updateAvailability,
   getMyAvailability
 } from "../controllers/providerController.js";
-import { getProviderServiceRequests } from "../controllers/serviceRequestController.js";
+import { getProviderServiceRequests } from "../controllers/serviceRequest/providerOfferController.js";
 import {
   updateProviderLocation,
   getProviderLocation,

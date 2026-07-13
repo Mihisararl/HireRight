@@ -22,6 +22,7 @@ import api from "../utils/api";
 import { AuthContext } from "../context/AuthContext";
 import { getMyAvailability, updateAvailability } from "../api/provider";
 import LanguageSwitcher from "../components/LanguageSwitcher";
+import { buildRatePayload, userToRateForm } from "../utils/providerRate";
 import "../styles/CustomerSettings.css";
 import "../styles/ProviderSettings.css";
 
@@ -52,6 +53,8 @@ const ProviderSettings = () => {
   const { user, refreshUser } = useContext(AuthContext);
   const fileInputRef = useRef(null);
 
+  const initialRate = userToRateForm(user);
+
   const [formData, setFormData] = useState({
     name: user?.name || "",
     email: user?.email || "",
@@ -61,7 +64,8 @@ const ProviderSettings = () => {
     profilePhoto: user?.profilePhoto || "",
     serviceCategory: user?.serviceCategory || "",
     yearsOfExperience: user?.yearsOfExperience || "",
-    hourlyRate: user?.hourlyRate || "",
+    rateType: initialRate.rateType,
+    rateAmount: initialRate.rateAmount,
     professionalBio: user?.professionalBio || "",
     city: user?.city || "",
     district: user?.district || "",
@@ -83,6 +87,7 @@ const ProviderSettings = () => {
 
   useEffect(() => {
     if (user) {
+      const rate = userToRateForm(user);
       setFormData({
         name: user.name || "",
         email: user.email || "",
@@ -92,7 +97,8 @@ const ProviderSettings = () => {
         profilePhoto: user.profilePhoto || "",
         serviceCategory: user.serviceCategory || "",
         yearsOfExperience: user.yearsOfExperience || "",
-        hourlyRate: user.hourlyRate || "",
+        rateType: rate.rateType,
+        rateAmount: rate.rateAmount,
         professionalBio: user.professionalBio || "",
         city: user.city || "",
         district: user.district || "",
@@ -168,6 +174,7 @@ const ProviderSettings = () => {
       await api.put("/auth/profile", {
         ...formData,
         ...bankData,
+        ...buildRatePayload(formData.rateType, formData.rateAmount),
       });
       await refreshUser();
       setStatus({ type: "success", message: t("provider.settingsPage.profileUpdated") });
@@ -378,17 +385,33 @@ const ProviderSettings = () => {
               </div>
             </div>
             <div className="customer-settings-field">
-              <label htmlFor="hourlyRate">{t("provider.settingsPage.hourlyRate")}</label>
+              <label htmlFor="rateType">{t("provider.settingsPage.chargeType")}</label>
+              <select
+                id="rateType"
+                name="rateType"
+                value={formData.rateType}
+                onChange={handleChange}
+              >
+                <option value="hourly">{t("provider.settingsPage.hourlyRateOption")}</option>
+                <option value="daily">{t("provider.settingsPage.dailyRateOption")}</option>
+              </select>
+            </div>
+            <div className="customer-settings-field">
+              <label htmlFor="rateAmount">
+                {formData.rateType === "daily"
+                  ? t("provider.settingsPage.dailyRate")
+                  : t("provider.settingsPage.hourlyRate")}
+              </label>
               <div className="customer-settings-input-wrap">
                 <span className="customer-settings-input-icon"><DollarSign size={16} /></span>
                 <input
-                  id="hourlyRate"
-                  name="hourlyRate"
+                  id="rateAmount"
+                  name="rateAmount"
                   type="number"
                   min="0"
-                  value={formData.hourlyRate}
+                  value={formData.rateAmount}
                   onChange={handleChange}
-                  placeholder="1500"
+                  placeholder={formData.rateType === "daily" ? "8000" : "1500"}
                   className="customer-settings-input--icon"
                 />
               </div>

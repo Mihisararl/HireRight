@@ -1,5 +1,6 @@
 import React from 'react';
 import { Star, MapPin, Briefcase, Clock, Phone } from 'lucide-react';
+import { formatProviderRate } from '../../utils/providerRate';
 import '../../styles/providerOfferProfile.css';
 
 const getInitials = (name) => {
@@ -65,10 +66,10 @@ const ProviderOfferProfile = ({ providerUser, providerProfile }) => {
             <span>{profile.yearsOfExperience} yr{profile.yearsOfExperience === 1 ? '' : 's'} experience</span>
           </div>
         )}
-        {profile.hourlyRate != null && (
+        {formatProviderRate(profile) && (
           <div className="provider-offer-meta-item">
             <Clock size={14} />
-            <span>Rs.{Number(profile.hourlyRate).toLocaleString()}/hr</span>
+            <span>{formatProviderRate(profile)}</span>
           </div>
         )}
         {phone && (

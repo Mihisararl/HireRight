@@ -3,6 +3,7 @@ import WorkerRegistrationRequest from '../models/WorkerRegistrationRequest.js';
 import Provider from '../models/Provider.js';
 import Review from '../models/Review.js';
 import ServiceRequest from '../models/ServiceRequest.js';
+import { resolveRateFields, applyResolvedRate } from '../utils/rateUtils.js';
 
 const toNumber = (value) => (value === '' || value === null || value === undefined ? undefined : Number(value));
 
@@ -47,6 +48,8 @@ const formatProviderResponse = (provider, bookedDatesMap, today) => {
     district: provider.district,
     yearsOfExperience: provider.yearsOfExperience,
     hourlyRate: provider.hourlyRate,
+    dailyRate: provider.dailyRate,
+    rateType: provider.rateType || 'hourly',
     professionalBio: provider.professionalBio,
     portfolioPhoto: provider.portfolioPhoto,
     profilePhoto: provider.userId?.profilePhoto || null,
@@ -141,6 +144,8 @@ export const registerProvider = async (req, res) => {
       serviceCategory,
       yearsOfExperience,
       hourlyRate,
+      dailyRate,
+      rateType,
       professionalBio,
       portfolioPhoto,
       city,
@@ -176,10 +181,15 @@ export const registerProvider = async (req, res) => {
       });
     }
 
-    if (!serviceCategory || yearsOfExperience === undefined || hourlyRate === undefined || !city || !district || !idDocument) {
+    if (!serviceCategory || yearsOfExperience === undefined || !city || !district || !idDocument) {
       return res.status(400).json({
         message: 'Complete all required worker registration fields before submitting.'
       });
+    }
+
+    const resolvedRate = resolveRateFields({ rateType, hourlyRate, dailyRate });
+    if (resolvedRate.error) {
+      return res.status(400).json({ message: resolvedRate.error });
     }
 
     const normalizedNic = normalizeNicNumber(nicNumber);
@@ -222,7 +232,9 @@ export const registerProvider = async (req, res) => {
     existingUser.isVerified = true;
     existingUser.serviceCategory = serviceCategory || existingUser.serviceCategory;
     existingUser.yearsOfExperience = toNumber(yearsOfExperience) ?? existingUser.yearsOfExperience;
-    existingUser.hourlyRate = toNumber(hourlyRate) ?? existingUser.hourlyRate;
+    existingUser.rateType = resolvedRate.rateType;
+    existingUser.hourlyRate = resolvedRate.hourlyRate;
+    existingUser.dailyRate = resolvedRate.dailyRate;
     existingUser.professionalBio = professionalBio || existingUser.professionalBio;
     existingUser.portfolioPhoto = portfolioPhoto || existingUser.portfolioPhoto;
     existingUser.idDocument = idDocument || existingUser.idDocument;
@@ -243,7 +255,9 @@ export const registerProvider = async (req, res) => {
       password,
       serviceCategory,
       yearsOfExperience: toNumber(yearsOfExperience),
-      hourlyRate: toNumber(hourlyRate),
+      rateType: resolvedRate.rateType,
+      hourlyRate: resolvedRate.hourlyRate,
+      dailyRate: resolvedRate.dailyRate,
       professionalBio,
       portfolioPhoto,
       city,

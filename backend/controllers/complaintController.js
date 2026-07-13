@@ -67,6 +67,7 @@ export const getComplaintByServiceRequest = async (req, res) => {
   }
 };
 
+// Allows a customer to reopen a resolved complaint within the allowed reopening period.
 export const reopenComplaint = async (req, res) => {
   try {
     const { id } = req.params;

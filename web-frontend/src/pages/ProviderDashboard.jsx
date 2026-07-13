@@ -40,6 +40,7 @@ import { AuthContext } from '../context/AuthContext';
 import ProviderJobTracking from '../components/location/ProviderJobTracking';
 import LanguageSwitcher from '../components/LanguageSwitcher';
 import { formatLocationDisplay, getRequestDailyBudget } from '../utils/locationHelpers';
+import { buildRatePayload } from '../utils/providerRate';
 
 const fileToDataUrl = (file) => new Promise((resolve, reject) => {
   const reader = new FileReader();
@@ -73,7 +74,8 @@ const ProviderDashboard = () => {
     password: '',
     serviceCategory: '',
     yearsOfExperience: '',
-    hourlyRate: '',
+    rateType: 'hourly',
+    rateAmount: '',
     professionalBio: '',
     portfolioPhoto: null,
     city: '',
@@ -107,7 +109,11 @@ const ProviderDashboard = () => {
       type: 'direct',
       request: booking,
       form: {
-        dailyRate: String(getRequestDailyBudget(booking) || booking.hourlyRate || ''),
+        dailyRate: String(
+          getRequestDailyBudget(booking)
+          || (booking.rateType === 'daily' ? booking.dailyRate : booking.hourlyRate)
+          || ''
+        ),
         estimatedDurationDays: '1',
         providerMessage: '',
       },
@@ -417,10 +423,12 @@ const ProviderDashboard = () => {
     } else if (regForm.yearsOfExperience < 0) {
       errs.yearsOfExperience = 'Must be a positive number';
     }
-    if (!regForm.hourlyRate) {
-      errs.hourlyRate = 'Hourly rate is required';
-    } else if (regForm.hourlyRate < 0) {
-      errs.hourlyRate = 'Must be a positive number';
+    if (!regForm.rateAmount) {
+      errs.rateAmount = regForm.rateType === 'daily'
+        ? 'Daily charge is required'
+        : 'Hourly rate is required';
+    } else if (Number(regForm.rateAmount) < 0) {
+      errs.rateAmount = 'Must be a positive number';
     }
     return errs;
   };
@@ -486,7 +494,7 @@ const ProviderDashboard = () => {
           password: regForm.password,
           serviceCategory: regForm.serviceCategory,
           yearsOfExperience: Number(regForm.yearsOfExperience),
-          hourlyRate: Number(regForm.hourlyRate),
+          ...buildRatePayload(regForm.rateType, regForm.rateAmount),
           professionalBio: regForm.professionalBio,
           city: regForm.city,
           district: regForm.district,
@@ -513,7 +521,8 @@ const ProviderDashboard = () => {
           password: '',
           serviceCategory: '',
           yearsOfExperience: '',
-          hourlyRate: '',
+          rateType: 'hourly',
+          rateAmount: '',
           professionalBio: '',
           portfolioPhoto: null,
           city: '',
@@ -1736,11 +1745,34 @@ const ProviderDashboard = () => {
                       </div>
                       <div>
                         <label style={{ display: 'block', fontSize: '13px', fontWeight: '600', color: '#334155', marginBottom: '6px' }}>
-                          Hourly Rate (Rs.) <span style={{ color: '#ef4444' }}>*</span>
+                          Charge Type <span style={{ color: '#ef4444' }}>*</span>
                         </label>
-                        <input name="hourlyRate" type="number" value={regForm.hourlyRate} onChange={handleRegChange} placeholder="1200" min="0" style={{ width: '100%', padding: '10px 12px', borderRadius: '8px', border: `2px solid ${regErrors.hourlyRate ? '#fca5a5' : '#e2e8f0'}`, fontSize: '14px', outline: 'none' }} />
-                        {regErrors.hourlyRate && <div style={{ color: '#ef4444', fontSize: '12px', marginTop: '4px' }}>{regErrors.hourlyRate}</div>}
+                        <select name="rateType" value={regForm.rateType} onChange={handleRegChange} style={{ width: '100%', padding: '10px 12px', borderRadius: '8px', border: '2px solid #e2e8f0', fontSize: '14px', outline: 'none' }}>
+                          <option value="hourly">Hourly Rate</option>
+                          <option value="daily">Daily Charge</option>
+                        </select>
                       </div>
+                    </div>
+
+                    <div>
+                      <label style={{ display: 'block', fontSize: '13px', fontWeight: '600', color: '#334155', marginBottom: '6px' }}>
+                        {regForm.rateType === 'daily' ? 'Daily Charge (Rs.)' : 'Hourly Rate (Rs.)'} <span style={{ color: '#ef4444' }}>*</span>
+                      </label>
+                      <input
+                        name="rateAmount"
+                        type="number"
+                        value={regForm.rateAmount}
+                        onChange={handleRegChange}
+                        placeholder={regForm.rateType === 'daily' ? '8000' : '1200'}
+                        min="0"
+                        style={{ width: '100%', padding: '10px 12px', borderRadius: '8px', border: `2px solid ${regErrors.rateAmount ? '#fca5a5' : '#e2e8f0'}`, fontSize: '14px', outline: 'none' }}
+                      />
+                      <p style={{ fontSize: '12px', color: '#64748b', marginTop: '4px', marginBottom: 0 }}>
+                        {regForm.rateType === 'daily'
+                          ? 'Amount you charge for one full day of work'
+                          : 'Amount you charge per hour of work'}
+                      </p>
+                      {regErrors.rateAmount && <div style={{ color: '#ef4444', fontSize: '12px', marginTop: '4px' }}>{regErrors.rateAmount}</div>}
                     </div>
 
                     <div>

@@ -13,6 +13,8 @@ export const buildProviderProfileSummary = (providerDoc) => {
     district: providerDoc.district,
     yearsOfExperience: providerDoc.yearsOfExperience,
     hourlyRate: providerDoc.hourlyRate,
+    dailyRate: providerDoc.dailyRate,
+    rateType: providerDoc.rateType || 'hourly',
     professionalBio: providerDoc.professionalBio || '',
     portfolioPhoto: providerDoc.portfolioPhoto || null,
     rating: totalReviews > 0 ? providerDoc.rating : 0,

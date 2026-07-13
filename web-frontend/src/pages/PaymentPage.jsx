@@ -3,6 +3,7 @@ import { ArrowLeft, CreditCard, Lock } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { AuthContext } from '../context/AuthContext';
 import { getPayhereHash, confirmPayment } from '../api/payment';
+import { formatLocationDisplay } from '../utils/locationHelpers';
 
 const PaymentPage = () => {
     const navigate = useNavigate();
@@ -27,6 +28,11 @@ const PaymentPage = () => {
         const cleaned = String(booking.amount || '').replace(/[^0-9.]/g, '');
         return Number(cleaned || 0);
     }, [booking.amount, booking.amountValue]);
+
+    const bookingAddress = useMemo(
+        () => formatLocationDisplay(booking.location),
+        [booking.location]
+    );
 
     const customerName = user?.name || 'Customer';
     const [firstName, ...restName] = customerName.split(' ');
@@ -133,8 +139,8 @@ const PaymentPage = () => {
                 last_name: lastName,
                 email: user?.email || 'customer@example.com',
                 phone: user?.phone || '',
-                address: booking.location || 'N/A',
-                city: booking.location || 'N/A',
+                address: bookingAddress || 'N/A',
+                city: bookingAddress || 'N/A',
                 country: 'Sri Lanka',
                 custom_1: user?.id || '',
                 custom_2: booking.providerUserId || ''
