@@ -1,6 +1,7 @@
 import React, { useCallback, useState } from 'react';
 import { FlatList, RefreshControl, StyleSheet, Text, View } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
+import { useTranslation } from 'react-i18next';
 import { getErrorMessage } from '../api/client';
 import { getProviderPayments } from '../api/payment';
 import EmptyState from '../components/EmptyState';
@@ -9,6 +10,7 @@ import { colors, spacing } from '../constants/theme';
 import { getPaymentBreakdown } from '../utils/paymentHelpers';
 
 export default function EarningsScreen() {
+  const { t } = useTranslation();
   const [payments, setPayments] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -21,12 +23,12 @@ export default function EarningsScreen() {
       const data = await getProviderPayments();
       setPayments(data || []);
     } catch (err) {
-      setError(getErrorMessage(err, 'Failed to load earnings'));
+      setError(getErrorMessage(err, t('mobile.failedLoadEarnings')));
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
-  }, []);
+  }, [t]);
 
   useFocusEffect(
     useCallback(() => {
@@ -37,14 +39,14 @@ export default function EarningsScreen() {
   const paid = payments.filter((p) => p.payoutStatus === 'paid' && p.status === 'approved');
   const total = paid.reduce((sum, p) => sum + getPaymentBreakdown(p).providerAmount, 0);
 
-  if (loading) return <LoadingView message="Loading earnings..." />;
+  if (loading) return <LoadingView message={t('mobile.loadingEarnings')} />;
 
   return (
     <View style={styles.container}>
       <View style={styles.summary}>
-        <Text style={styles.summaryLabel}>Total paid earnings</Text>
+        <Text style={styles.summaryLabel}>{t('mobile.totalPaidEarnings')}</Text>
         <Text style={styles.summaryValue}>Rs. {total.toLocaleString()}</Text>
-        <Text style={styles.summaryMeta}>{paid.length} released payment(s)</Text>
+        <Text style={styles.summaryMeta}>{t('mobile.releasedPayments', { count: paid.length })}</Text>
       </View>
 
       {error ? <Text style={styles.error}>{error}</Text> : null}
@@ -63,26 +65,26 @@ export default function EarningsScreen() {
           return (
           <View style={styles.card}>
             <Text style={styles.amount}>Rs. {breakdown.providerAmount.toLocaleString()}</Text>
-            <Text style={styles.meta}>Service: Rs. {breakdown.serviceAmount.toLocaleString()}</Text>
+            <Text style={styles.meta}>{t('provider.serviceAmount')}: Rs. {breakdown.serviceAmount.toLocaleString()}</Text>
             {breakdown.settlementType === 'PARTIAL_RELEASE' && (
-              <Text style={styles.meta}>Settlement: Rs. {breakdown.settlementAmount.toLocaleString()}</Text>
+              <Text style={styles.meta}>{t('provider.settlementType')}: Rs. {breakdown.settlementAmount.toLocaleString()}</Text>
             )}
             <Text style={styles.meta}>
-              Commission ({breakdown.commissionRate}%): -Rs. {breakdown.commissionAmount.toLocaleString()}
+              {t('provider.platformCommission', { rate: breakdown.commissionRate })}: -Rs. {breakdown.commissionAmount.toLocaleString()}
             </Text>
             <Text style={styles.meta}>Status: {item.payoutStatus || item.status}</Text>
             <Text style={styles.meta}>
               {item.releasedAt || item.approvedAt
                 ? new Date(item.releasedAt || item.approvedAt).toLocaleDateString()
-                : 'Pending release'}
+                : t('mobile.pendingRelease')}
             </Text>
           </View>
           );
         }}
         ListEmptyComponent={
           <EmptyState
-            title="No payments yet"
-            subtitle="Released payments from completed jobs will show here."
+            title={t('mobile.noPaymentsTitle')}
+            subtitle={t('mobile.noPaymentsSubtitle')}
           />
         }
         contentContainerStyle={payments.length === 0 ? styles.empty : undefined}

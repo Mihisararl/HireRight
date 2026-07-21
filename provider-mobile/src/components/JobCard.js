@@ -1,10 +1,12 @@
 import React from 'react';
 import { Linking, Pressable, StyleSheet, Text, View } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import { colors, spacing } from '../constants/theme';
 import { formatLocationDisplay, hasCoordinates, googleMapsUrl } from '../utils/locationHelpers';
 
 export default function JobCard({ job, onPress, actionLabel, onAction, actionDisabled }) {
-  const customerName = job.userId?.name || 'Customer';
+  const { t } = useTranslation();
+  const customerName = job.userId?.name || t('provider.customer');
   const status = job.status || 'Pending';
 
   return (
@@ -17,9 +19,9 @@ export default function JobCard({ job, onPress, actionLabel, onAction, actionDis
       </View>
 
       <Text style={styles.category}>{job.serviceCategory}</Text>
-      <Text style={styles.meta}>Customer: {customerName}</Text>
-      <Text style={styles.meta}>Location: {formatLocationDisplay(job.location)}</Text>
-      <Text style={styles.meta}>Date: {job.preferredDate} · {job.preferredTime}</Text>
+      <Text style={styles.meta}>{t('provider.customer')}: {customerName}</Text>
+      <Text style={styles.meta}>{t('provider.location')}: {formatLocationDisplay(job.location)}</Text>
+      <Text style={styles.meta}>{t('provider.date')}: {job.preferredDate} · {job.preferredTime}</Text>
       <Text style={styles.budget}>Rs. {Number(job.budget || 0).toLocaleString()}</Text>
 
       {hasCoordinates(job.location) ? (
@@ -27,7 +29,7 @@ export default function JobCard({ job, onPress, actionLabel, onAction, actionDis
           onPress={() => Linking.openURL(googleMapsUrl(job.location.lat, job.location.lng))}
           style={styles.mapLink}
         >
-          <Text style={styles.mapLinkText}>Open in Maps</Text>
+          <Text style={styles.mapLinkText}>{t('mobile.openGoogleMaps')}</Text>
         </Pressable>
       ) : null}
 

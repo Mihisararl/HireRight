@@ -8,18 +8,22 @@ import {
   TextInput,
   View,
 } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import { getApprovedProviders } from '../../api/public';
 import PublicScreenLayout from '../../components/PublicScreenLayout';
 import { SERVICE_CATEGORIES } from '../../constants/publicContent';
 import { colors, spacing } from '../../constants/theme';
 import { formatProviderRateLong } from '../../utils/providerRate';
 
+const ALL_CATEGORY = 'ALL';
+
 export default function PublicServicesScreen({ navigation, route }) {
+  const { t } = useTranslation();
   const initialQuery = route.params?.query || '';
   const [providers, setProviders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState(initialQuery);
-  const [selectedCategory, setSelectedCategory] = useState('All Services');
+  const [selectedCategory, setSelectedCategory] = useState(ALL_CATEGORY);
 
   useEffect(() => {
     const load = async () => {
@@ -43,11 +47,22 @@ export default function PublicServicesScreen({ navigation, route }) {
     }
   }, [route.params?.query]);
 
+  const categoryOptions = useMemo(
+    () => [
+      { value: ALL_CATEGORY, label: t('mobile.allServices') },
+      ...SERVICE_CATEGORIES.filter((c) => c !== 'All Services').map((category) => ({
+        value: category,
+        label: category,
+      })),
+    ],
+    [t]
+  );
+
   const filteredProviders = useMemo(() => {
     const query = searchQuery.trim().toLowerCase();
     return providers.filter((provider) => {
       const matchesCategory =
-        selectedCategory === 'All Services' || provider.serviceCategory === selectedCategory;
+        selectedCategory === ALL_CATEGORY || provider.serviceCategory === selectedCategory;
       const name = `${provider.firstName || ''} ${provider.lastName || ''}`.trim().toLowerCase();
       const matchesQuery =
         !query
@@ -61,15 +76,13 @@ export default function PublicServicesScreen({ navigation, route }) {
   return (
     <PublicScreenLayout navigation={navigation} activeRoute="Services">
       <View style={styles.hero}>
-        <Text style={styles.heroTitle}>Browse Services</Text>
-        <Text style={styles.heroSubtitle}>
-          Explore verified workers and their rates across Sri Lanka.
-        </Text>
+        <Text style={styles.heroTitle}>{t('mobile.browseServicesTitle')}</Text>
+        <Text style={styles.heroSubtitle}>{t('mobile.browseServicesSubtitle')}</Text>
         <TextInput
           style={styles.searchInput}
           value={searchQuery}
           onChangeText={setSearchQuery}
-          placeholder="Search by service, worker, or city..."
+          placeholder={t('mobile.servicesSearchPlaceholder')}
           placeholderTextColor={colors.textMuted}
         />
       </View>
@@ -79,16 +92,16 @@ export default function PublicServicesScreen({ navigation, route }) {
         showsHorizontalScrollIndicator={false}
         contentContainerStyle={styles.categories}
       >
-        {SERVICE_CATEGORIES.map((category) => {
-          const active = category === selectedCategory;
+        {categoryOptions.map((category) => {
+          const active = category.value === selectedCategory;
           return (
             <Pressable
-              key={category}
+              key={category.value}
               style={[styles.categoryChip, active && styles.categoryChipActive]}
-              onPress={() => setSelectedCategory(category)}
+              onPress={() => setSelectedCategory(category.value)}
             >
               <Text style={[styles.categoryText, active && styles.categoryTextActive]}>
-                {category}
+                {category.label}
               </Text>
             </Pressable>
           );
@@ -99,13 +112,13 @@ export default function PublicServicesScreen({ navigation, route }) {
         {loading ? (
           <ActivityIndicator size="large" color={colors.primary} style={styles.loader} />
         ) : filteredProviders.length === 0 ? (
-          <Text style={styles.emptyText}>No services found. Try another category or search.</Text>
+          <Text style={styles.emptyText}>{t('mobile.noServicesFound')}</Text>
         ) : (
           filteredProviders.map((provider) => (
             <View key={provider._id} style={styles.card}>
               <View style={styles.cardHeader}>
                 <Text style={styles.cardTitle}>
-                  {provider.serviceCategory} Service
+                  {t('mobile.serviceSuffix', { category: provider.serviceCategory })}
                 </Text>
                 <Text style={styles.rating}>
                   ⭐ {Number(provider.rating || 0).toFixed(1)} ({provider.totalReviews || 0})
@@ -115,7 +128,7 @@ export default function PublicServicesScreen({ navigation, route }) {
                 {provider.firstName} {provider.lastName}
               </Text>
               <Text style={styles.meta}>
-                📍 {provider.city || 'Location not set'}
+                📍 {provider.city || t('mobile.locationNotSet')}
                 {provider.district ? `, ${provider.district}` : ''}
               </Text>
               {provider.phone ? (
@@ -123,7 +136,7 @@ export default function PublicServicesScreen({ navigation, route }) {
               ) : null}
               {provider.yearsOfExperience != null ? (
                 <Text style={styles.meta}>
-                  {provider.yearsOfExperience} years experience
+                  {t('mobile.yearsExperience', { count: provider.yearsOfExperience })}
                 </Text>
               ) : null}
               <Text style={styles.price}>{formatProviderRateLong(provider)}</Text>

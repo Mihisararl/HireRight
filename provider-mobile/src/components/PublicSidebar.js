@@ -6,6 +6,7 @@ import {
   Text,
   View,
 } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { PUBLIC_NAV_ITEMS } from '../constants/publicNav';
@@ -13,6 +14,7 @@ import { usePublicNav } from '../context/PublicNavContext';
 import { colors, spacing } from '../constants/theme';
 
 export default function PublicSidebar() {
+  const { t } = useTranslation();
   const navigation = useNavigation();
   const route = useRoute();
   const insets = useSafeAreaInsets();
@@ -43,7 +45,7 @@ export default function PublicSidebar() {
             </Pressable>
           </View>
 
-          <Text style={styles.menuLabel}>Menu</Text>
+          <Text style={styles.menuLabel}>{t('mobile.menu')}</Text>
 
           {PUBLIC_NAV_ITEMS.map((item) => {
             const active = item.key === activeRoute;
@@ -55,7 +57,7 @@ export default function PublicSidebar() {
               >
                 <Text style={styles.navIcon}>{item.icon}</Text>
                 <Text style={[styles.navText, active && styles.navTextActive]}>
-                  {item.label}
+                  {t(item.labelKey)}
                 </Text>
               </Pressable>
             );
@@ -66,7 +68,7 @@ export default function PublicSidebar() {
               style={styles.loginBtn}
               onPress={() => navigateTo('Login')}
             >
-              <Text style={styles.loginText}>Provider Login</Text>
+              <Text style={styles.loginText}>{t('mobile.providerLogin')}</Text>
             </Pressable>
           </View>
         </View>

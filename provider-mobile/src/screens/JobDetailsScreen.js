@@ -9,6 +9,7 @@ import {
   TextInput,
   View,
 } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import { getErrorMessage } from '../api/client';
 import {
   acceptDirectBooking,
@@ -24,6 +25,7 @@ import { formatLocationDisplay, googleMapsUrl, hasCoordinates } from '../utils/l
 const ACTIVE_STATUSES = ['Accepted', 'Confirmed'];
 
 export default function JobDetailsScreen({ route, navigation }) {
+  const { t } = useTranslation();
   const initialJob = route.params?.job;
   const mode = route.params?.mode || 'assigned';
 
@@ -40,7 +42,7 @@ export default function JobDetailsScreen({ route, navigation }) {
 
   const { error: trackingError, lastSentAt } = useLocationTracking(trackingEnabled);
 
-  const customerName = job?.userId?.name || 'Customer';
+  const customerName = job?.userId?.name || t('provider.customer');
   const coordsReady = hasCoordinates(job?.location);
 
   const runAction = async (label, action) => {
@@ -50,12 +52,12 @@ export default function JobDetailsScreen({ route, navigation }) {
       if (result?.serviceRequest) {
         setJob(result.serviceRequest);
       }
-      Alert.alert('Success', result?.message || `${label} completed.`);
+      Alert.alert(t('mobile.success'), result?.message || `${label} completed.`);
       if (mode === 'available' || mode === 'booking') {
         navigation.goBack();
       }
     } catch (error) {
-      Alert.alert('Error', getErrorMessage(error, `Failed to ${label.toLowerCase()}`));
+      Alert.alert(t('mobile.error'), getErrorMessage(error, `${t('mobile.error')}: ${label}`));
     } finally {
       setBusy(false);
     }
@@ -68,11 +70,11 @@ export default function JobDetailsScreen({ route, navigation }) {
       : Number(job.budget) || 0;
 
     if (!offerPrice) {
-      Alert.alert('Error', 'Please enter a valid proposed price.');
+      Alert.alert(t('mobile.error'), t('mobile.invalidProposedPrice'));
       return;
     }
 
-    return runAction('Send offer', () =>
+    return runAction(t('provider.sendOffer'), () =>
       sendOffer(job._id, {
         message: offerMessage.trim(),
         proposedPrice: offerPrice,
@@ -82,23 +84,23 @@ export default function JobDetailsScreen({ route, navigation }) {
   };
 
   const handleAcceptBooking = () =>
-    runAction('Accept booking', () => acceptDirectBooking(job._id, responseMessage));
+    runAction(t('provider.acceptBooking'), () => acceptDirectBooking(job._id, responseMessage));
 
   const handleRejectBooking = () =>
-    runAction('Reject booking', () => rejectDirectBooking(job._id, responseMessage));
+    runAction(t('provider.rejectBooking'), () => rejectDirectBooking(job._id, responseMessage));
 
   const handleStartJourney = () =>
-    runAction('Start journey', async () => {
+    runAction(t('provider.startJourney'), async () => {
       const data = await startJourney(job._id);
       return data;
     });
 
   const handleCompleteJob = () => {
-    Alert.alert('Complete job', 'Mark this job as completed on your side?', [
-      { text: 'Cancel', style: 'cancel' },
+    Alert.alert(t('mobile.completeJobConfirmTitle'), t('mobile.completeJobConfirmMessage'), [
+      { text: t('mobile.cancel'), style: 'cancel' },
       {
-        text: 'Complete',
-        onPress: () => runAction('Complete job', () => completeJob(job._id)),
+        text: t('mobile.complete'),
+        onPress: () => runAction(t('provider.completeJob'), () => completeJob(job._id)),
       },
     ]);
   };
@@ -108,72 +110,73 @@ export default function JobDetailsScreen({ route, navigation }) {
       <Text style={styles.title}>{job.serviceTitle}</Text>
       <Text style={styles.status}>{job.status}</Text>
 
-      <Section title="Customer">
-        <InfoRow label="Name" value={customerName} />
-        {job.userId?.phone ? <InfoRow label="Phone" value={job.userId.phone} /> : null}
-        {job.userId?.email ? <InfoRow label="Email" value={job.userId.email} /> : null}
+      <Section title={t('provider.customer')}>
+        <InfoRow label={t('common.name')} value={customerName} />
+        {job.userId?.phone ? <InfoRow label={t('common.phone')} value={job.userId.phone} /> : null}
+        {job.userId?.email ? <InfoRow label={t('common.email')} value={job.userId.email} /> : null}
       </Section>
 
-      <Section title="Service">
-        <InfoRow label="Category" value={job.serviceCategory} />
-        <InfoRow label="Date" value={`${job.preferredDate} at ${job.preferredTime}`} />
-        <InfoRow label="Budget" value={`Rs. ${Number(job.budget || 0).toLocaleString()}`} />
-        <InfoRow label="Description" value={job.description} />
+      <Section title={t('mobile.serviceInfo')}>
+        <InfoRow label={t('mobile.category')} value={job.serviceCategory} />
+        <InfoRow label={t('provider.date')} value={`${job.preferredDate} ${t('provider.at')} ${job.preferredTime}`} />
+        <InfoRow label={t('provider.budget')} value={`Rs. ${Number(job.budget || 0).toLocaleString()}`} />
+        <InfoRow label={t('provider.description')} value={job.description} />
         {job.specificRequirements ? (
-          <InfoRow label="Requirements" value={job.specificRequirements} />
+          <InfoRow label={t('mobile.requirements')} value={job.specificRequirements} />
         ) : null}
       </Section>
 
-      <Section title="Location">
-        <InfoRow label="Address" value={formatLocationDisplay(job.location)} />
+      <Section title={t('provider.location')}>
+        <InfoRow label={t('mobile.address')} value={formatLocationDisplay(job.location)} />
         {coordsReady ? (
           <>
-            <InfoRow label="Latitude" value={String(job.location.lat)} />
-            <InfoRow label="Longitude" value={String(job.location.lng)} />
+            <InfoRow label={t('mobile.latitude')} value={String(job.location.lat)} />
+            <InfoRow label={t('mobile.longitude')} value={String(job.location.lng)} />
             <Pressable
               style={styles.linkBtn}
               onPress={() => Linking.openURL(googleMapsUrl(job.location.lat, job.location.lng))}
             >
-              <Text style={styles.linkText}>Open in Google Maps</Text>
+              <Text style={styles.linkText}>{t('mobile.openGoogleMaps')}</Text>
             </Pressable>
           </>
         ) : (
-          <Text style={styles.warning}>GPS coordinates not available for this job.</Text>
+          <Text style={styles.warning}>{t('mobile.gpsUnavailable')}</Text>
         )}
       </Section>
 
       {mode === 'available' ? (
-        <Section title="Send Offer">
-          <Field label="Message (optional)" value={offerMessage} onChangeText={setOfferMessage} multiline />
-          <Field label="Proposed price (Rs.)" value={proposedPrice} onChangeText={setProposedPrice} keyboardType="numeric" />
-          <Field label="Proposed date" value={proposedDate} onChangeText={setProposedDate} />
-          <ActionButton label="Accept Job / Send Offer" onPress={handleSendOffer} loading={busy} />
+        <Section title={t('provider.sendOffer')}>
+          <Field label={t('mobile.messageOptional')} value={offerMessage} onChangeText={setOfferMessage} multiline />
+          <Field label={t('mobile.proposedPrice')} value={proposedPrice} onChangeText={setProposedPrice} keyboardType="numeric" />
+          <Field label={t('mobile.proposedDate')} value={proposedDate} onChangeText={setProposedDate} />
+          <ActionButton label={t('provider.acceptJob')} onPress={handleSendOffer} loading={busy} waitLabel={t('mobile.pleaseWait')} />
         </Section>
       ) : null}
 
       {mode === 'booking' ? (
-        <Section title="Booking Response">
-          <Field label="Message (optional)" value={responseMessage} onChangeText={setResponseMessage} multiline />
-          <ActionButton label="Accept Booking" onPress={handleAcceptBooking} loading={busy} color={colors.success} />
-          <ActionButton label="Reject Booking" onPress={handleRejectBooking} loading={busy} color={colors.danger} />
+        <Section title={t('mobile.bookingResponse')}>
+          <Field label={t('mobile.messageOptional')} value={responseMessage} onChangeText={setResponseMessage} multiline />
+          <ActionButton label={t('provider.acceptBooking')} onPress={handleAcceptBooking} loading={busy} color={colors.success} waitLabel={t('mobile.pleaseWait')} />
+          <ActionButton label={t('provider.rejectBooking')} onPress={handleRejectBooking} loading={busy} color={colors.danger} waitLabel={t('mobile.pleaseWait')} />
         </Section>
       ) : null}
 
       {mode === 'assigned' && isActiveJob ? (
-        <Section title="Job Actions">
+        <Section title={t('mobile.jobActions')}>
           {!journeyActive ? (
             <ActionButton
-              label="Start Journey"
+              label={t('provider.startJourney')}
               onPress={handleStartJourney}
               loading={busy}
               disabled={!coordsReady}
+              waitLabel={t('mobile.pleaseWait')}
             />
           ) : (
             <View style={styles.trackingBox}>
-              <Text style={styles.trackingTitle}>Live tracking active</Text>
+              <Text style={styles.trackingTitle}>{t('mobile.liveTrackingActive')}</Text>
               <Text style={styles.trackingMeta}>
-                Location sent every 10 seconds
-                {lastSentAt ? ` · Last: ${lastSentAt.toLocaleTimeString()}` : ''}
+                {t('mobile.locationSentEvery10s')}
+                {lastSentAt ? ` · ${lastSentAt.toLocaleTimeString()}` : ''}
               </Text>
               {trackingError ? <Text style={styles.trackingError}>{trackingError}</Text> : null}
             </View>
@@ -181,13 +184,14 @@ export default function JobDetailsScreen({ route, navigation }) {
 
           {!job.providerCompleted ? (
             <ActionButton
-              label="Complete Job"
+              label={t('provider.completeJob')}
               onPress={handleCompleteJob}
               loading={busy}
               color={colors.success}
+              waitLabel={t('mobile.pleaseWait')}
             />
           ) : (
-            <Text style={styles.completedNote}>You marked this job complete.</Text>
+            <Text style={styles.completedNote}>{t('mobile.markedCompleteNote')}</Text>
           )}
         </Section>
       ) : null}
@@ -229,14 +233,14 @@ function Field({ label, value, onChangeText, multiline, keyboardType }) {
   );
 }
 
-function ActionButton({ label, onPress, loading, disabled, color = colors.primary }) {
+function ActionButton({ label, onPress, loading, disabled, color = colors.primary, waitLabel = 'Please wait...' }) {
   return (
     <Pressable
       style={[styles.actionBtn, { backgroundColor: color }, (loading || disabled) && styles.actionDisabled]}
       onPress={onPress}
       disabled={loading || disabled}
     >
-      <Text style={styles.actionText}>{loading ? 'Please wait...' : label}</Text>
+      <Text style={styles.actionText}>{loading ? waitLabel : label}</Text>
     </Pressable>
   );
 }
