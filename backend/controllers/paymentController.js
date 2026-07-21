@@ -211,7 +211,7 @@ export const confirmPayment = async (req, res) => {
       return res.status(404).json({ message: 'Service request not found or not authorized' });
     }
 
-    if (!['Accepted', 'Confirmed'].includes(serviceRequest.status)) {
+    if (!['Accepted', 'Confirmed', 'Completed'].includes(serviceRequest.status)) {
       return res.status(400).json({ message: 'This booking is not ready for payment' });
     }
 

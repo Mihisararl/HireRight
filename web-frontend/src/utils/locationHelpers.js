@@ -123,7 +123,7 @@ export const getRequestDailyBudget = (request) => (
 export const getRequestPayableAmount = (request) => {
   if (!request) return 0;
 
-  const confirmed = request.status === 'Accepted' || request.status === 'Confirmed';
+  const confirmed = ['Accepted', 'Confirmed', 'Completed'].includes(request.status);
   if (!confirmed) return 0;
 
   if (request.agreedTotalAmount != null && Number(request.agreedTotalAmount) > 0) {

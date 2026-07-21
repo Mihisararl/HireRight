@@ -62,10 +62,11 @@ export const applyAgreedTerms = (serviceRequest, estimate) => {
 };
 
 export const isAgreementConfirmed = (request) => (
-  ['Accepted', 'Confirmed'].includes(request?.status)
+  ['Accepted', 'Confirmed', 'Completed'].includes(request?.status)
   || request?.agreementStatus === AGREEMENT_STATUSES.CONFIRMED
   || request?.agreementStatus === AGREEMENT_STATUSES.PAYMENT_PENDING
   || request?.agreementStatus === AGREEMENT_STATUSES.IN_PROGRESS
+  || request?.agreementStatus === AGREEMENT_STATUSES.COMPLETED
 );
 
 export const getEstimateFromRequest = (request) => {

@@ -173,6 +173,7 @@
     "totalAmount": "Total Amount",
     "markTaskCompleted": "Mark Task Completed",
     "awaitingProvider": "Awaiting Provider Confirmation",
+    "providerMarkedComplete": "Provider marked the job complete — please confirm",
     "paymentTransferred": "Payment successfully transferred to {{provider}}",
     "paymentRefunded": "Payment refunded to your account",
     "originalPayment": "Original Payment",

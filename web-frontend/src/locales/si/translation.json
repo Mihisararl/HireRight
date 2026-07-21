@@ -173,6 +173,7 @@
     "totalAmount": "මුළු මුදල",
     "markTaskCompleted": "කාර්යය සම්පූර්ණ ලෙස සලකුණු කරන්න",
     "awaitingProvider": "සේවා සපයන්නාගේ තහවුරු කිරීම බලාපොරොත්තුව",
+    "providerMarkedComplete": "සේවා සපයන්නා රැකියාව සම්පූර්ණ කළා — කරුණාකර තහවුරු කරන්න",
     "paymentTransferred": "ගෙවීම {{provider}} වෙත සාර්ථකව මාරු විය",
     "paymentRefunded": "ගෙවීම ඔබගේ ගිණුමට ආපසු ලබා දෙන ලදී",
     "originalPayment": "මුල් ගෙවීම",

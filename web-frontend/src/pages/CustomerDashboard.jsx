@@ -302,11 +302,15 @@ const CustomerDashboard = () => {
     const providerName = request.providerId?.name || t('customer.providerFallback');
     const statusLabel = getStatusDisplay(request.status);
     const isConfirmed = request.status === 'Accepted' || request.status === 'Confirmed';
+    const isCompleted = request.status === 'Completed';
+    const isPayableStatus = isConfirmed || isCompleted;
+    const providerCompleted = Boolean(request.providerCompleted);
+    const customerCompleted = Boolean(request.customerCompleted);
     const payment = payments.find((item) => String(item.serviceRequestId) === String(request._id));
     const isPaid = Boolean(payment);
     const payableAmount = getRequestPayableAmount(request);
     const displayAmount = getRequestDisplayAmount(request, payment);
-    const amountForCard = request.status === 'Completed' || isPaid
+    const amountForCard = isCompleted || isPaid
       ? displayAmount
       : payableAmount;
     const paymentSettled = isPaymentSettled(payment);
@@ -321,17 +325,19 @@ const CustomerDashboard = () => {
       phone: request.providerId?.phone || '',
       service: request.serviceTitle,
       status: statusLabel,
-      statusColor: isConfirmed ? "#1d4ed8" : "#ca8a04",
-      statusBg: isConfirmed ? "#dbeafe" : "#fef3c7",
+      statusColor: isCompleted ? "#059669" : isConfirmed ? "#1d4ed8" : "#ca8a04",
+      statusBg: isCompleted ? "#d1fae5" : isConfirmed ? "#dbeafe" : "#fef3c7",
       date: `${request.preferredDate} at ${request.preferredTime}`,
       location: formatLocationDisplay(request.location),
       customerLocation: request.location,
       amount: `Rs.${amountForCard.toLocaleString()}`,
       amountValue: amountForCard,
-      canPayNow: (request.status === 'Accepted' || request.status === 'Confirmed') && !isPaid,
+      canPayNow: isPayableStatus && !isPaid && payableAmount > 0,
       isPaid,
-      canComplete: (request.status === 'Accepted' || request.status === 'Confirmed') && !request.customerCompleted,
-      customerCompleted: Boolean(request.customerCompleted),
+      canComplete: isConfirmed && !customerCompleted,
+      customerCompleted,
+      providerCompleted,
+      awaitingProviderConfirmation: customerCompleted && !providerCompleted && isConfirmed,
       canReport: !paymentSettled,
       complaintStatus: complaint?.status || null,
       paymentReleased,
@@ -385,7 +391,7 @@ const CustomerDashboard = () => {
   };
 
   const handlePaymentDueClick = () => {
-    const dueBookings = bookings.filter((b) => b.canPayNow);
+    const dueBookings = [...bookings, ...completedCards].filter((b) => b.canPayNow);
     if (dueBookings.length === 0) {
       setActiveTab('active');
       return;
@@ -394,7 +400,9 @@ const CustomerDashboard = () => {
       navigate('/payment', { state: { booking: dueBookings[0], fromDashboard: true } });
       return;
     }
-    setActiveTab('active');
+    const firstDue = dueBookings[0];
+    const onCompletedTab = completedCards.some((c) => String(c.id) === String(firstDue.id));
+    setActiveTab(onCompletedTab ? 'completed' : 'active');
     setHighlightBookingId(dueBookings[0].id);
     scrollToBooking(dueBookings[0].id);
     setTimeout(() => setHighlightBookingId(null), 4000);
@@ -1812,13 +1820,14 @@ const CustomerDashboard = () => {
                       {t('customer.markTaskCompleted')}
                     </button>
                   )}
-                  {b.customerCompleted && !b.canComplete && (
+                  {b.awaitingProviderConfirmation && (
                     <button className="secondary-action-btn" style={{ opacity: 0.7, cursor: 'default' }} disabled>
-                      {b.paymentSettled && b.paymentBreakdown?.settlementType === 'FULL_REFUND'
-                        ? t('customer.paymentRefunded')
-                        : b.paymentReleased
-                          ? t('customer.paymentTransferred', { provider: b.provider })
-                          : t('customer.awaitingProvider')}
+                      {t('customer.awaitingProvider')}
+                    </button>
+                  )}
+                  {b.providerCompleted && !b.customerCompleted && b.canComplete && (
+                    <button className="secondary-action-btn" style={{ opacity: 0.85, cursor: 'default' }} disabled>
+                      {t('customer.providerMarkedComplete')}
                     </button>
                   )}
                   {b.isPaid && b.paymentSettled && b.paymentBreakdown && (
