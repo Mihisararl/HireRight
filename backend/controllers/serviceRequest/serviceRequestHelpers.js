@@ -13,6 +13,9 @@ export const normalizeServiceRequest = (doc) => {
   if (obj.dailyBudget == null && obj.budget != null) {
     obj.dailyBudget = obj.budget;
   }
+  if (obj.budget == null && obj.dailyBudget != null) {
+    obj.budget = obj.dailyBudget;
+  }
   delete obj.estimatedDuration;
 
   if (obj.providerOffer) {

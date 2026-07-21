@@ -21,6 +21,7 @@ import { startJourney } from '../api/provider';
 import { useLocationTracking } from '../hooks/useLocationTracking';
 import { colors, spacing } from '../constants/theme';
 import { formatLocationDisplay, googleMapsUrl, hasCoordinates } from '../utils/locationHelpers';
+import { formatLkr, formatLkrPerDay, getRequestDailyBudget } from '../utils/moneyHelpers';
 
 const ACTIVE_STATUSES = ['Accepted', 'Confirmed'];
 
@@ -31,7 +32,9 @@ export default function JobDetailsScreen({ route, navigation }) {
 
   const [job, setJob] = useState(initialJob);
   const [offerMessage, setOfferMessage] = useState('');
-  const [proposedPrice, setProposedPrice] = useState(String(job?.budget || ''));
+  const [proposedPrice, setProposedPrice] = useState(
+    String(getRequestDailyBudget(job) || '')
+  );
   const [proposedDate, setProposedDate] = useState(job?.preferredDate || '');
   const [responseMessage, setResponseMessage] = useState('');
   const [busy, setBusy] = useState(false);
@@ -67,7 +70,7 @@ export default function JobDetailsScreen({ route, navigation }) {
     const normalizedPrice = Number(proposedPrice);
     const offerPrice = Number.isFinite(normalizedPrice) && normalizedPrice > 0
       ? normalizedPrice
-      : Number(job.budget) || 0;
+      : getRequestDailyBudget(job);
 
     if (!offerPrice) {
       Alert.alert(t('mobile.error'), t('mobile.invalidProposedPrice'));
@@ -119,7 +122,7 @@ export default function JobDetailsScreen({ route, navigation }) {
       <Section title={t('mobile.serviceInfo')}>
         <InfoRow label={t('mobile.category')} value={job.serviceCategory} />
         <InfoRow label={t('provider.date')} value={`${job.preferredDate} ${t('provider.at')} ${job.preferredTime}`} />
-        <InfoRow label={t('provider.budget')} value={`Rs. ${Number(job.budget || 0).toLocaleString()}`} />
+        <InfoRow label={t('provider.budget')} value={formatLkrPerDay(getRequestDailyBudget(job))} />
         <InfoRow label={t('provider.description')} value={job.description} />
         {job.specificRequirements ? (
           <InfoRow label={t('mobile.requirements')} value={job.specificRequirements} />

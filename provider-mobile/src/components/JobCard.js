@@ -3,6 +3,7 @@ import { Linking, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { colors, spacing } from '../constants/theme';
 import { formatLocationDisplay, hasCoordinates, googleMapsUrl } from '../utils/locationHelpers';
+import { formatLkrPerDay, getRequestDailyBudget } from '../utils/moneyHelpers';
 
 export default function JobCard({ job, onPress, actionLabel, onAction, actionDisabled }) {
   const { t } = useTranslation();
@@ -22,7 +23,7 @@ export default function JobCard({ job, onPress, actionLabel, onAction, actionDis
       <Text style={styles.meta}>{t('provider.customer')}: {customerName}</Text>
       <Text style={styles.meta}>{t('provider.location')}: {formatLocationDisplay(job.location)}</Text>
       <Text style={styles.meta}>{t('provider.date')}: {job.preferredDate} · {job.preferredTime}</Text>
-      <Text style={styles.budget}>Rs. {Number(job.budget || 0).toLocaleString()}</Text>
+      <Text style={styles.budget}>{formatLkrPerDay(getRequestDailyBudget(job))}</Text>
 
       {hasCoordinates(job.location) ? (
         <Pressable

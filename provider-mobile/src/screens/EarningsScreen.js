@@ -8,6 +8,7 @@ import EmptyState from '../components/EmptyState';
 import LoadingView from '../components/LoadingView';
 import { colors, spacing } from '../constants/theme';
 import { getPaymentBreakdown } from '../utils/paymentHelpers';
+import { formatLkr } from '../utils/moneyHelpers';
 
 export default function EarningsScreen() {
   const { t } = useTranslation();
@@ -45,7 +46,7 @@ export default function EarningsScreen() {
     <View style={styles.container}>
       <View style={styles.summary}>
         <Text style={styles.summaryLabel}>{t('mobile.totalPaidEarnings')}</Text>
-        <Text style={styles.summaryValue}>Rs. {total.toLocaleString()}</Text>
+        <Text style={styles.summaryValue}>{formatLkr(total)}</Text>
         <Text style={styles.summaryMeta}>{t('mobile.releasedPayments', { count: paid.length })}</Text>
       </View>
 
@@ -64,13 +65,13 @@ export default function EarningsScreen() {
           const breakdown = getPaymentBreakdown(item);
           return (
           <View style={styles.card}>
-            <Text style={styles.amount}>Rs. {breakdown.providerAmount.toLocaleString()}</Text>
-            <Text style={styles.meta}>{t('provider.serviceAmount')}: Rs. {breakdown.serviceAmount.toLocaleString()}</Text>
+            <Text style={styles.amount}>{formatLkr(breakdown.providerAmount)}</Text>
+            <Text style={styles.meta}>{t('provider.serviceAmount')}: {formatLkr(breakdown.serviceAmount)}</Text>
             {breakdown.settlementType === 'PARTIAL_RELEASE' && (
-              <Text style={styles.meta}>{t('provider.settlementType')}: Rs. {breakdown.settlementAmount.toLocaleString()}</Text>
+              <Text style={styles.meta}>{t('provider.settlementType')}: {formatLkr(breakdown.settlementAmount)}</Text>
             )}
             <Text style={styles.meta}>
-              {t('provider.platformCommission', { rate: breakdown.commissionRate })}: -Rs. {breakdown.commissionAmount.toLocaleString()}
+              {t('provider.platformCommission', { rate: breakdown.commissionRate })}: -{formatLkr(breakdown.commissionAmount)}
             </Text>
             <Text style={styles.meta}>Status: {item.payoutStatus || item.status}</Text>
             <Text style={styles.meta}>
