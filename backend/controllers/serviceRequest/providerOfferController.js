@@ -7,6 +7,11 @@ import {
   parseProviderEstimate,
 } from '../../utils/serviceAgreement.js';
 import {
+  categoriesMatch,
+  getRequestCategoriesForProvider,
+  resolveProviderServiceCategory,
+} from '../../utils/serviceCategoryUtils.js';
+import {
   mapRequests,
   normalizeServiceRequest,
   saveServiceRequest,
@@ -15,9 +20,23 @@ import {
 // GET - Get available service requests for providers
 export const getAvailableServiceRequests = async (req, res) => {
   try {
+    const providerAccount = await User.findById(req.user.id).select('role serviceCategory');
+    if (!providerAccount || providerAccount.role !== 'provider') {
+      return res.status(403).json({ message: 'Only providers can view available work' });
+    }
+
+    const providerProfile = await Provider.findOne({ userId: req.user.id }).select('serviceCategory');
+    const providerCategory = resolveProviderServiceCategory(providerAccount, providerProfile);
+    const matchingCategories = getRequestCategoriesForProvider(providerCategory);
+
+    if (matchingCategories.length === 0) {
+      return res.status(200).json([]);
+    }
+
     const query = {
       status: "Pending",
       bookingType: "post",
+      serviceCategory: { $in: matchingCategories },
       $or: [
         { agreementStatus: AGREEMENT_STATUSES.PENDING_PROVIDER_ESTIMATE },
         { agreementStatus: { $exists: false } },
@@ -83,6 +102,13 @@ export const acceptServiceRequest = async (req, res) => {
 
     if (serviceRequest.bookingType !== 'post') {
       return res.status(400).json({ message: "This request is not open for offers" });
+    }
+
+    const providerCategory = resolveProviderServiceCategory(providerAccount, providerProfile);
+    if (!categoriesMatch(providerCategory, serviceRequest.serviceCategory)) {
+      return res.status(403).json({
+        message: "This job is outside your service category",
+      });
     }
 
     serviceRequest.status = "OfferSent";
