@@ -3,6 +3,7 @@ import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Text } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { useAuth } from '../context/AuthContext';
 import { PublicNavProvider } from '../context/PublicNavContext';
@@ -23,23 +24,27 @@ const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
 
 function JobsStack() {
+  const { t } = useTranslation();
+
   return (
     <Stack.Navigator>
       <Stack.Screen
         name="JobsList"
         component={JobsScreen}
-        options={{ title: 'Jobs', headerShown: false }}
+        options={{ title: t('mobile.jobs'), headerShown: false }}
       />
       <Stack.Screen
         name="JobDetails"
         component={JobDetailsScreen}
-        options={{ title: 'Job Details' }}
+        options={{ title: t('mobile.jobDetails') }}
       />
     </Stack.Navigator>
   );
 }
 
 function MainTabs() {
+  const { t } = useTranslation();
+
   return (
     <Tab.Navigator
       screenOptions={{
@@ -53,9 +58,9 @@ function MainTabs() {
         name="JobsTab"
         component={JobsStack}
         options={{
-          title: 'Jobs',
+          title: t('mobile.jobs'),
           headerShown: false,
-          tabBarLabel: 'Jobs',
+          tabBarLabel: t('mobile.jobs'),
           tabBarIcon: ({ color }) => <Text style={{ color, fontSize: 16 }}>📋</Text>,
         }}
       />
@@ -63,7 +68,8 @@ function MainTabs() {
         name="Earnings"
         component={EarningsScreen}
         options={{
-          title: 'Earnings',
+          title: t('provider.earnings'),
+          tabBarLabel: t('provider.earnings'),
           tabBarIcon: ({ color }) => <Text style={{ color, fontSize: 16 }}>💰</Text>,
         }}
       />
@@ -71,7 +77,8 @@ function MainTabs() {
         name="Reviews"
         component={ReviewsScreen}
         options={{
-          title: 'Reviews',
+          title: t('provider.reviews'),
+          tabBarLabel: t('provider.reviews'),
           tabBarIcon: ({ color }) => <Text style={{ color, fontSize: 16 }}>⭐</Text>,
         }}
       />
@@ -79,7 +86,8 @@ function MainTabs() {
         name="Profile"
         component={ProfileScreen}
         options={{
-          title: 'Profile',
+          title: t('profile'),
+          tabBarLabel: t('profile'),
           tabBarIcon: ({ color }) => <Text style={{ color, fontSize: 16 }}>👤</Text>,
         }}
       />
@@ -105,10 +113,11 @@ function PublicStack() {
 }
 
 export default function AppNavigator() {
+  const { t } = useTranslation();
   const { loading, isAuthenticated } = useAuth();
 
   if (loading) {
-    return <LoadingView message="Starting HireRight..." />;
+    return <LoadingView message={t('mobile.startingApp')} />;
   }
 
   return (

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
   Pressable,
   StyleSheet,
@@ -6,16 +6,44 @@ import {
   TextInput,
   View,
 } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import PublicScreenLayout from '../../components/PublicScreenLayout';
-import {
-  HOME_HOW_IT_WORKS,
-  POPULAR_SERVICES,
-  POPULAR_TAGS,
-} from '../../constants/publicContent';
+import { POPULAR_SERVICES } from '../../constants/publicContent';
 import { colors, spacing } from '../../constants/theme';
 
+const POPULAR_SERVICE_KEYS = [
+  { key: 'homeRepair', emoji: '🔧' },
+  { key: 'plumbing', emoji: '🚿' },
+  { key: 'outdoorHelp', emoji: '🏡' },
+  { key: 'photography', emoji: '📷' },
+  { key: 'householdHelp', emoji: '✨' },
+  { key: 'trending', emoji: '⭐' },
+];
+
+const TAG_KEYS = ['cleaning', 'repairs', 'moving', 'painting', 'photography'];
+
 export default function HomeScreen({ navigation }) {
+  const { t } = useTranslation();
   const [searchQuery, setSearchQuery] = useState('');
+
+  const popularTags = useMemo(
+    () => TAG_KEYS.map((key) => ({ key, label: t(`home.tags.${key}`) })),
+    [t]
+  );
+
+  const popularServices = useMemo(
+    () => POPULAR_SERVICE_KEYS.map((item) => ({
+      ...item,
+      name: t(`home.popularServices.${item.key}`),
+    })),
+    [t]
+  );
+
+  const howItWorksSteps = useMemo(() => ([
+    { step: '1', title: t('home.howItWorks.step1Title'), description: t('home.howItWorks.step1Desc') },
+    { step: '2', title: t('home.howItWorks.step2Title'), description: t('home.howItWorks.step2Desc') },
+    { step: '3', title: t('home.howItWorks.step3Title'), description: t('home.howItWorks.step3Desc') },
+  ]), [t]);
 
   const handleSearch = () => {
     navigation.navigate('Services', { query: searchQuery.trim() });
@@ -24,45 +52,43 @@ export default function HomeScreen({ navigation }) {
   return (
     <PublicScreenLayout navigation={navigation} activeRoute="Home">
       <View style={styles.hero}>
-        <Text style={styles.heroTitle}>Find trusted help for every task</Text>
-        <Text style={styles.heroSubtitle}>
-          Connect with skilled workers across Sri Lanka for home services, repairs, and more.
-        </Text>
+        <Text style={styles.heroTitle}>{t('home.hero.title')}</Text>
+        <Text style={styles.heroSubtitle}>{t('mobile.heroSubtitleMobile')}</Text>
 
         <View style={styles.searchRow}>
           <TextInput
             style={styles.searchInput}
             value={searchQuery}
             onChangeText={setSearchQuery}
-            placeholder="Search services or workers..."
+            placeholder={t('mobile.searchPlaceholder')}
             placeholderTextColor={colors.textMuted}
             onSubmitEditing={handleSearch}
             returnKeyType="search"
           />
           <Pressable style={styles.searchBtn} onPress={handleSearch}>
-            <Text style={styles.searchBtnText}>Search</Text>
+            <Text style={styles.searchBtnText}>{t('home.hero.search')}</Text>
           </Pressable>
         </View>
 
         <View style={styles.tagsRow}>
-          {POPULAR_TAGS.map((tag) => (
+          {popularTags.map((tag) => (
             <Pressable
-              key={tag}
+              key={tag.key}
               style={styles.tag}
-              onPress={() => navigation.navigate('Services', { query: tag })}
+              onPress={() => navigation.navigate('Services', { query: tag.label })}
             >
-              <Text style={styles.tagText}>{tag}</Text>
+              <Text style={styles.tagText}>{tag.label}</Text>
             </Pressable>
           ))}
         </View>
       </View>
 
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Popular Services</Text>
+        <Text style={styles.sectionTitle}>{t('home.popularServices.title')}</Text>
         <View style={styles.grid}>
-          {POPULAR_SERVICES.map((service) => (
+          {popularServices.map((service) => (
             <Pressable
-              key={service.name}
+              key={service.key}
               style={styles.serviceCard}
               onPress={() => navigation.navigate('Services', { query: service.name })}
             >
@@ -74,8 +100,8 @@ export default function HomeScreen({ navigation }) {
       </View>
 
       <View style={styles.sectionAlt}>
-        <Text style={styles.sectionTitle}>How It Works</Text>
-        {HOME_HOW_IT_WORKS.map((item) => (
+        <Text style={styles.sectionTitle}>{t('home.howItWorks.title')}</Text>
+        {howItWorksSteps.map((item) => (
           <View key={item.step} style={styles.stepCard}>
             <View style={styles.stepBadge}>
               <Text style={styles.stepBadgeText}>{item.step}</Text>
@@ -90,20 +116,18 @@ export default function HomeScreen({ navigation }) {
           style={styles.secondaryBtn}
           onPress={() => navigation.navigate('HowItWorks')}
         >
-          <Text style={styles.secondaryBtnText}>Learn more</Text>
+          <Text style={styles.secondaryBtnText}>{t('mobile.learnMore')}</Text>
         </Pressable>
       </View>
 
       <View style={styles.cta}>
-        <Text style={styles.ctaTitle}>Ready to earn with your skills?</Text>
-        <Text style={styles.ctaText}>
-          Join HireRight as a worker and start getting hired on your own schedule.
-        </Text>
+        <Text style={styles.ctaTitle}>{t('mobile.readyToEarn')}</Text>
+        <Text style={styles.ctaText}>{t('mobile.becomeWorkerCta')}</Text>
         <Pressable
           style={styles.primaryBtn}
           onPress={() => navigation.navigate('BecomeWorker')}
         >
-          <Text style={styles.primaryBtnText}>Become a Worker</Text>
+          <Text style={styles.primaryBtnText}>{t('home.nav.becomeWorker')}</Text>
         </Pressable>
       </View>
     </PublicScreenLayout>

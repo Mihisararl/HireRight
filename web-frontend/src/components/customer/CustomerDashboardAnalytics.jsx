@@ -164,7 +164,7 @@ export default function CustomerDashboardAnalytics({
     const reviewedIds = new Set(reviews.map((r) => String(r.serviceRequestId)));
     const reviewsPending = completedCards.filter((c) => c.paymentReleased && !reviewedIds.has(String(c.id))).length;
     const openComplaints = complaints.filter((c) => c.status === 'open').length;
-    const paymentsDueBookings = bookings.filter((b) => b.canPayNow).length;
+    const paymentsDueBookings = [...bookings, ...completedCards].filter((b) => b.canPayNow).length;
 
     return {
       monthlyActivity: months.map((m) => monthlyMap[m.key]),

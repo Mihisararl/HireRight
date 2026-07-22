@@ -1,6 +1,7 @@
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import { FlatList, RefreshControl, StyleSheet, Text, View } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
+import { useTranslation } from 'react-i18next';
 import { getErrorMessage } from '../api/client';
 import {
   getAvailableJobs,
@@ -14,13 +15,8 @@ import SegmentTabs from '../components/SegmentTabs';
 import { useAuth } from '../context/AuthContext';
 import { colors, spacing } from '../constants/theme';
 
-const TABS = [
-  { key: 'my', label: 'My Jobs' },
-  { key: 'available', label: 'Find Work' },
-  { key: 'bookings', label: 'Bookings' },
-];
-
 export default function JobsScreen({ navigation }) {
+  const { t } = useTranslation();
   const { user } = useAuth();
   const [activeTab, setActiveTab] = useState('my');
   const [jobs, setJobs] = useState([]);
@@ -30,6 +26,12 @@ export default function JobsScreen({ navigation }) {
   const [bookingCount, setBookingCount] = useState(0);
 
   const isApproved = user?.providerStatus === 'approved';
+
+  const tabs = useMemo(() => ([
+    { key: 'my', label: t('mobile.myJobs') },
+    { key: 'available', label: t('provider.findWork') },
+    { key: 'bookings', label: t('provider.bookingRequests') },
+  ]), [t]);
 
   const loadJobs = useCallback(async (showLoader = true) => {
     if (showLoader) setLoading(true);
@@ -51,13 +53,13 @@ export default function JobsScreen({ navigation }) {
         setBookingCount(bookings.length);
       }
     } catch (err) {
-      setError(getErrorMessage(err, 'Failed to load jobs'));
+      setError(getErrorMessage(err, t('mobile.failedLoadJobs')));
       setJobs([]);
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [activeTab]);
+  }, [activeTab, t]);
 
   useFocusEffect(
     useCallback(() => {
@@ -65,7 +67,7 @@ export default function JobsScreen({ navigation }) {
     }, [loadJobs])
   );
 
-  const tabs = TABS.map((tab) =>
+  const tabsWithBadge = tabs.map((tab) =>
     tab.key === 'bookings' ? { ...tab, badge: bookingCount || undefined } : tab
   );
 
@@ -79,7 +81,7 @@ export default function JobsScreen({ navigation }) {
         <JobCard
           job={item}
           onPress={() => openDetails(item, 'available')}
-          actionLabel="Send Offer"
+          actionLabel={t('provider.sendOffer')}
           onAction={() => openDetails(item, 'available')}
           actionDisabled={!isApproved}
         />
@@ -91,7 +93,7 @@ export default function JobsScreen({ navigation }) {
         <JobCard
           job={item}
           onPress={() => openDetails(item, 'booking')}
-          actionLabel="Review Booking"
+          actionLabel={t('mobile.reviewBooking')}
           onAction={() => openDetails(item, 'booking')}
         />
       );
@@ -101,32 +103,32 @@ export default function JobsScreen({ navigation }) {
       <JobCard
         job={item}
         onPress={() => openDetails(item, 'assigned')}
-        actionLabel="View Job"
+        actionLabel={t('mobile.viewJob')}
         onAction={() => openDetails(item, 'assigned')}
       />
     );
   };
 
-  if (loading) return <LoadingView message="Loading jobs..." />;
+  if (loading) return <LoadingView message={t('mobile.loadingJobs')} />;
 
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.title}>Jobs</Text>
-        <Text style={styles.welcome}>Hi, {user?.name || 'Provider'}</Text>
+        <Text style={styles.title}>{t('mobile.jobs')}</Text>
+        <Text style={styles.welcome}>
+          {t('provider.welcome', { name: user?.name || t('provider.providerFallback') })}
+        </Text>
       </View>
 
-      <SegmentTabs tabs={tabs} activeKey={activeTab} onChange={setActiveTab} />
+      <SegmentTabs tabs={tabsWithBadge} activeKey={activeTab} onChange={setActiveTab} />
 
       {error ? (
-        <PressableBanner message={error} onRetry={() => loadJobs(false)} />
+        <PressableBanner message={error} onRetry={() => loadJobs(false)} retryLabel={t('mobile.tapToRetry')} />
       ) : null}
 
       {!isApproved && activeTab === 'available' ? (
         <View style={styles.banner}>
-          <Text style={styles.bannerText}>
-            Your profile must be approved before you can send offers.
-          </Text>
+          <Text style={styles.bannerText}>{t('mobile.approvalRequired')}</Text>
         </View>
       ) : null}
 
@@ -142,13 +144,13 @@ export default function JobsScreen({ navigation }) {
         }
         ListEmptyComponent={
           <EmptyState
-            title="No jobs here"
+            title={t('mobile.noJobsTitle')}
             subtitle={
               activeTab === 'my'
-                ? 'Accepted jobs will appear here.'
+                ? t('mobile.noJobsMy')
                 : activeTab === 'available'
-                  ? 'No open service requests right now.'
-                  : 'No pending booking requests.'
+                  ? t('mobile.noJobsAvailable')
+                  : t('mobile.noJobsBookings')
             }
           />
         }
@@ -158,11 +160,11 @@ export default function JobsScreen({ navigation }) {
   );
 }
 
-function PressableBanner({ message, onRetry }) {
+function PressableBanner({ message, onRetry, retryLabel }) {
   return (
     <View style={styles.errorBox}>
       <Text style={styles.errorText}>{message}</Text>
-      <Text style={styles.retry} onPress={onRetry}>Tap to retry</Text>
+      <Text style={styles.retry} onPress={onRetry}>{retryLabel}</Text>
     </View>
   );
 }

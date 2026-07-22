@@ -74,20 +74,32 @@ export const getPaymentBreakdown = (payment) => {
   }
 
   if (settled) {
+    if (payment?.commissionAmount != null && payment?.providerAmount != null) {
+      return {
+        serviceAmount,
+        settlementType: SETTLEMENT_TYPES.FULL_RELEASE,
+        settlementAmount: serviceAmount,
+        commissionRate,
+        commissionAmount: Number(payment.commissionAmount),
+        providerAmount: Number(payment.providerAmount),
+        refundAmount: Number(payment.refundAmount ?? 0),
+      };
+    }
     return {
       serviceAmount,
       settlementType: SETTLEMENT_TYPES.FULL_RELEASE,
       settlementAmount: serviceAmount,
       commissionRate,
-      commissionAmount: Number(payment.commissionAmount ?? 0),
-      providerAmount: Number(payment.providerAmount ?? serviceAmount),
+      commissionAmount: 0,
+      providerAmount: serviceAmount,
       refundAmount: 0,
     };
   }
 
   return calculateSettlement({
     totalAmount: serviceAmount,
-    settlementType: SETTLEMENT_TYPES.FULL_RELEASE,
+    settlementType: payment?.settlementType || SETTLEMENT_TYPES.FULL_RELEASE,
+    settlementAmountInput: payment?.settlementAmount,
     commissionRatePercent: commissionRate,
   });
 };

@@ -8,10 +8,13 @@ import {
   View,
 } from 'react-native';
 import { spacing } from '../constants/theme';
+import i18n from '../i18n';
 
 const LOADING_BACKGROUND = require('../../assets/loading-page.jpg');
 
-export default function LoadingView({ message = 'Loading...' }) {
+export default function LoadingView({ message }) {
+  const displayMessage = message ?? (i18n.isInitialized ? i18n.t('common.loading') : 'Loading...');
+  const tagline = i18n.isInitialized ? i18n.t('mobile.providerTagline') : 'Provider';
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(24)).current;
   const scaleAnim = useRef(new Animated.Value(0.9)).current;
@@ -96,11 +99,11 @@ export default function LoadingView({ message = 'Loading...' }) {
           <Animated.Text style={[styles.brand, { opacity: glowAnim }]}>
             HireRight
           </Animated.Text>
-          <Text style={styles.tagline}>Provider</Text>
+          <Text style={styles.tagline}>{tagline}</Text>
         </Animated.View>
 
         <ActivityIndicator size="large" color="#ffffff" style={styles.spinner} />
-        {message ? <Text style={styles.message}>{message}</Text> : null}
+        {displayMessage ? <Text style={styles.message}>{displayMessage}</Text> : null}
       </View>
     </ImageBackground>
   );

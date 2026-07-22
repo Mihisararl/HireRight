@@ -1,11 +1,7 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import PublicScreenLayout from '../../components/PublicScreenLayout';
-import {
-  HOW_IT_WORKS_CUSTOMERS,
-  HOW_IT_WORKS_WORKERS,
-  WHY_CHOOSE,
-} from '../../constants/publicContent';
 import { colors, spacing } from '../../constants/theme';
 
 function StepSection({ title, subtitle, items }) {
@@ -32,30 +28,43 @@ function StepSection({ title, subtitle, items }) {
 }
 
 export default function HowItWorksScreen({ navigation }) {
+  const { t } = useTranslation();
+
+  const howItWorksCustomers = useMemo(
+    () => t('mobile.publicContent.hiwCustomers', { returnObjects: true }) || [],
+    [t]
+  );
+  const howItWorksWorkers = useMemo(
+    () => t('mobile.publicContent.hiwWorkers', { returnObjects: true }) || [],
+    [t]
+  );
+  const whyChoose = useMemo(
+    () => t('mobile.publicContent.whyChoose', { returnObjects: true }) || [],
+    [t]
+  );
+
   return (
     <PublicScreenLayout navigation={navigation} activeRoute="HowItWorks">
       <View style={styles.hero}>
-        <Text style={styles.heroTitle}>How HireRight Works</Text>
-        <Text style={styles.heroSubtitle}>
-          Simple, secure, and efficient. Connect with professionals or find work in a few steps.
-        </Text>
+        <Text style={styles.heroTitle}>{t('mobile.howItWorksHeroTitle')}</Text>
+        <Text style={styles.heroSubtitle}>{t('mobile.howItWorksHeroSubtitle')}</Text>
       </View>
 
       <StepSection
-        title="For Customers"
-        subtitle="Getting help is simple. Follow these three easy steps."
-        items={HOW_IT_WORKS_CUSTOMERS}
+        title={t('mobile.forCustomers')}
+        subtitle={t('mobile.forCustomersSubtitle')}
+        items={howItWorksCustomers}
       />
 
       <StepSection
-        title="For Workers"
-        subtitle="Turn your skills into income on your own schedule."
-        items={HOW_IT_WORKS_WORKERS}
+        title={t('mobile.forWorkers')}
+        subtitle={t('mobile.forWorkersSubtitle')}
+        items={howItWorksWorkers}
       />
 
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Why Choose HireRight?</Text>
-        {WHY_CHOOSE.map((item) => (
+        <Text style={styles.sectionTitle}>{t('mobile.whyChooseTitle')}</Text>
+        {whyChoose.map((item) => (
           <View key={item.title} style={styles.featureCard}>
             <Text style={styles.featureTitle}>{item.title}</Text>
             <Text style={styles.featureDesc}>{item.description}</Text>
@@ -64,19 +73,19 @@ export default function HowItWorksScreen({ navigation }) {
       </View>
 
       <View style={styles.cta}>
-        <Text style={styles.ctaTitle}>Ready to get started?</Text>
+        <Text style={styles.ctaTitle}>{t('mobile.readyToGetStarted')}</Text>
         <View style={styles.ctaRow}>
           <Pressable
             style={styles.primaryBtn}
             onPress={() => navigation.navigate('Services')}
           >
-            <Text style={styles.primaryBtnText}>Browse Services</Text>
+            <Text style={styles.primaryBtnText}>{t('mobile.browseServicesBtn')}</Text>
           </Pressable>
           <Pressable
             style={styles.secondaryBtn}
             onPress={() => navigation.navigate('BecomeWorker')}
           >
-            <Text style={styles.secondaryBtnText}>Become a Worker</Text>
+            <Text style={styles.secondaryBtnText}>{t('home.nav.becomeWorker')}</Text>
           </Pressable>
         </View>
       </View>

@@ -102,6 +102,8 @@ export const updateProfile = async (req, res) => {
       return res.status(404).json({ message: 'User not found' });
     }
 
+    const rateFieldsProvided = [rateType, hourlyRate, dailyRate].some((value) => value !== undefined);
+
     if (email && email !== user.email) {
       const existing = await User.findOne({ email });
       if (existing) {
@@ -130,7 +132,6 @@ export const updateProfile = async (req, res) => {
       if (serviceCategory !== undefined) user.serviceCategory = serviceCategory;
       if (yearsOfExperience !== undefined) user.yearsOfExperience = Number(yearsOfExperience) || 0;
 
-      const rateFieldsProvided = [rateType, hourlyRate, dailyRate].some((value) => value !== undefined);
       if (rateFieldsProvided) {
         const resolvedRate = resolveRateFields({ rateType, hourlyRate, dailyRate });
         if (resolvedRate.error) {

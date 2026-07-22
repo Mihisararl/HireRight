@@ -15,7 +15,9 @@ import { useFocusEffect } from '@react-navigation/native';
 import { getErrorMessage } from '../api/client';
 import { updateProfile } from '../api/auth';
 import { getMyAvailability, updateAvailability } from '../api/provider';
+import { useTranslation } from 'react-i18next';
 import LoadingView from '../components/LoadingView';
+import LanguageSwitcher from '../components/LanguageSwitcher';
 import { useAuth } from '../context/AuthContext';
 import { colors, spacing } from '../constants/theme';
 
@@ -103,6 +105,7 @@ function userToForm(user) {
 }
 
 export default function ProfileScreen() {
+  const { t } = useTranslation();
   const { user, logout, refreshUser } = useAuth();
   const [loading, setLoading] = useState(false);
   const [available, setAvailable] = useState(true);
@@ -123,11 +126,11 @@ export default function ProfileScreen() {
       setAvailable(Boolean(data.isAvailableToday));
       setBookedDates(data.bookedDates || []);
     } catch (err) {
-      Alert.alert('Error', getErrorMessage(err, 'Failed to load availability'));
+      Alert.alert(t('mobile.error'), getErrorMessage(err, t('mobile.failedLoadAvailability')));
     } finally {
       setLoading(false);
     }
-  }, [user?.providerStatus]);
+  }, [user?.providerStatus, t]);
 
   useFocusEffect(
     useCallback(() => {
@@ -147,7 +150,7 @@ export default function ProfileScreen() {
       setAvailable(Boolean(data.isAvailableToday));
       setBookedDates(data.bookedDates || []);
     } catch (err) {
-      Alert.alert('Error', getErrorMessage(err, 'Failed to update availability'));
+      Alert.alert(t('mobile.error'), getErrorMessage(err, t('provider.alerts.failedUpdateAvailability')));
     } finally {
       setSavingAvailability(false);
     }
@@ -155,7 +158,7 @@ export default function ProfileScreen() {
 
   const handleSaveProfile = async () => {
     if (!form.name.trim() || !form.email.trim() || !form.phone.trim()) {
-      Alert.alert('Validation', 'Name, email, and phone are required.');
+      Alert.alert(t('mobile.validation'), t('mobile.nameEmailPhoneRequired'));
       return;
     }
 
@@ -181,18 +184,18 @@ export default function ProfileScreen() {
         branch: form.branch.trim(),
       });
       await refreshUser();
-      Alert.alert('Saved', 'Profile updated successfully.');
+      Alert.alert(t('common.saveChanges'), t('mobile.profileSaved'));
     } catch (err) {
-      Alert.alert('Error', getErrorMessage(err, 'Failed to update profile'));
+      Alert.alert(t('mobile.error'), getErrorMessage(err, t('auth.completeProfileFailed')));
     } finally {
       setSavingProfile(false);
     }
   };
 
   const handleLogout = () => {
-    Alert.alert('Logout', 'Sign out of HireRight Provider?', [
-      { text: 'Cancel', style: 'cancel' },
-      { text: 'Logout', style: 'destructive', onPress: logout },
+    Alert.alert(t('mobile.logoutTitle'), t('mobile.logoutMessage'), [
+      { text: t('common.cancel'), style: 'cancel' },
+      { text: t('logout'), style: 'destructive', onPress: logout },
     ]);
   };
 
@@ -201,13 +204,13 @@ export default function ProfileScreen() {
   const isRejected = user?.providerStatus === 'rejected';
 
   const statusMessage = isRejected
-    ? 'Your registration was rejected. Update your details and complete registration on the web app if needed.'
+    ? t('provider.registrationRejected')
     : hasSubmittedWorkerProfile
-      ? 'Your profile is under admin review. You will be able to send offers after approval.'
-      : 'Create your worker profile on the web app to become a worker on HireRight.';
+      ? t('provider.registrationPending')
+      : t('provider.registrationIncomplete');
 
   if (loading && isApproved) {
-    return <LoadingView message="Loading profile..." />;
+    return <LoadingView message={t('mobile.loadingProfile')} />;
   }
 
   return (
@@ -220,12 +223,17 @@ export default function ProfileScreen() {
         contentContainerStyle={styles.content}
         keyboardShouldPersistTaps="handled"
       >
+        <View style={styles.langRow}>
+          <Text style={styles.langLabel}>{t('language')}</Text>
+          <LanguageSwitcher />
+        </View>
+
         <View style={styles.card}>
           <Text style={styles.name}>{user?.name}</Text>
           <Text style={styles.meta}>{user?.email}</Text>
           <View style={styles.badgeRow}>
-            <Text style={styles.badge}>Role: {user?.role}</Text>
-            <Text style={styles.badge}>Status: {user?.providerStatus || 'pending'}</Text>
+            <Text style={styles.badge}>{t('mobile.roleBadge', { role: user?.role })}</Text>
+            <Text style={styles.badge}>{t('mobile.statusBadge', { status: user?.providerStatus || 'pending' })}</Text>
           </View>
         </View>
 
@@ -233,9 +241,9 @@ export default function ProfileScreen() {
           <View style={styles.card}>
             <View style={styles.switchRow}>
               <View style={{ flex: 1 }}>
-                <Text style={styles.sectionTitle}>Available today</Text>
+                <Text style={styles.sectionTitle}>{t('mobile.availableToday')}</Text>
                 <Text style={styles.hint}>
-                  {available ? 'Customers can book you today' : 'Marked unavailable for today'}
+                  {available ? t('mobile.availableTodayHint') : t('mobile.unavailableTodayHint')}
                 </Text>
               </View>
               <Switch
@@ -245,7 +253,7 @@ export default function ProfileScreen() {
               />
             </View>
             {bookedDates.length > 0 ? (
-              <Text style={styles.booked}>Booked dates: {bookedDates.join(', ')}</Text>
+              <Text style={styles.booked}>{t('mobile.bookedDates', { dates: bookedDates.join(', ') })}</Text>
             ) : null}
           </View>
         ) : (
@@ -257,37 +265,37 @@ export default function ProfileScreen() {
         )}
 
         <View style={styles.card}>
-          <Text style={styles.sectionTitle}>Profile settings</Text>
-          <Text style={styles.hint}>Update your contact and professional details.</Text>
+          <Text style={styles.sectionTitle}>{t('mobile.profileSettings')}</Text>
+          <Text style={styles.hint}>{t('mobile.profileSettingsHint')}</Text>
 
-          <Field label="Full name" value={form.name} onChangeText={(v) => updateField('name', v)} />
+          <Field label={t('auth.fullName')} value={form.name} onChangeText={(v) => updateField('name', v)} />
           <Field
-            label="Email"
+            label={t('common.email')}
             value={form.email}
             onChangeText={(v) => updateField('email', v)}
             autoCapitalize="none"
             keyboardType="email-address"
           />
           <Field
-            label="Phone"
+            label={t('common.phone')}
             value={form.phone}
             onChangeText={(v) => updateField('phone', v)}
             keyboardType="phone-pad"
           />
-          <Field label="City" value={form.city} onChangeText={(v) => updateField('city', v)} />
+          <Field label={t('provider.settingsPage.city')} value={form.city} onChangeText={(v) => updateField('city', v)} />
           <Field
-            label="District"
+            label={t('provider.settingsPage.district')}
             value={form.district}
             onChangeText={(v) => updateField('district', v)}
             placeholder={SRI_LANKAN_DISTRICTS.slice(0, 3).join(', ') + '...'}
           />
           <Field
-            label="Postal code"
+            label={t('provider.settingsPage.postalCode')}
             value={form.postalCode}
             onChangeText={(v) => updateField('postalCode', v)}
           />
           <Field
-            label="Address"
+            label={t('provider.settingsPage.streetAddress')}
             value={form.address}
             onChangeText={(v) => updateField('address', v)}
             multiline
@@ -295,28 +303,28 @@ export default function ProfileScreen() {
         </View>
 
         <View style={styles.card}>
-          <Text style={styles.sectionTitle}>Professional info</Text>
+          <Text style={styles.sectionTitle}>{t('mobile.professionalInfo')}</Text>
           <Field
-            label="Service category"
+            label={t('provider.settingsPage.serviceCategory')}
             value={form.serviceCategory}
             onChangeText={(v) => updateField('serviceCategory', v)}
             placeholder={SERVICE_CATEGORIES.join(', ')}
           />
           <Field
-            label="Years of experience"
+            label={t('provider.settingsPage.yearsOfExperience')}
             value={form.yearsOfExperience}
             onChangeText={(v) => updateField('yearsOfExperience', v)}
             keyboardType="numeric"
           />
 
-          <Text style={styles.label}>Charge type</Text>
+          <Text style={styles.label}>{t('mobile.chargeType')}</Text>
           <View style={styles.rateTypeRow}>
             <Pressable
               style={[styles.rateTypeBtn, form.rateType === 'hourly' && styles.rateTypeBtnActive]}
               onPress={() => updateField('rateType', 'hourly')}
             >
               <Text style={[styles.rateTypeText, form.rateType === 'hourly' && styles.rateTypeTextActive]}>
-                Hourly rate
+                {t('mobile.hourlyRateLabel')}
               </Text>
             </Pressable>
             <Pressable
@@ -324,20 +332,20 @@ export default function ProfileScreen() {
               onPress={() => updateField('rateType', 'daily')}
             >
               <Text style={[styles.rateTypeText, form.rateType === 'daily' && styles.rateTypeTextActive]}>
-                Daily charge
+                {t('mobile.dailyChargeLabel')}
               </Text>
             </Pressable>
           </View>
 
           <Field
-            label={form.rateType === 'daily' ? 'Daily charge (Rs.)' : 'Hourly rate (Rs.)'}
+            label={form.rateType === 'daily' ? t('provider.settingsPage.dailyRate') : t('provider.settingsPage.hourlyRate')}
             value={form.rateAmount}
             onChangeText={(v) => updateField('rateAmount', v)}
             keyboardType="numeric"
             placeholder={form.rateType === 'daily' ? '8000' : '1200'}
           />
           <Field
-            label="Professional bio"
+            label={t('provider.settingsPage.professionalBio')}
             value={form.professionalBio}
             onChangeText={(v) => updateField('professionalBio', v)}
             multiline
@@ -346,25 +354,25 @@ export default function ProfileScreen() {
         </View>
 
         <View style={styles.card}>
-          <Text style={styles.sectionTitle}>Bank details</Text>
+          <Text style={styles.sectionTitle}>{t('mobile.bankDetails')}</Text>
           <Field
-            label="Bank name"
+            label={t('provider.settingsPage.bankName')}
             value={form.bankName}
             onChangeText={(v) => updateField('bankName', v)}
           />
           <Field
-            label="Account number"
+            label={t('provider.settingsPage.accountNumber')}
             value={form.accountNumber}
             onChangeText={(v) => updateField('accountNumber', v)}
             keyboardType="numeric"
           />
           <Field
-            label="Account holder name"
+            label={t('provider.settingsPage.accountHolderName')}
             value={form.accountHolderName}
             onChangeText={(v) => updateField('accountHolderName', v)}
           />
           <Field
-            label="Branch"
+            label={t('provider.settingsPage.branch')}
             value={form.branch}
             onChangeText={(v) => updateField('branch', v)}
           />
@@ -376,12 +384,12 @@ export default function ProfileScreen() {
           disabled={savingProfile}
         >
           <Text style={styles.saveBtnText}>
-            {savingProfile ? 'Saving...' : 'Save profile'}
+            {savingProfile ? t('common.saving') : t('mobile.saveProfile')}
           </Text>
         </Pressable>
 
         <Pressable style={styles.logoutBtn} onPress={handleLogout}>
-          <Text style={styles.logoutText}>Logout</Text>
+          <Text style={styles.logoutText}>{t('logout')}</Text>
         </Pressable>
       </ScrollView>
     </KeyboardAvoidingView>
@@ -400,6 +408,22 @@ const styles = StyleSheet.create({
   content: {
     padding: spacing.md,
     paddingBottom: spacing.xl,
+  },
+  langRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: spacing.md,
+    backgroundColor: colors.card,
+    borderRadius: 12,
+    padding: spacing.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  langLabel: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: colors.text,
   },
   card: {
     backgroundColor: colors.card,

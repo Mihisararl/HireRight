@@ -1,6 +1,7 @@
 import React, { useCallback, useState } from 'react';
 import { FlatList, RefreshControl, StyleSheet, Text, View } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
+import { useTranslation } from 'react-i18next';
 import { getErrorMessage } from '../api/client';
 import { getProviderReviews } from '../api/review';
 import EmptyState from '../components/EmptyState';
@@ -8,6 +9,7 @@ import LoadingView from '../components/LoadingView';
 import { colors, spacing } from '../constants/theme';
 
 export default function ReviewsScreen() {
+  const { t } = useTranslation();
   const [reviews, setReviews] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -20,12 +22,12 @@ export default function ReviewsScreen() {
       const data = await getProviderReviews();
       setReviews(data || []);
     } catch (err) {
-      setError(getErrorMessage(err, 'Failed to load reviews'));
+      setError(getErrorMessage(err, t('mobile.failedLoadReviews')));
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
-  }, []);
+  }, [t]);
 
   useFocusEffect(
     useCallback(() => {
@@ -37,14 +39,14 @@ export default function ReviewsScreen() {
     ? (reviews.reduce((sum, r) => sum + (r.rating || 0), 0) / reviews.length).toFixed(2)
     : '0.00';
 
-  if (loading) return <LoadingView message="Loading reviews..." />;
+  if (loading) return <LoadingView message={t('mobile.loadingReviews')} />;
 
   return (
     <View style={styles.container}>
       <View style={styles.summary}>
-        <Text style={styles.summaryLabel}>Average rating</Text>
+        <Text style={styles.summaryLabel}>{t('provider.reviewsTitle')}</Text>
         <Text style={styles.summaryValue}>{average} / 5</Text>
-        <Text style={styles.summaryMeta}>{reviews.length} review(s)</Text>
+        <Text style={styles.summaryMeta}>{t('mobile.reviewCount', { count: reviews.length })}</Text>
       </View>
 
       {error ? <Text style={styles.error}>{error}</Text> : null}
@@ -61,17 +63,17 @@ export default function ReviewsScreen() {
         renderItem={({ item }) => (
           <View style={styles.card}>
             <View style={styles.cardHeader}>
-              <Text style={styles.name}>{item.userId?.name || 'Customer'}</Text>
+              <Text style={styles.name}>{item.userId?.name || t('mobile.customerLabel')}</Text>
               <Text style={styles.rating}>{item.rating} ★</Text>
             </View>
             <Text style={styles.date}>
               {item.createdAt ? new Date(item.createdAt).toLocaleDateString() : ''}
             </Text>
-            <Text style={styles.comment}>{item.comment || 'No comment provided.'}</Text>
+            <Text style={styles.comment}>{item.comment || t('provider.noComment')}</Text>
           </View>
         )}
         ListEmptyComponent={
-          <EmptyState title="No reviews yet" subtitle="Customer reviews will appear here." />
+          <EmptyState title={t('mobile.noReviewsTitle')} subtitle={t('mobile.noReviewsSubtitle')} />
         }
         contentContainerStyle={reviews.length === 0 ? styles.empty : undefined}
       />

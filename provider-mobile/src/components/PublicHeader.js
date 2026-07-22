@@ -1,12 +1,20 @@
 import React from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { useTranslation } from 'react-i18next';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import LanguageSwitcher from './LanguageSwitcher';
+import { ROUTE_LABEL_KEYS } from '../constants/publicNav';
 import { usePublicNav } from '../context/PublicNavContext';
 import { colors, spacing } from '../constants/theme';
 
 export default function PublicHeader({ navigation, activeRoute }) {
+  const { t } = useTranslation();
   const insets = useSafeAreaInsets();
   const { openSidebar } = usePublicNav();
+
+  const routeLabel = activeRoute && activeRoute !== 'Login'
+    ? t(ROUTE_LABEL_KEYS[activeRoute] || activeRoute)
+    : null;
 
   return (
     <View style={[styles.header, { paddingTop: insets.top + spacing.sm }]}>
@@ -16,27 +24,15 @@ export default function PublicHeader({ navigation, activeRoute }) {
 
       <Pressable style={styles.brandWrap} onPress={() => navigation.navigate('Home')}>
         <Text style={styles.brand}>HireRight</Text>
-        {activeRoute && activeRoute !== 'Login' ? (
-          <Text style={styles.routeHint}>{formatRouteLabel(activeRoute)}</Text>
-        ) : null}
+        {routeLabel ? <Text style={styles.routeHint}>{routeLabel}</Text> : null}
       </Pressable>
 
+      <LanguageSwitcher compact />
       <Pressable style={styles.loginBtn} onPress={() => navigation.navigate('Login')}>
-        <Text style={styles.loginText}>Login</Text>
+        <Text style={styles.loginText}>{t('home.nav.login')}</Text>
       </Pressable>
     </View>
   );
-}
-
-function formatRouteLabel(routeName) {
-  const labels = {
-    Home: 'Home',
-    Services: 'Services',
-    HowItWorks: 'How It Works',
-    BecomeWorker: 'Become a Worker',
-    Login: 'Login',
-  };
-  return labels[routeName] || routeName;
 }
 
 const styles = StyleSheet.create({
@@ -79,13 +75,13 @@ const styles = StyleSheet.create({
   },
   loginBtn: {
     backgroundColor: colors.primary,
-    paddingHorizontal: 16,
+    paddingHorizontal: 12,
     paddingVertical: 8,
     borderRadius: 20,
   },
   loginText: {
     color: '#fff',
     fontWeight: '700',
-    fontSize: 14,
+    fontSize: 13,
   },
 });
