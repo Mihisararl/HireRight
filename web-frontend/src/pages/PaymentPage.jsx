@@ -3,6 +3,7 @@ import { ArrowLeft, CreditCard, Lock } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { AuthContext } from '../context/AuthContext';
 import { getPayhereHash, confirmPayment } from '../api/payment';
+import { BACKEND_BASE_URL } from '../utils/config';
 import { formatLocationDisplay } from '../utils/locationHelpers';
 
 const PaymentPage = () => {
@@ -123,13 +124,12 @@ const PaymentPage = () => {
                 currency
             });
 
-            const apiBaseUrl = process.env.REACT_APP_API_URL || 'http://localhost:5000';
             const payment = {
                 sandbox: true,
                 merchant_id,
                 return_url: `${window.location.origin}/customer-dashboard`,
                 cancel_url: `${window.location.origin}/customer-dashboard`,
-                notify_url: notify_url || `${apiBaseUrl}/api/payment/notify`,
+                notify_url: notify_url || `${BACKEND_BASE_URL}/api/payment/notify`,
                 order_id: orderId,
                 items: booking.service,
                 amount: amountValue.toFixed(2),
